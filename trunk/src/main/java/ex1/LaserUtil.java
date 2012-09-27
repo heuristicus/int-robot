@@ -118,7 +118,7 @@ public class LaserUtil extends AbstractNodeMain {
             if (current == 0) {
                 current = replaceZeroWith;
             } else if (current < ignoreThreshold){
-                System.out.println("VALUE BELOW THRESHOLD --- IGNORING: "+current);
+                System.out.println("VALUE BELOW THRESHOLD --- IGNORING: " + current);
                 continue;
             }
             if (current < min) {
