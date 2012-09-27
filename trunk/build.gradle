@@ -1,0 +1,28 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+// The Maven plugin is only required if your package is used as a library.
+apply plugin: 'maven'
+
+// The Application plugin and mainClassName attribute are only required if
+// your package is used as a binary.
+apply plugin: 'application'
+mainClassName = 'org.ros.RosRun'
+
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+
+repositories {
+  mavenLocal()
+  maven {
+    url 'https://maven-us.nuxeo.org/nexus/content/groups/public'
+  }
+}
+
+version = '0.0.0-SNAPSHOT'
+group = 'socs.robotics'
+
+dependencies {
+  compile 'ros.rosjava_core:rosjava:0.0.0-SNAPSHOT'
+}
+

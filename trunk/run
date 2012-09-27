@@ -1,0 +1,12 @@
+BASE_LOC=/data/private/robot/workspace/robotics/build/install/robotics/bin/robotics
+
+if [ -n "$1" ]
+then
+        echo "Running $1..."
+        sleep 2
+else
+        echo "No argument provided. Exiting."
+        exit
+fi
+
+bash $BASE_LOC $1

@@ -1,0 +1,20 @@
+<package>
+  <description brief="robotics">
+
+     robotics
+
+  </description>
+  <author>Robot User</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/robotics</url>
+  <depend package="rosjava"/>
+  <depend package="std_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="nav_msgs"/>
+  <depend package="tf"/>
+
+</package>
+
+
