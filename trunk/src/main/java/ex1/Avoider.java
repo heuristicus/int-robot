@@ -1,14 +1,14 @@
 package ex1;
 
 import geometry_msgs.Twist;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+
 import sensor_msgs.LaserScan;
 
 public class Avoider extends AbstractNodeMain {

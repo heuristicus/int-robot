@@ -9,6 +9,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import sensor_msgs.LaserScan;
+import util.LaserUtil;
 
 public class Avoider2 extends AbstractNodeMain {
 

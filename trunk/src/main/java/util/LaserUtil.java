@@ -1,4 +1,4 @@
-package ex1;
+package util;
 
 import java.util.Arrays;
 import org.ros.message.MessageListener;
@@ -98,7 +98,7 @@ public class LaserUtil extends AbstractNodeMain {
         int len = sector.length;
         int mid = len / 2;
         if (len % 2 == 0) {
-    // If even, get middle two values and return their average.
+        	// If even, get middle two values and return their average.
             return (sector[mid] + sector[mid - 1]) / 2;
         } else {
             // just return the median value
@@ -107,7 +107,7 @@ public class LaserUtil extends AbstractNodeMain {
 
     }
 
-    public static float[] getAllSectorMedians(float[][] sectors){
+    public static float[] medianOfEachSector(float[][] sectors){
         float[] medians = new float[sectors.length];
         for (int i = 0; i < sectors.length; i++) {
             medians[i] = _getSectorMedian(sectors[i]);
