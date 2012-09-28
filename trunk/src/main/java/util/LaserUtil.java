@@ -133,9 +133,10 @@ public class LaserUtil extends AbstractNodeMain {
         return averages;
     }
 
-    public static float minReading(float[] readings, float replaceZeroWith, float ignoreThreshold) {
+    public static int minReadingPos(float[] readings, float replaceZeroWith, float ignoreThreshold) {
         if (readings.length < 1) throw new IllegalArgumentException("Gimme args, yo");
         float min = Float.MAX_VALUE;
+        int minPos = 0; // Position of the minimum found so far
         float current;
 
         for (int i = 0; i < readings.length; i++) {
@@ -148,13 +149,14 @@ public class LaserUtil extends AbstractNodeMain {
             }
             if (current < min) {
                 min = current;
+                minPos = i;
             }
         }
         if (min == Float.MAX_VALUE) {
             System.out.println("OH SHIT SOMETHING'S GONE WRONG APC!");
         }
 
-        return min;
+        return minPos;
     }
 
     @Override

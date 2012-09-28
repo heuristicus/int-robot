@@ -11,7 +11,7 @@ import org.ros.node.topic.Subscriber;
 import sensor_msgs.LaserScan;
 import util.LaserUtil;
 
-public class Avoider2 extends AbstractNodeMain {
+public class Avoider3 extends AbstractNodeMain {
 
     public static final String DASHES = "---------------------------------";//Debugging
 
@@ -25,6 +25,15 @@ public class Avoider2 extends AbstractNodeMain {
 
     private Publisher<Twist> pub;
     private Subscriber<LaserScan> laser;
+
+    // Direction of obstacle (so rotate in opposite direction)
+    private ObstacleDirection obstacleDirection = ObstacleDirection.UNSET;
+
+    public enum ObstacleDirection {
+        UNSET,
+        RIGHT,
+        LEFT;
+    }
 
     @Override
     public GraphName getDefaultNodeName() {
@@ -59,15 +68,36 @@ public class Avoider2 extends AbstractNodeMain {
                 System.out.println("MinMedian: " + minMedian);
                 if (minMedian > SAFE_DISTANCE + MAX_SPEED) {
                     System.out.println("Safe distance: minMedian exceeds " + SAFE_DISTANCE + MAX_SPEED);
+                    obstacleDirection = ObstacleDirection.UNSET;
                     moveForward(MAX_SPEED);
                 } else {
                     System.out.println("UNSAFE: minMedian is less than " + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + DEFAULT_ROTATION);
 
-                    //moveForward(avg - SAFE_DISTANCE);
-                    rotate(DEFAULT_ROTATION);
+                    if (obstacleDirection == ObstacleDirection.UNSET) {
+                        // Which direction is the closest obstacle in?
+                        // We +1 because minMedianPos returns 0-based array index
+                        obstacleDirection = getDirectionOfObstacle(SECTORS_CHECKED, minMedianPos+1);
+                    }
+
+                    rotate(obstacleDirection, DEFAULT_ROTATION);
                 }
             }
         });
+    }
+
+    public ObstacleDirection getDirectionOfObstacle(int numOfSectors, int sector) {
+        // If we have the middle sector of an odd number of sectors,
+        // the object is dead ahead. So compute a random direction. Lol.
+        if (numOfSectors % 2 == 1 &&
+                (sector == (numOfSectors/2) + 1)) {
+            return Math.random() < 0.5 ? ObstacleDirection.LEFT : ObstacleDirection.RIGHT;
+        }
+
+        if (sector > (numOfSectors/2)) {
+            return ObstacleDirection.RIGHT;
+        } else {
+            return ObstacleDirection.LEFT;
+        }
     }
 
     public boolean moveForward(double distance) {
@@ -84,10 +114,19 @@ public class Avoider2 extends AbstractNodeMain {
         return true;
     }
 
-    /** Rotate this angle in radians, clockwise. */
+    /** Turns clockwise in the given number of radians.
+     * Positive goes clockwise. */
     public void rotate(double theta) {
         Twist twist = pub.newMessage();
         twist.getAngular().setZ(-theta);
         pub.publish(twist);
+    }
+
+    /** Rotates in the opposite direction to the nearest obstacle */
+    public void rotate(ObstacleDirection obstacleDir, double theta) {
+        // If obstacle is on the right, we turn anti-clockwise.
+        // All other cases turn clockwise (including UNSET)
+        theta = obstacleDir == ObstacleDirection.RIGHT ? -theta : theta;
+        rotate(theta);
     }
 }
