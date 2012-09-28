@@ -91,6 +91,31 @@ public class LaserUtil extends AbstractNodeMain {
         return _getSectors(numOfSectors, 8, laser);
     }
 
+
+    /* gets the median of the specified sector. Use the get */
+    private static float _getSectorMedian(float[] sector) {
+        Arrays.sort(sector);
+        int len = sector.length;
+        int mid = len / 2;
+        if (len % 2 == 0) {
+    // If even, get middle two values and return their average.
+            return (sector[mid] + sector[mid - 1]) / 2;
+        } else {
+            // just return the median value
+            return sector[mid];
+        }
+
+    }
+
+    public static float[] getAllSectorMedians(float[][] sectors){
+        float[] medians = new float[sectors.length];
+        for (int i = 0; i < sectors.length; i++) {
+            medians[i] = _getSectorMedian(sectors[i]);
+        }
+        return medians;
+    }
+
+
     public static float[] averageOfEachSector(float[][] readings)
             throws IllegalStateException {
         float[] averages = new float[readings.length];
