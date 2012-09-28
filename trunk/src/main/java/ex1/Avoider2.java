@@ -44,7 +44,7 @@ public class Avoider2 extends AbstractNodeMain {
                 System.out.println(scan.getRanges().length);
 
                 float[][] readings = LaserUtil.getSectors(SECTORS_CHECKED, scan);
-                float[] avgs = LaserUtil.averageOfEachSector(readings);
+                float[] avgs = LaserUtil.medianOfEachSector(readings);
                 float minAvg = LaserUtil.minReading(avgs, DEFAULT_REPLACEMENT_FOR_ZERO, IGNORE_THRESHOLD);
 
                 System.out.println("Averages: ");
