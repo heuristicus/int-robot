@@ -56,8 +56,10 @@ public class Avoider3 extends AbstractNodeMain {
 
                 float[][] readings = LaserUtil.getSectors(SECTORS_CHECKED, scan);
                 float[] medians = LaserUtil.medianOfEachSector(readings);
-                int minMedianPos = LaserUtil.minReadingPos(medians, DEFAULT_REPLACEMENT_FOR_ZERO, IGNORE_THRESHOLD);
-                float minMedian = medians[minMedianPos];
+                int minMedianPos = LaserUtil.minReadingPos(medians, IGNORE_THRESHOLD);
+                // minMedianPos returns -1 if all sectors are trash or zero.
+                float minMedian;
+                minMedian = minMedianPos == -1 ? -1 : medians[minMedianPos];
 
                 System.out.println("Medians: ");
                 for (int i= 0; i < medians.length; i++) {
@@ -66,19 +68,27 @@ public class Avoider3 extends AbstractNodeMain {
                 System.out.println("");
 
                 System.out.println("MinMedian: " + minMedian);
-                if (minMedian > SAFE_DISTANCE + MAX_SPEED) {
-                    System.out.println("Safe distance: minMedian exceeds " + SAFE_DISTANCE + MAX_SPEED);
+                // if the minimum median value is a safe distance away
+                // or the method returning the median point returned an error value, move forwards.
+                // the error value indicates that the values in the median array were trash values
+                // or zero values, which indicate that the path ahead is likely to be clear.
+                // any normal return value from the method indicates that there is something to be seen.
+                if (minMedian > SAFE_DISTANCE + MAX_SPEED || minMedian == -1) {
+                    System.out.println("SAFE: minMedian is " + minMedian + ", allowable distance: " + (SAFE_DISTANCE + MAX_SPEED));
                     obstacleDirection = ObstacleDirection.UNSET;
                     moveForward(MAX_SPEED);
                 } else {
-                    System.out.println("UNSAFE: minMedian is less than " + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + DEFAULT_ROTATION);
+                    System.out.println("UNSAFE: minMedian is less than "
+                            + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + DEFAULT_ROTATION);
 
                     if (obstacleDirection == ObstacleDirection.UNSET) {
                         // Which direction is the closest obstacle in?
                         // We +1 because minMedianPos returns 0-based array index
                         obstacleDirection = getDirectionOfObstacle(SECTORS_CHECKED, minMedianPos+1);
+                        System.out.println("Obstacle detected in " + obstacleDirection 
+                                + " direction. Will turn in opposite direction until clear.");
                     }
-
+                    System.out.println("Continuing turn in " + obstacleDirection);
                     rotate(obstacleDirection, DEFAULT_ROTATION);
                 }
             }
@@ -118,7 +128,7 @@ public class Avoider3 extends AbstractNodeMain {
      * Positive goes clockwise. */
     public void rotate(double theta) {
         Twist twist = pub.newMessage();
-        twist.getAngular().setZ(-theta);
+        twist.getAngular().setZ(theta); // Don't think this needs to be minus (at least, it rotates the wrong way when using the other method)
         pub.publish(twist);
     }
 

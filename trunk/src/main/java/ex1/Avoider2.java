@@ -47,7 +47,7 @@ public class Avoider2 extends AbstractNodeMain {
 
                 float[][] readings = LaserUtil.getSectors(SECTORS_CHECKED, scan);
                 float[] medians = LaserUtil.medianOfEachSector(readings);
-                int minMedianPos = LaserUtil.minReadingPos(medians, DEFAULT_REPLACEMENT_FOR_ZERO, IGNORE_THRESHOLD);
+                int minMedianPos = LaserUtil.minReadingPos(medians, IGNORE_THRESHOLD);
                 float minMedian = medians[minMedianPos];
 
                 System.out.println("Medians: ");

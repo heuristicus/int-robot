@@ -133,29 +133,41 @@ public class LaserUtil extends AbstractNodeMain {
         return averages;
     }
 
-    public static int minReadingPos(float[] readings, float replaceZeroWith, float ignoreThreshold) {
+    public static int minReadingPos(float[] readings, float ignoreThreshold) {
         if (readings.length < 1) throw new IllegalArgumentException("Gimme args, yo");
         float min = Float.MAX_VALUE;
-        int minPos = 0; // Position of the minimum found so far
+        int minPos = 0, failCount = 0; // Position of the minimum found so far
         float current;
+
+        
+
+
+        int failThreshold = readings.length; // CHANGE THIS TO A CONSTANT SOMEWHERE
+
+
+
+
 
         for (int i = 0; i < readings.length; i++) {
             current = readings[i];
             if (current == 0) {
-                current = replaceZeroWith;
+                failCount++;
             } else if (current < ignoreThreshold){
-                System.out.println("VALUE BELOW THRESHOLD --- IGNORING: " + current);
+                System.out.println("VALUE BELOW THRESHOLD --- IGNORING sector " + i + " with value " + current);
+                failCount++;
                 continue;
-            }
-            if (current < min) {
+            } else if (current < min) {
                 min = current;
                 minPos = i;
             }
         }
-        if (min == Float.MAX_VALUE) {
-            System.out.println("OH SHIT SOMETHING'S GONE WRONG APC!");
+        if (min == Float.MAX_VALUE && failCount != failThreshold) {
+            System.out.println("SOMETHING WENT HORRIBLY WRONG");
+        } else if (failCount >= failThreshold){
+            System.out.println("FAIL THRESHOLD EXCEEDED");
+            return -1;
         }
-
+        System.out.println("FAIL COUNT: " + failCount + ", FAIL THRESHOLD: " + failThreshold);
         return minPos;
     }
 
