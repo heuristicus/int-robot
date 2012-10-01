@@ -93,6 +93,16 @@ public class LaserUtil extends AbstractNodeMain {
         return sectors;
     }
 
+    public static void printSectors(float[][] sectors) {
+        for (int i = 0; i < sectors.length; i++) {
+            System.out.print("Sector " + i + ": ");
+            for (int j= 0; j < sectors[i].length; j++) {
+                System.out.print(sectors[i][j] + "\t");
+            }
+            System.out.println("");
+        }
+    }
+
     /**
      * There will be 64 sectors over the 180 degree viewing angle of the
      * laser. These will each contain 8 readings covering 2.8125 degrees each.

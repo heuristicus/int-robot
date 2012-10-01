@@ -54,6 +54,7 @@ public class Avoider3 extends AbstractNodeMain {
                 System.out.println("Laser rangeMax is: " + scan.getRangeMax());
 
                 float[][] readings = LaserUtil.getSectors(SECTORS_CHECKED, scan);
+                //LaserUtil.printSectors(readings);
                 float[] medians = LaserUtil.medianOfEachSector(readings);
                 int minMedianPos = LaserUtil.minReadingPos(medians, IGNORE_THRESHOLD);
                 // minMedianPos returns -1 if all sectors are trash or zero.
@@ -62,7 +63,7 @@ public class Avoider3 extends AbstractNodeMain {
 
                 System.out.println("Medians: ");
                 for (int i= 0; i < medians.length; i++) {
-                    System.out.println(medians[i]);
+                    System.out.print(medians[i] + "\t");
                 }
                 System.out.println("");
 
