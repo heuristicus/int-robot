@@ -20,7 +20,6 @@ public class Avoider3 extends AbstractNodeMain {
     public static final int SECTORS_CHECKED = 21; // Check this many sectors
     public static final double EPSILON = 0.05;
     public static final double DEFAULT_ROTATION = 0.3f; // about 10 degrees
-    public static final float DEFAULT_REPLACEMENT_FOR_ZERO = 7.0f;
     public static final float IGNORE_THRESHOLD = 0.01f;
 
     private Publisher<Twist> pub;
@@ -73,7 +72,7 @@ public class Avoider3 extends AbstractNodeMain {
                 // the error value indicates that the values in the median array were trash values
                 // or zero values, which indicate that the path ahead is likely to be clear.
                 // any normal return value from the method indicates that there is something to be seen.
-                if (minMedian > SAFE_DISTANCE + MAX_SPEED || minMedian == -1) {
+                if (minMedian > SAFE_DISTANCE + MAX_SPEED) {
                     System.out.println("SAFE: minMedian is " + minMedian + ", allowable distance: " + (SAFE_DISTANCE + MAX_SPEED));
                     obstacleDirection = ObstacleDirection.UNSET;
                     moveForward(MAX_SPEED);
