@@ -8,7 +8,10 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.topic.Subscriber;
 import sensor_msgs.LaserScan;
 
+
 public class LaserUtil extends AbstractNodeMain {
+
+    public static final float DEFAULT_ZERO_REPLACEMENT = 7.0f;
 
     @Override
     public void onStart(ConnectedNode node) {
@@ -61,6 +64,7 @@ public class LaserUtil extends AbstractNodeMain {
         }
 
         float[] ranges = laser.getRanges();
+
         float[][] sectors = new float[numOfSectors][degreesPerSector];
 
         int degreesRequired = numOfSectors * degreesPerSector;
@@ -70,9 +74,21 @@ public class LaserUtil extends AbstractNodeMain {
 
         int middleAngle = ranges.length / 2;
         int startAngle = middleAngle - (degreesRequired / 2);
-
+        int readingIndex;
+        float readingVal;
         for (int sector = 0; sector < numOfSectors; sector++) {
-            System.arraycopy(ranges, startAngle + (degreesPerSector * sector), sectors[sector], 0, sectors[sector].length);
+            for (int reading = 0; reading < sectors[sector].length; reading++) {
+                readingIndex = startAngle + (degreesPerSector * sector) + reading;
+                if (ranges[readingIndex] == 0.0f){
+                    readingVal = DEFAULT_ZERO_REPLACEMENT;
+                } else {
+                    readingVal = ranges[readingIndex];
+                }
+                //sectors[sector][reading] = ranges[readingIndex] == 0.0 ? DEFAULT_ZERO_REPLACEMENT : ranges[readingIndex];
+                sectors[sector][reading] = readingVal;
+            }
+
+            //System.arraycopy(ranges, startAngle + (degreesPerSector * sector), sectors[sector], 0, sectors[sector].length);
         }
         return sectors;
     }
@@ -136,38 +152,24 @@ public class LaserUtil extends AbstractNodeMain {
     public static int minReadingPos(float[] readings, float ignoreThreshold) {
         if (readings.length < 1) throw new IllegalArgumentException("Gimme args, yo");
         float min = Float.MAX_VALUE;
-        int minPos = 0, failCount = 0; // Position of the minimum found so far
+        int minPos = 0; // Position of the minimum found so far
         float current;
-
-        
-
-
-        int failThreshold = readings.length; // CHANGE THIS TO A CONSTANT SOMEWHERE
-
-
-
-
 
         for (int i = 0; i < readings.length; i++) {
             current = readings[i];
-            if (current == 0) {
-                failCount++;
-            } else if (current < ignoreThreshold){
-                System.out.println("VALUE BELOW THRESHOLD --- IGNORING sector " + i + " with value " + current);
-                failCount++;
+
+            if (current < ignoreThreshold){
+                System.out.println("VALUE BELOW THRESHOLD --- sector " + i + " with value " + current);
                 continue;
             } else if (current < min) {
                 min = current;
                 minPos = i;
             }
         }
-        if (min == Float.MAX_VALUE && failCount != failThreshold) {
+        if (min == Float.MAX_VALUE) {
             System.out.println("SOMETHING WENT HORRIBLY WRONG");
-        } else if (failCount >= failThreshold){
-            System.out.println("FAIL THRESHOLD EXCEEDED");
-            return -1;
         }
-        System.out.println("FAIL COUNT: " + failCount + ", FAIL THRESHOLD: " + failThreshold);
+
         return minPos;
     }
 
