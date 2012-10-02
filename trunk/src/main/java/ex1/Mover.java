@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
+import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 
 
@@ -32,7 +33,9 @@ public class Mover extends AbstractNodeMain {
         }
     }
 
-
-
+    @Override
+    public void onShutdownComplete(Node node) {
+        System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
+    }
 
 }

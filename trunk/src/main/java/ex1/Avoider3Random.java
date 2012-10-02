@@ -5,6 +5,7 @@ import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
+import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import sensor_msgs.LaserScan;
@@ -136,5 +137,10 @@ public class Avoider3Random extends AbstractNodeMain {
     public void rotate(RotationDirection rotationDir, double theta) {
         theta = rotationDir == RotationDirection.RIGHT ? -theta : theta;
         rotate(theta);
+    }
+
+    @Override
+    public void onShutdownComplete(Node node) {
+        System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
     }
 }

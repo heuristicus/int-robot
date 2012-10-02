@@ -5,18 +5,36 @@ import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.DefaultNodeMainExecutor;
+import org.ros.node.Node;
 import org.ros.node.NodeConfiguration;
 import org.ros.node.NodeMainExecutor;
 
-
 public class Launcher extends AbstractNodeMain {
+
+    // Create a default configuration for the nodes that we will be creating
+    NodeConfiguration conf = NodeConfiguration.newPrivate();
+    //
+    NodeMainExecutor exec = DefaultNodeMainExecutor.newDefault();
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
-        NodeConfiguration conf = NodeConfiguration.newPrivate();
-        NodeMainExecutor exec = DefaultNodeMainExecutor.newDefault();
+        // Start up the specified nodes
         exec.execute(new Avoider2(), conf);
+    }
 
+    @Override
+    public void onShutdown(Node node) {
+        // Shut down all the nodes that we've started up.
+        System.out.println("Launcher shutting down started nodes...");
+        exec.shutdown();
+        System.out.println("All nodes shut down.");
+    }
+    
+    // Doesn't seem like this is being called?
+    @Override
+    public void onShutdownComplete(Node node) {
+        System.out.println("Launcher Shutting down...");
+        System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
     }
 
     @Override
