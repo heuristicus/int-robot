@@ -1,7 +1,6 @@
 package ex1;
 
 import geometry_msgs.Twist;
-import java.util.Arrays;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
