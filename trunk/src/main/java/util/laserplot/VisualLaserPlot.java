@@ -68,7 +68,7 @@ public class VisualLaserPlot extends AbstractNodeMain {
         @Override
     	public void paint(Graphics g) {
             g.setColor(BACKGROUND_COLOUR);
-            g.fillRect(0, 0, sizeX, sizeY);
+            g.fillRect(0, 0, sizeX*2, sizeY*2);
             g.setColor(PLOT_POINT_COLOR);
             float reading;
             int y;

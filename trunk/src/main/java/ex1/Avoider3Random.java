@@ -11,11 +11,13 @@ import sensor_msgs.LaserScan;
 import util.LaserUtil;
 
 /**
- * Keeps going forward to explore the lab, avoiding obstacles by turning away
- * from them (that is, if the obstacle is in a laser reading to the right
- * of the central reading, we rotate counter-clockwise).
+ * Keeps moving forwards until it encounters an obstacle within its safe zone.
+ * When there is an obstacle, it will rotate in a random direction and keep
+ * rotating that way until the obstacle is no longer in view (this fixes
+ * a problem with Avoider2Random where it would stop rotating and turn back
+ * on itself).
  */
-public class Avoider3 extends AbstractNodeMain {
+public class Avoider3Random extends AbstractNodeMain {
 
     public static final String DASHES = "---------------------------------";//Debugging
 
@@ -29,10 +31,10 @@ public class Avoider3 extends AbstractNodeMain {
     private Publisher<Twist> pub;
     private Subscriber<LaserScan> laser;
 
-    // Direction of obstacle (so rotate in opposite direction)
-    private ObstacleDirection obstacleDirection = ObstacleDirection.UNSET;
+    // Direction of current rotation
+    private RotationDirection rotationDirection = RotationDirection.UNSET;
 
-    public enum ObstacleDirection {
+    public enum RotationDirection {
         UNSET,
         RIGHT,
         LEFT;
@@ -79,38 +81,32 @@ public class Avoider3 extends AbstractNodeMain {
                 // any normal return value from the method indicates that there is something to be seen.
                 if (minMedian > SAFE_DISTANCE + MAX_SPEED) {
                     System.out.println("SAFE: minMedian is " + minMedian + ", allowable distance: " + (SAFE_DISTANCE + MAX_SPEED));
-                    obstacleDirection = ObstacleDirection.UNSET;
+                    rotationDirection = RotationDirection.UNSET;
                     moveForward(MAX_SPEED);
                 } else {
                     System.out.println("UNSAFE: minMedian is less than "
                             + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + DEFAULT_ROTATION);
 
-                    if (obstacleDirection == ObstacleDirection.UNSET) {
+                    if (rotationDirection == RotationDirection.UNSET) {
                         // Which direction is the closest obstacle in?
                         // We +1 because minMedianPos returns 0-based array index
-                        obstacleDirection = getDirectionOfObstacle(SECTORS_CHECKED, minMedianPos+1);
-                        System.out.println("Obstacle detected in " + obstacleDirection 
-                                + " direction. Will turn in opposite direction until clear.");
+                        rotationDirection = getRandomRotationDirection();
+                        System.out.println("Rotating in " + rotationDirection
+                                + " direction until clear.");
                     }
-                    System.out.println("Continuing turn in " + obstacleDirection);
-                    rotate(obstacleDirection, DEFAULT_ROTATION);
+                    System.out.println("Continuing turn in " + rotationDirection);
+                    rotate(rotationDirection, DEFAULT_ROTATION);
                 }
             }
         });
     }
 
-    public ObstacleDirection getDirectionOfObstacle(int numOfSectors, int sector) {
-        // If we have the middle sector of an odd number of sectors,
-        // the object is dead ahead. So compute a random direction. Lol.
-        if (numOfSectors % 2 == 1 &&
-                (sector == (numOfSectors/2) + 1)) {
-            return Math.random() < 0.5 ? ObstacleDirection.LEFT : ObstacleDirection.RIGHT;
-        }
 
-        if (sector > (numOfSectors/2)) {
-            return ObstacleDirection.RIGHT;
+    public RotationDirection getRandomRotationDirection() {
+        if (Math.random() < 0.5) {
+            return RotationDirection.RIGHT;
         } else {
-            return ObstacleDirection.LEFT;
+            return RotationDirection.LEFT;
         }
     }
 
@@ -136,11 +132,9 @@ public class Avoider3 extends AbstractNodeMain {
         pub.publish(twist);
     }
 
-    /** Rotates in the opposite direction to the nearest obstacle */
-    public void rotate(ObstacleDirection obstacleDir, double theta) {
-        // If obstacle is on the right, we turn anti-clockwise.
-        // All other cases turn clockwise (including UNSET)
-        theta = obstacleDir == ObstacleDirection.RIGHT ? -theta : theta;
+    /** Rotates in the given direction */
+    public void rotate(RotationDirection rotationDir, double theta) {
+        theta = rotationDir == RotationDirection.RIGHT ? -theta : theta;
         rotate(theta);
     }
 }

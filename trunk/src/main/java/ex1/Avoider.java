@@ -11,6 +11,10 @@ import org.ros.node.topic.Subscriber;
 
 import sensor_msgs.LaserScan;
 
+/**
+ * Moves the robot forward up to a set distance away from the obstacle
+ * in front. Uses 20 laser readings from the centre of the laser's view.
+ */
 public class Avoider extends AbstractNodeMain {
 
     public static final String DASHES = "---------------------------------";//Debugging
@@ -46,7 +50,7 @@ public class Avoider extends AbstractNodeMain {
                     moveForward(MAX_SPEED);
                 } else {
                     System.out.printf("publishing to twist:  " + (avg - SAFE_DISTANCE));
-                    moveForward(avg - SAFE_DISTANCE);
+                    moveForward(0);
 
                 }
             }

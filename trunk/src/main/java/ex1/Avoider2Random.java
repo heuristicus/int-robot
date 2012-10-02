@@ -1,7 +1,6 @@
 package ex1;
 
 import geometry_msgs.Twist;
-import java.util.Arrays;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
@@ -12,10 +11,11 @@ import sensor_msgs.LaserScan;
 import util.LaserUtil;
 
 /**
- * Keeps going forward, turning counter-clockwise any time it encounters
- * an obstacle within its safe zone.
+ * Keeps going forward until it encounters an obstacle within the safe zone.
+ * If it encounters an obstacle, it turns in a random direction (clockwise
+ * or counter-clockwise are equally probable).
  */
-public class Avoider2 extends AbstractNodeMain {
+public class Avoider2Random extends AbstractNodeMain {
 
     public static final String DASHES = "---------------------------------";//Debugging
 
@@ -65,10 +65,10 @@ public class Avoider2 extends AbstractNodeMain {
                     System.out.println("Safe distance: minMedian exceeds " + SAFE_DISTANCE + MAX_SPEED);
                     moveForward(MAX_SPEED);
                 } else {
-                    System.out.println("UNSAFE: minMedian is less than " + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + DEFAULT_ROTATION);
+                    double rotation = Math.random() < 0.5 ? DEFAULT_ROTATION : -DEFAULT_ROTATION;
+                    System.out.println("UNSAFE: minMedian is less than " + (SAFE_DISTANCE + MAX_SPEED) + ". Rotating: " + rotation);
 
-                    //moveForward(avg - SAFE_DISTANCE);
-                    rotate(DEFAULT_ROTATION);
+                    rotate(rotation);
                 }
             }
         });
