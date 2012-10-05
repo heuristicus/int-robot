@@ -18,8 +18,7 @@ public class NetworkJoystickServer extends AbstractNodeMain {
     @Override
     public void onStart(ConnectedNode node) {
         pub = node.newPublisher("cmd_vel", Twist._TYPE);
-        moveAlongX(0.5);
-
+        
         try {
             ServerSocket serv = new ServerSocket(12585);
             System.out.println("Accepting connection...");
@@ -35,6 +34,9 @@ public class NetworkJoystickServer extends AbstractNodeMain {
                     System.out.println("LineRead: " + line);
                     handleInput(line);
                 }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e){}
             }
         } catch (IOException e) {
             System.out.println("IOException. Oops");
@@ -51,26 +53,25 @@ public class NetworkJoystickServer extends AbstractNodeMain {
     public void handleInput(String line) {
         if (line.startsWith("MoveX")) {
             String[] tokens = line.split(":");
-            double speed = Double.parseDouble(tokens[1]);
+            float speed = Float.parseFloat(tokens[1]);
 
-            System.out.println("Moving along x: " + speed);
+            System.out.println("\tMoving along x: " + speed);
 
             moveAlongX(speed);
         } else if (line.startsWith("RotateZ")) {
             String[] tokens = line.split(":");
-            double angle = Double.parseDouble(tokens[1]);
+            float angle = Float.parseFloat(tokens[1]);
 
-            System.out.println("Rotating along z: " + angle);
+            System.out.println("\tRotating along z: " + angle);
 
             rotate(angle);
         }
     }
 
-    public boolean moveAlongX(double speed) {
+    public void moveAlongX(float speed) {
         Twist twist = pub.newMessage();
         twist.getLinear().setX(speed);
         pub.publish(twist);
-        return true;
     }
 
     /** Turns clockwise in the given number of radians.
