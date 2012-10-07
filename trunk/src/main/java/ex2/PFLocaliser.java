@@ -72,11 +72,13 @@ public class PFLocaliser extends AbstractLocaliser {
 
             }
             if (allEqual) {
-                PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
-                pa.setPoses(particleCloud.getPoses());
-                System.out.println("Robot hasn't moved. Exiting "+System.currentTimeMillis()%10);
-                lastPoseList = pa.getPoses();
-                return pa;
+//                PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
+//                pa.setPoses(particleCloud.getPoses());
+//                System.out.println("Robot hasn't moved. Exiting "+System.currentTimeMillis()%10);
+//                lastPoseList = pa.getPoses();
+//                return pa;
+                lastPoseList = copyPoseArray(particleCloud).getPoses();
+                return particleCloud;
             }
         }
         System.out.println("Robot movement detected. Adding noise lolz "+System.currentTimeMillis()%10);
@@ -112,8 +114,39 @@ public class PFLocaliser extends AbstractLocaliser {
         }
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
         pa.setPoses(newPoses);
-        lastPoseList = pa.getPoses();
+        lastPoseList = copyPoseArray(pa).getPoses();
+
         return pa;
+
+    }
+
+    public PoseArray copyPoseArray(PoseArray poses) {
+        PoseArray newPoses = messageFactory.newFromType(PoseArray._TYPE);
+        List<Pose> newPoseList = newPoses.getPoses();
+        
+        for (Pose pose : poses.getPoses()) {
+            newPoseList.add(copyPose(pose));
+        }
+        
+        newPoses.setPoses(newPoseList);
+
+        return newPoses;
+    }
+
+    public Pose copyPose(Pose pose){
+        Pose newPose = messageFactory.newFromType(Pose._TYPE);
+        
+        newPose.getOrientation().setW(pose.getOrientation().getW());
+        newPose.getOrientation().setX(pose.getOrientation().getX());
+        newPose.getOrientation().setY(pose.getOrientation().getY());
+        newPose.getOrientation().setZ(pose.getOrientation().getZ());
+
+        newPose.getPosition().setX(pose.getPosition().getX());
+        newPose.getPosition().setY(pose.getPosition().getY());
+        newPose.getPosition().setZ(pose.getPosition().getZ());
+
+        return newPose;
+
     }
 
     @Override
