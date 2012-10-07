@@ -7,7 +7,6 @@ import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
@@ -17,7 +16,7 @@ import sensor_msgs.LaserScan;
 
 public class PFLocaliser extends AbstractLocaliser {
 
-    public static final int PARTICLE_NUMBER = 3;
+    public static final int PARTICLE_NUMBER = 100;
     public static final double ROTATION_NOISE = Math.PI/30.0;
     public static final double POSITION_NOISE = 0.15;
     
@@ -57,26 +56,36 @@ public class PFLocaliser extends AbstractLocaliser {
 
             boolean allEqual = true;
             for (int i = 0; i < lastPoseList.size(); i++) {
-                Pose oldPose = lastPoseList.get(i);
-                Pose newPose = newCloud.get(i);
-                boolean equal = oldPose.getPosition().getX() == newPose.getPosition().getX();
-                equal = equal && (oldPose.getPosition().getY() == newPose.getPosition().getY());
+//                Pose oldPose = lastPoseList.get(i);
+//                Pose newPose = newCloud.get(i);
+                boolean equal = poseIsEqual(lastPoseList.get(i), newCloud.get(i));
 
-                System.out.print(oldPose.getPosition().getX()+", "+oldPose.getPosition().getY()+"\t");
-                System.out.println(newPose.getPosition().getX()+", "+newPose.getPosition().getY());
+//                System.out.print(oldPose.getPosition().getX()+", "+oldPose.getPosition().getY()+"\t");
+//                System.out.println(newPose.getPosition().getX()+", "+newPose.getPosition().getY());
 
+                /*
+                 * Save time by jumping out of the loop as soon as the is a
+                 * pose which differs. Do we really need this? If the robot has
+                 * moved at all, all points will have changed, so we only need
+                 * to sample a single pose rather than all of them, assuming that
+                 * robot movements are being applied to all points in the method
+                 * that is hidden from us.
+                 */
                 if (! equal) {
                     allEqual = false;
                     break;
                 }
-
             }
+
+            /*
+             * If all the points in the list are the same, make a deep copy of
+             * the new pose array and store it. This is also probably unnecessary.
+             * We could just keep the same lastPoseList until the particleCloud
+             * changes, and only then copy it to make a new array - this would
+             * save a significant amount of time if we are using a large number
+             * of particles.
+             */
             if (allEqual) {
-//                PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
-//                pa.setPoses(particleCloud.getPoses());
-//                System.out.println("Robot hasn't moved. Exiting "+System.currentTimeMillis()%10);
-//                lastPoseList = pa.getPoses();
-//                return pa;
                 lastPoseList = copyPoseArray(particleCloud).getPoses();
                 return particleCloud;
             }
@@ -146,7 +155,34 @@ public class PFLocaliser extends AbstractLocaliser {
         newPose.getPosition().setZ(pose.getPosition().getZ());
 
         return newPose;
+    }
 
+    /* Check if one pose is equal to another. Will compare quaternion and
+     * position data by checking the data that they contain, not the objects.
+     */
+    public boolean poseIsEqual(Pose p1, Pose p2){
+        // Make an initial assumption that poses are equal.
+        return quaternionIsEqual(p1.getOrientation(), p2.getOrientation()) &&
+                pointIsEqual(p1.getPosition(), p2.getPosition());
+    }
+
+    /* Check if two quaternions are equal. Checks not the object, but the data
+     * that it contains.
+     */
+    public boolean quaternionIsEqual(Quaternion q1, Quaternion q2){
+        return q1.getW() == q2.getW() &&
+                q1.getX() == q2.getX() &&
+                q1.getY() == q2.getY() &&
+                q1.getZ() == q2.getZ();
+    }
+
+    /* Check if two points are equal. Checks not the object, but the data that
+     * it contains.
+     */
+    public boolean pointIsEqual(Point p1, Point p2){
+        return p1.getX() == p2.getX() &&
+                p1.getY() == p2.getY() &&
+                p1.getZ() == p2.getZ();
     }
 
     @Override
@@ -191,19 +227,32 @@ public class PFLocaliser extends AbstractLocaliser {
 
     /** Returns a new pose which is the given pose with noise added. */
     public Pose applyNoise(Pose pose) {
-        Quaternion orient = pose.getOrientation();
-        Point pos = pose.getPosition();
-
-        Point rPos = messageFactory.newFromType(Point._TYPE);
-        rPos.setX(getGaussian(pos.getX(), POSITION_NOISE));
-        rPos.setY(getGaussian(pos.getY(), POSITION_NOISE));
-        //Quaternion rOrient = rotateQuaternion(orient,
-        //      getGaussian(AbstractLocaliser.getHeading(orient), ROTATION_NOISE));
-
         Pose rPose = messageFactory.newFromType(Pose._TYPE);
-//        rPose.setOrientation(rOrient);
-        rPose.setOrientation(orient);
-        rPose.setPosition(rPos);
+
+        rPose.setOrientation(applyQuaternionNoiseGaussian(pose.getOrientation()));
+        rPose.setPosition(applyPointNoiseGaussian(pose.getPosition()));
+        
         return rPose;
     }
+
+    /* Applies gaussian rotation noise to the provided quaternion. A new
+     * quaternion object with added noise is returned.
+     */
+    public Quaternion applyQuaternionNoiseGaussian(Quaternion q){
+        return AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), 
+                getGaussian(getHeading(q), ROTATION_NOISE));
+    }
+
+    /* Applies gaussian noise to the provided point. A new point object with
+     * the added noise is returned.
+     */
+    public Point applyPointNoiseGaussian(Point p){
+        Point noisyPosition = messageFactory.newFromType(Point._TYPE);
+        
+        noisyPosition.setX(getGaussian(p.getX(), POSITION_NOISE));
+        noisyPosition.setY(getGaussian(p.getY(), POSITION_NOISE));
+
+        return noisyPosition;
+    }
+
 }
