@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
+import org.ros.node.topic.Publisher;
 import pf.AbstractLocaliser;
 import pf.SensorModel;
 import sensor_msgs.LaserScan;
@@ -24,16 +25,35 @@ public class PFLocaliser extends AbstractLocaliser {
     public static final double CLUSTER_THRESHOLD = 0.5;
     public List<Pose> lastPoseList;
 
+    Publisher<Pose> expPub;
+
     private Random randGen = new Random();
 
     public PFLocaliser() {
         super();
     }
 
+    
+
     @Override
     public PoseArray initialisePF(PoseWithCovarianceStamped initialPose) {
+//        System.out.println(AbstractLocaliser.getHeading(initialPose.getPose().getPose().getOrientation())
+//                + "   x " + initialPose.getPose().getPose().getPosition().getX()
+//                + "   y " + initialPose.getPose().getPose().getPosition().getY());
+//
+//        Pose p = messageFactory.newFromType(Pose._TYPE);
+//        p.setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), 2.251));
+//        Point pt = messageFactory.newFromType(Point._TYPE);
+//        pt.setX(-3.80);
+//        pt.setY(-11.90);
+//        p.setPosition(pt);
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
         ArrayList<Pose> poseList = new ArrayList();
+
+//        for (int i= 0; i < PARTICLE_NUMBER; i++) {
+//            Pose poseWithNoise = applyNoise(p);
+//            poseList.add(poseWithNoise);
+//        }
 
         for (int i= 0; i < PARTICLE_NUMBER; i++) {
             Pose poseWithNoise = applyNoise(initialPose.getPose().getPose());
@@ -115,6 +135,13 @@ public class PFLocaliser extends AbstractLocaliser {
                 counter += weights[j];
                 if (rand < counter) {
                     Pose nextPose = poseList.get(j);
+                    /*
+                     * Do we really want to apply the same amount of noise to
+                     * particles on rotation and movement? If the action only
+                     * rotates the robot, the amount of noise applied to
+                     * the position of the particles should be smaller. Is this
+                     * true in the opposite case as well? (probably not)
+                     */
                     Pose nextPoseWithNoise = applyNoise(nextPose);
                     newPoses.add(nextPoseWithNoise);
                     break;
@@ -214,6 +241,9 @@ public class PFLocaliser extends AbstractLocaliser {
                 biggestClusterIndex = i;
             }
         }
+        //System.out.println("location: [" + poses.get(biggestClusterIndex).getPosition().getX()
+          //      + ", " + poses.get(biggestClusterIndex).getPosition().getY()
+          //      + "], heading: " + AbstractLocaliser.getHeading(poses.get(biggestClusterIndex).getOrientation()));
         return poses.get(biggestClusterIndex);
     }
 
