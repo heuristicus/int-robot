@@ -388,4 +388,13 @@ public abstract class AbstractLocaliser extends PFLocalisationNode {
         return map;
     }
 
+    public static double getRotationNoise() {
+        return ROTATION_NOISE;
+    }
+
+    public static double getPositionNoise() {
+        return POSITION_NOISE;
+    }
+
+
 }

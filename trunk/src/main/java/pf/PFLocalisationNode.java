@@ -94,7 +94,7 @@ public class PFLocalisationNode extends AbstractNodeMain {
                     double x = pf.getPose().getPose().getPose().getPosition().getX();
                     double y = pf.getPose().getPose().getPose().getPosition().getY();
                     double heading = Math.toDegrees(PFLocaliser.getHeading(pf.getPose().getPose().getPose().getOrientation()));
-                    System.out.println("\nPublishing pose:\nLoc: " + x + ", " + y + "\nHeading: " + heading);
+//                    System.out.println("\nPublishing pose:\nLoc: " + x + ", " + y + "\nHeading: " + heading);
                 }
             }
         });

@@ -3,10 +3,13 @@ package ex2;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
+import geometry_msgs.PoseWithCovariance;
+import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import java.util.List;
 import java.util.Random;
 import org.ros.message.MessageFactory;
+import org.ros.message.Time;
 import pf.AbstractLocaliser;
 
 public class LocalisationUtil {
@@ -92,7 +95,7 @@ public class LocalisationUtil {
 
     /* Check if one pose is equal to another. Will compare quaternion and
      * position data by checking the data that they contain, not the objects. */
-    public boolean poseIsEqual(Pose p1, Pose p2){
+    public static boolean poseIsEqual(Pose p1, Pose p2){
         // Make an initial assumption that poses are equal.
         return quaternionIsEqual(p1.getOrientation(), p2.getOrientation()) &&
                 pointIsEqual(p1.getPosition(), p2.getPosition());
@@ -100,7 +103,7 @@ public class LocalisationUtil {
 
     /* Check if two quaternions are equal. Checks not the object, but the data
      * that it contains. */
-    public boolean quaternionIsEqual(Quaternion q1, Quaternion q2){
+    public static boolean quaternionIsEqual(Quaternion q1, Quaternion q2){
         return q1.getW() == q2.getW() &&
                 q1.getX() == q2.getX() &&
                 q1.getY() == q2.getY() &&
@@ -109,9 +112,30 @@ public class LocalisationUtil {
 
     /* Check if two points are equal. Checks not the object, but the data that
      * it contains. */
-    public boolean pointIsEqual(Point p1, Point p2){
+    public static boolean pointIsEqual(Point p1, Point p2){
         return p1.getX() == p2.getX() &&
                 p1.getY() == p2.getY() &&
                 p1.getZ() == p2.getZ();
     }
+
+    public static void printPose(Pose p){
+        System.out.printf("[%f, %f], %f ", p.getPosition().getX(), p.getPosition().getY(), AbstractLocaliser.getHeading(p.getOrientation()));
+    }
+
+    public static String getTimeStampWithPose(PoseWithCovariance p, Time stamp){
+        return stamp.secs + "."
+                + stamp.nsecs + ","
+                + p.getPose().getPosition().getX() + ","
+                + p.getPose().getPosition().getY() + ","
+                + AbstractLocaliser.getHeading(p.getPose().getOrientation());
+    }
+
+    public static boolean timeStampEqual(Time s1, Time s2){
+        System.out.println("s1: "+s1.secs+"."+s1.nsecs +
+                "\t\tAND s2: " + s2.secs + "." + s2.nsecs +
+                " AND secs.EQUAL=" +(s1.secs == s2.secs) +
+                " AND nsecs.EQUAL="+(s1.nsecs == s2.nsecs));
+        return s1.nsecs == s2.nsecs && s1.secs == s2.secs;
+    }
+
 }

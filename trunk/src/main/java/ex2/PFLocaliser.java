@@ -18,7 +18,7 @@ import sensor_msgs.LaserScan;
 public class PFLocaliser extends AbstractLocaliser {
 
     public static final int PARTICLE_NUMBER = 100;
-    public static final double ROTATION_NOISE = Math.PI/30.0;
+    public static final double ROTATION_NOISE = Math.PI/30;
     public static final double POSITION_NOISE = 0.15;
     
     // How far another point is before being considered a clustered point
@@ -47,7 +47,7 @@ public class PFLocaliser extends AbstractLocaliser {
         pa.setPoses(poseList);
         return pa;
 
-        //        return experimentStart(initialPose);
+        //return experimentStart(initialPose);
     }
 
     public PoseArray experimentStart(PoseWithCovarianceStamped initialPose){
@@ -88,33 +88,16 @@ public class PFLocaliser extends AbstractLocaliser {
             for (int i = 0; i < lastPoseList.size(); i++) {
                 boolean equal = util.poseIsEqual(lastPoseList.get(i), newCloud.get(i));
 
-//                System.out.print(oldPose.getPosition().getX()+", "+oldPose.getPosition().getY()+"\t");
-//                System.out.println(newPose.getPosition().getX()+", "+newPose.getPosition().getY());
-
-                /* Save time by jumping out of the loop as soon as there is a
-                 * pose which differs. Do we really need this? If the robot has
-                 * moved at all, all points will have changed, so we only need
-                 * to sample a single pose rather than all of them, assuming that
-                 * robot movements are being applied to all points in the method
-                 * that is hidden from us. */
                 if (! equal) {
                     allEqual = false;
                     break;
                 }
             }
 
-            /* If all the points in the list are the same, make a deep copy of
-             * the new pose array and store it. This is also probably unnecessary.
-             * We could just keep the same lastPoseList until the particleCloud
-             * changes, and only then copy it to make a new array - this would
-             * save a significant amount of time if we are using a large number
-             * of particles. */
             if (allEqual) {
-                //lastPoseList = util.copyPoseArray(particleCloud).getPoses();
                 return particleCloud;
             }
         }
-        System.out.println("Robot movement detected. Adding noise lolz "+System.currentTimeMillis()%100);
 
         List<Pose> poseList = particleCloud.getPoses();
         double[] weights = new double[poseList.size()];
@@ -127,7 +110,7 @@ public class PFLocaliser extends AbstractLocaliser {
             weights[i] = weight;
         }
 
-        System.out.println("Mean weight: " + totalWeight/weights.length);
+//        System.out.println("Mean weight: " + totalWeight/weights.length);
 
         // New set of poses which are sampled from the previous
         // set and have had noise added to them.
@@ -188,9 +171,9 @@ public class PFLocaliser extends AbstractLocaliser {
                 biggestClusterIndex = i;
             }
         }
-        //System.out.println("location: [" + poses.get(biggestClusterIndex).getPosition().getX()
-          //      + ", " + poses.get(biggestClusterIndex).getPosition().getY()
-          //      + "], heading: " + AbstractLocaliser.getHeading(poses.get(biggestClusterIndex).getOrientation()));
+//        System.out.println("location: [" + poses.get(biggestClusterIndex).getPosition().getX()
+  //            + ", " + poses.get(biggestClusterIndex).getPosition().getY()
+    //          + "], heading: " + AbstractLocaliser.getHeading(poses.get(biggestClusterIndex).getOrientation()) + "\n");
         return poses.get(biggestClusterIndex);
     }
 }

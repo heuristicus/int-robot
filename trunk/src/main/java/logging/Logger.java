@@ -1,36 +1,62 @@
 package logging;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import org.ros.namespace.GraphName;
-import org.ros.node.AbstractNodeMain;
-import org.ros.node.ConnectedNode;
-import org.ros.node.Node;
 
-public class Logger extends AbstractNodeMain{
+public class Logger {
 
+    private static final String LOG_DIRECTORY = "/data/private/robot/workspace/robotics/logs";
     private final String logFile;
+    private File file;
+    private PrintWriter writer;
+    private boolean autoFlush = false;
 
-    public Logger(){
+    public Logger() throws FileNotFoundException, IOException {
+        this("ros_log_", true);
+    }
+
+    public Logger(String filename, boolean withDate)
+            throws FileNotFoundException, IOException {
+        if (withDate){
+            logFile = filename + getTimeDateStamp() + ".log";
+        } else {
+            logFile = filename + ".log";
+        }
+        file = new File(LOG_DIRECTORY, logFile);
+        writer = new PrintWriter(file);
+        System.out.println("Initialised Logger to: " + file.getPath());
+    }
+
+    public void logString(String s) {
+        writer.print(s);
+        if (autoFlush) writer.flush();
+    }
+
+    /** Log string and add a newline */
+    public void logLine(String s) {
+        writer.println(s);
+        if (autoFlush) writer.flush();
+    }
+
+    public void setAutoFlushing(boolean autoFlushing) {
+        this.autoFlush = autoFlushing;
+    }
+
+    public void close() {
+        writer.flush();
+        writer.close();
+    }
+
+    public static String getTimeDateStamp(){
         Calendar curDate = Calendar.getInstance();
-        DateFormat form = new SimpleDateFormat("dd/MM/yyyy_HH-mm-ss");
-        logFile = "run_log_" + form.format(curDate.getTime()) + ".log";
-    }
-
-    @Override
-    public void onStart(ConnectedNode connectedNode) {
-        System.out.println("Logging to " + logFile + "...");
-    }
-
-    @Override
-    public GraphName getDefaultNodeName() {
-        return GraphName.of("Logger");
-    }
-
-    @Override
-    public void onShutdownComplete(Node node) {
-        System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
+        DateFormat form = new SimpleDateFormat("dd_MM_yyyy-HH:mm:ss");
+        return form.format(curDate.getTime());
     }
 
 }
