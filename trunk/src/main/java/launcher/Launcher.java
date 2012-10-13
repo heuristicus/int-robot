@@ -1,9 +1,6 @@
 package launcher;
 
-import ex1.Avoider2;
 import ex2.ExperimentNav;
-import ex2.PFLocaliser;
-import logging.Logger;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -25,6 +22,7 @@ public class Launcher extends AbstractNodeMain {
         // Start up the specified nodes
         //exec.execute(new Logger(), conf);
         //exec.execute(new Avoider2(), conf);
+        PFLocalisationNode.experimentMode = true;
         exec.execute(new PFLocalisationNode(), conf);
         exec.execute(new ExperimentNav(), conf);
     }

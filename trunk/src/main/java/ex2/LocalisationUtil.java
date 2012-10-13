@@ -4,8 +4,8 @@ import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
 import geometry_msgs.PoseWithCovariance;
-import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.ros.message.MessageFactory;
@@ -19,6 +19,7 @@ public class LocalisationUtil {
 
     private double positionNoise;
     private double rotationNoise;
+
 
     public LocalisationUtil(MessageFactory msgFactory, Random rand,
             double positionNoise, double rotationNoise) {
@@ -35,6 +36,16 @@ public class LocalisationUtil {
         rand *= stdDev;
         rand += mean;
         return rand;
+    }
+
+    /** Applies noise to all particles and returns a new noisier list */
+    public ArrayList<Pose> applyNoise(ArrayList<Pose> poses) {
+        ArrayList<Pose> newPoses = new ArrayList<Pose>(poses.size());
+        for (int i = 0; i < poses.size(); i++) {
+            Pose newPose = applyNoise(poses.get(i));
+            newPoses.add(newPose);
+        }
+        return newPoses;
     }
 
     /** Returns a new pose which is the given pose with noise added. */

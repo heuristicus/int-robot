@@ -17,6 +17,7 @@ import org.ros.node.topic.Subscriber;
 
 import geometry_msgs.PoseWithCovarianceStamped; // Pose estimates (with covariance)
 import geometry_msgs.PoseArray; // Pose estimates
+import geometry_msgs.PoseStamped;
 import geometry_msgs.Quaternion; // Rotation
 import geometry_msgs.TransformStamped;
 import tf.tfMessage; // Transform from odom to map
@@ -25,6 +26,9 @@ import nav_msgs.OccupancyGrid; // Map
 
 public class PFLocalisationNode extends AbstractNodeMain {
 
+    // Whether we are performaing an automated experiment
+    public static boolean experimentMode = true;
+    
     // Settings
     private static final double PUBLISH_DELTA = 0.1; // // Minimum change (m/radians) before publishing new particle cloud and pose
 
@@ -43,6 +47,7 @@ public class PFLocalisationNode extends AbstractNodeMain {
 
     // Publishers
     private Publisher<PoseWithCovarianceStamped> amcl_pose;
+    private Publisher<PoseStamped> estimated_pose;
     private Publisher<PoseArray> particlecloud;
     private Publisher<tfMessage> transformpublisher;
 
@@ -66,6 +71,7 @@ public class PFLocalisationNode extends AbstractNodeMain {
 
         // Create Publishers
         amcl_pose = node.newPublisher("amcl_pose", PoseWithCovarianceStamped._TYPE);
+        estimated_pose = node.newPublisher("estimated_pose", PoseStamped._TYPE);
         particlecloud = node.newPublisher("particlecloud", PoseArray._TYPE);
         transformpublisher = node.newPublisher("tf", tfMessage._TYPE);
 
@@ -80,6 +86,11 @@ public class PFLocalisationNode extends AbstractNodeMain {
                 if (mapReceived && initialPoseReceived && sufficientMovementDetected(pf.getPose())) {
                     // Publish the new pose
                     amcl_pose.publish(pf.getPose());
+                    
+                    PoseStamped estPose = estimated_pose.newMessage();
+                    estPose.setPose(pf.getPose().getPose().getPose());
+                    estPose.setHeader(pf.getParticleCloud().getHeader());
+                    estimated_pose.publish(estPose);
 
                     // Update record of previously-published pose
                     last_published_pose = pf.getPose();

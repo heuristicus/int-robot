@@ -3,8 +3,8 @@ package ex2;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
+import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
-import geometry_msgs.Quaternion;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +22,8 @@ public class PFLocaliser extends AbstractLocaliser {
     public static final double POSITION_NOISE = 0.15;
     
     // How far another point is before being considered a clustered point
-    public static final double CLUSTER_THRESHOLD = 0.5;
+    public static final double CLUSTER_THRESHOLD = 0.9;
+
     public List<Pose> lastPoseList;
 
     private Random randGen = new Random();
@@ -32,10 +33,15 @@ public class PFLocaliser extends AbstractLocaliser {
         super();
         util = new LocalisationUtil(messageFactory, randGen,
                 POSITION_NOISE, ROTATION_NOISE);
+        System.out.println("pflocaliser");
     }
 
     @Override
     public PoseArray initialisePF(PoseWithCovarianceStamped initialPose) {
+        if (experimentMode) {
+            return experimentStart(initialPose);
+        }
+
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
         ArrayList<Pose> poseList = new ArrayList();
 
@@ -46,8 +52,6 @@ public class PFLocaliser extends AbstractLocaliser {
 
         pa.setPoses(poseList);
         return pa;
-
-        //return experimentStart(initialPose);
     }
 
     public PoseArray experimentStart(PoseWithCovarianceStamped initialPose){
@@ -71,6 +75,7 @@ public class PFLocaliser extends AbstractLocaliser {
         }
 
         pa.setPoses(poseList);
+        System.out.println("experiment started");
         return pa;
     }
 
@@ -86,7 +91,7 @@ public class PFLocaliser extends AbstractLocaliser {
 
             boolean allEqual = true;
             for (int i = 0; i < lastPoseList.size(); i++) {
-                boolean equal = util.poseIsEqual(lastPoseList.get(i), newCloud.get(i));
+                boolean equal = LocalisationUtil.poseIsEqual(lastPoseList.get(i), newCloud.get(i));
 
                 if (! equal) {
                     allEqual = false;
@@ -114,6 +119,57 @@ public class PFLocaliser extends AbstractLocaliser {
 
         // New set of poses which are sampled from the previous
         // set and have had noise added to them.
+        ArrayList<Pose> sampledPoses = stackSample(poseList, weights, totalWeight);
+        ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
+
+        PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
+        pa.setPoses(noisyPoses);
+
+        lastPoseList = util.copyPoseArray(pa).getPoses();
+
+        return pa;
+    }
+
+    public ArrayList<Pose> lowVarianceSample(List<Pose> poseList, double[] weights, double totalWeight){
+        // Equation source: Probabilistic Robotics (Thrun 2005)
+        // M = totalNumOfWeights
+        // m = 1 to M (iteration counter)
+        // Get a random number 'r' between 0 and M^-1
+        // s = r
+        // On every iteration, s += M^-1
+        // If s >= totalWeightSoFar
+        //     then pick the particle with index curParticle
+        //     else loop through weights, accumulating total until s >= totalWeightSoFar
+
+        final int M = poseList.size();
+        final double stepSize = totalWeight / M;
+        final double r = randGen.nextDouble() * stepSize;
+        double s = r;
+
+        double totalWeightSoFar = 0.0;
+        int curParticle = 0;
+
+        ArrayList<Pose> newPoses = new ArrayList<Pose>(M);
+        for (int m = 0; m < M; m++) {
+            while (s > totalWeightSoFar) {
+                totalWeightSoFar += weights[curParticle];
+                curParticle++;
+            }
+            Pose nextPose = poseList.get(curParticle);
+            newPoses.add(nextPose);
+            s += stepSize;
+        }
+
+        if (newPoses.size() != poseList.size()) {
+            System.out.println("WARNINGS! ALL OF THE WARNINGS! LOW VARIANCE "
+                    + "SAMPLING MUST BE BROKEN. NEW POSES: "+newPoses.size()+
+                    " AND POSELIST: "+poseList.size());
+        }
+
+        return newPoses;
+    }
+
+    public ArrayList<Pose> stackSample(List<Pose> poseList, double[] weights, double totalWeight){
         ArrayList<Pose> newPoses = new ArrayList(poseList.size());
         double counter;
         for (int i = 0; i < poseList.size(); i++) {
@@ -129,17 +185,12 @@ public class PFLocaliser extends AbstractLocaliser {
                      * rotates the robot, the amount of noise applied to
                      * the position of the particles should be smaller. Is this
                      * true in the opposite case as well? (probably not) */
-                    Pose nextPoseWithNoise = util.applyNoise(nextPose);
-                    newPoses.add(nextPoseWithNoise);
+                    newPoses.add(nextPose);
                     break;
                 }
             }
         }
-        PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
-        pa.setPoses(newPoses);
-        lastPoseList = util.copyPoseArray(pa).getPoses();
-
-        return pa;
+        return newPoses;
     }
 
     @Override
@@ -171,9 +222,18 @@ public class PFLocaliser extends AbstractLocaliser {
                 biggestClusterIndex = i;
             }
         }
+
+        Pose estimatedPose = poses.get(biggestClusterIndex);
+
+        // Publish estimatedPose so it can be viewed in rviz
+//        Publisher<PoseStamped> posePub = node.newPublisher("estimated_pose", PoseStamped._TYPE);
+//        PoseStamped pubPose = posePub.newMessage();
+//        pubPose.setPose(estimatedPose);
+//        pubPose.setHeader(particleCloud.getHeader());
+//        posePub.publish(pubPose);
 //        System.out.println("location: [" + poses.get(biggestClusterIndex).getPosition().getX()
   //            + ", " + poses.get(biggestClusterIndex).getPosition().getY()
     //          + "], heading: " + AbstractLocaliser.getHeading(poses.get(biggestClusterIndex).getOrientation()) + "\n");
-        return poses.get(biggestClusterIndex);
+        return estimatedPose;
     }
 }
