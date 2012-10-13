@@ -22,6 +22,7 @@ public class ExperimentNav extends AbstractNodeMain {
     Publisher<Twist> move;
     Logger logger;
     Logger checkpointLogger;
+    ConnectedNode node;
     boolean newAmclData = false;
 
     private Odometry[] odomArray = new Odometry[10];
@@ -30,6 +31,7 @@ public class ExperimentNav extends AbstractNodeMain {
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
+        this.node = connectedNode;
         try {
             System.out.println("Initialising logger...");
             logger = new Logger();
@@ -172,7 +174,12 @@ public class ExperimentNav extends AbstractNodeMain {
                     move.publish(fwd);
                 }
 
-                checkpointReached();
+
+                if (curX > 8.55 && curX < 8.65 && curY < -11.05 && curY > -11.15 && moveflag == 8){
+                    checkpointReached();
+                    node.shutdown();
+                }
+
 
             }
         });
