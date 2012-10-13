@@ -172,6 +172,8 @@ public class ExperimentNav extends AbstractNodeMain {
                     move.publish(fwd);
                 }
 
+                checkpointReached();
+
             }
         });
     }
@@ -186,12 +188,13 @@ public class ExperimentNav extends AbstractNodeMain {
         desc += "PFLocaliser ClusterThreshold: "+PFLocaliser.CLUSTER_THRESHOLD + NL;
         desc += "AbstractLocaliser RotationNoise: "+AbstractLocaliser.getRotationNoise() + NL;
         desc += "AbstractLocaliser PositionNoise: "+AbstractLocaliser.getPositionNoise();
+        desc += "\n\n";
         return desc;
     }
 
     public void checkpointReached() {
-        checkpointLogger.logLine(getTimeStampWithPoseString(lastMatchingOdom)
-                + "\t" + getTimeStampWithPoseString(amclData));
+        checkpointLogger.logLine(getTimeStampWithPoseString(amclData)
+                + "\t" + getTimeStampWithPoseString(lastMatchingOdom));
     }
 
     public String getTimeStampWithPoseString(PoseWithCovarianceStamped pose) {
