@@ -42,6 +42,7 @@ public class Launcher extends AbstractNodeMain {
         System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
     }
 
+
     @Override
     public GraphName getDefaultNodeName() {
         return GraphName.of("Launcher");

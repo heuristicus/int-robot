@@ -1,0 +1,22 @@
+* exercise 2
+** estimated pose selection
+*** clustering algorithm
+   make clustering algorithm take average of best cluster
+*** weights
+   include weights in the selection of the estimated pose
+   highest weighted particle
+   highest connected particle of highest weighted particle cluster
+   highest weighted cluster average
+** sampling methods
+  low variance sampling, stratified sampling
+** random particles
+  random particle MCL: recovery from failures - fox
+  relate the random particles injected to the average measurement probability
+  get this from the importance factor using (1/M) * sum(w(m,t)) where 1 <= m <= M, and t is the current timestep
+  best to average over multiple time steps. keep a short term average and a long term average - there are times 
+  where sensor noise is unusually high or spread out because you are doing global localisation
+** experiments
+  methods for selection of estimated pose
+  low variance sampling vs importance weight sampling
+  changing noise applied to odometry
+  
