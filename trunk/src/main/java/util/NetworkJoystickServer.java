@@ -18,7 +18,8 @@ public class NetworkJoystickServer extends AbstractNodeMain {
     @Override
     public void onStart(ConnectedNode node) {
         pub = node.newPublisher("cmd_vel", Twist._TYPE);
-        
+        moveAlongX(0.5);
+
         try {
             ServerSocket serv = new ServerSocket(12585);
             System.out.println("Accepting connection...");
@@ -34,12 +35,13 @@ public class NetworkJoystickServer extends AbstractNodeMain {
                     System.out.println("LineRead: " + line);
                     handleInput(line);
                 }
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e){}
+                Thread.sleep(250);
             }
         } catch (IOException e) {
             System.out.println("IOException. Oops");
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            System.out.println("InterruptedException. D'oh.");
             e.printStackTrace();
         }
         System.out.println("Exited main.");
@@ -53,25 +55,26 @@ public class NetworkJoystickServer extends AbstractNodeMain {
     public void handleInput(String line) {
         if (line.startsWith("MoveX")) {
             String[] tokens = line.split(":");
-            float speed = Float.parseFloat(tokens[1]);
+            double speed = Double.parseDouble(tokens[1]);
 
-            System.out.println("\tMoving along x: " + speed);
+            System.out.println("Moving along x: " + speed);
 
             moveAlongX(speed);
         } else if (line.startsWith("RotateZ")) {
             String[] tokens = line.split(":");
-            float angle = Float.parseFloat(tokens[1]);
+            double angle = Double.parseDouble(tokens[1]);
 
-            System.out.println("\tRotating along z: " + angle);
+            System.out.println("Rotating along z: " + angle);
 
             rotate(angle);
         }
     }
 
-    public void moveAlongX(float speed) {
+    public boolean moveAlongX(double speed) {
         Twist twist = pub.newMessage();
         twist.getLinear().setX(speed);
         pub.publish(twist);
+        return true;
     }
 
     /** Turns clockwise in the given number of radians.
