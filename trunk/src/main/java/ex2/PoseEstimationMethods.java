@@ -54,14 +54,24 @@ public class PoseEstimationMethods {
             avgrot += (AbstractLocaliser.getHeading(cur.getOrientation()) - avgrot);
         }
 
-        System.out.println(" average x : " + avgx + " average y: " + avgy);
-
         Pose avgPose = messageFactory.newFromType(Pose._TYPE);
         avgPose.getPosition().setX(avgx);
         avgPose.getPosition().setY(avgy);
         avgPose.setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), avgrot));
 
         return avgPose;
+    }
+
+    public static Pose highestWeighted(PoseArray particleCloud, double[] weights){
+        double maxWeight = 0;
+        int maxWeightIndex = 0;
+        for (int i = 0; i < weights.length; i++) {
+            if (weights[i] > maxWeight) {
+                maxWeight = weights[i];
+                maxWeightIndex = i;
+            }
+        }
+        return particleCloud.getPoses().get(maxWeightIndex);
     }
 
     public static Pose mostConnectedPointClustering(PoseArray particleCloud, double clusterThreshold){

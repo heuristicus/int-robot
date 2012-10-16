@@ -4,6 +4,7 @@ import geometry_msgs.Pose;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import org.ros.message.MessageFactory;
 
 public class SamplingMethods {
 
@@ -25,13 +26,19 @@ public class SamplingMethods {
 
         double totalWeightSoFar = 0.0;
         int curParticle = 0;
+        int curWeight = 0;
 
         ArrayList<Pose> newPoses = new ArrayList<Pose>(M);
         for (int m = 0; m < M; m++) {
+            System.out.println("s: " + s + " totalweight: " + totalWeightSoFar);
             while (s > totalWeightSoFar) {
-                totalWeightSoFar += weights[curParticle];
-                curParticle++;
+                totalWeightSoFar += weights[curWeight];
+                curParticle = curWeight;
+                curWeight++;
+                System.out.println("totalweight now: " + totalWeightSoFar);
+                //curParticle++;
             }
+            System.out.println("adding curparticle: " + curParticle);
             Pose nextPose = poseList.get(curParticle);
             newPoses.add(nextPose);
             s += stepSize;
@@ -101,17 +108,28 @@ public class SamplingMethods {
 	}
 	
 	// Give the groups a proportional weight between 0 and 1
-	double groupOneWeight = groupOneTotal / totalweight;
-	double groupTwoWeight = groupTwoTotal / totalweight;
+	double groupOneWeight = groupOneTotal / totalWeight;
+	double groupTwoWeight = groupTwoTotal / totalWeight;
 		
-	int groupOneParticleNumber = groupOneWeight * weights.length;
+	int groupOneParticleNumber = (int) groupOneWeight * weights.length;
 	int groupTwoParticleNumber = weights.length - groupOneParticleNumber;
 	
-	ArrayList<Pose> newPoses = new ArrayList<Pose>(lowVarianceSample(poseList, weights, totalWeight, groupOneParticleNumber, Random randGen));
-	newPoses.addAll(lowVarianceSample(poseList, weights, totalWeight, groupTwoParticleNumber, Random randGen));
+	ArrayList<Pose> newPoses = new ArrayList<Pose>(lowVarianceSample(poseList, weights, totalWeight, groupOneParticleNumber, randGen));
+	newPoses.addAll(lowVarianceSample(poseList, weights, totalWeight, groupTwoParticleNumber, randGen));
 	
-
         return newPoses;
+    }
+
+    public static Pose singleStackSample(List<Pose> poseList, double[] weights, double totalWeight, Random randGen){
+        double rand = randGen.nextDouble() * totalWeight;
+        double counter = 0.0;
+        int i = 0;
+        while (rand < counter) {
+            counter += weights[i];
+            i++;
+        }
+
+        return poseList.get(i);
     }
 
     public static ArrayList<Pose> stackSample(List<Pose> poseList, double[] weights, double totalWeight, Random randGen){
@@ -119,9 +137,8 @@ public class SamplingMethods {
         double counter;
         for (int i = 0; i < poseList.size(); i++) {
             counter = 0.0;
+            double rand = randGen.nextDouble() * totalWeight;
             for (int j = 0; j < weights.length; j++) {
-                double rand = randGen.nextDouble() * totalWeight;
-
                 counter += weights[j];
                 if (rand < counter) {
                     Pose nextPose = poseList.get(j);

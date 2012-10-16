@@ -12,6 +12,8 @@ import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import pf.AbstractLocaliser;
+import std_msgs.Bool;
+
 
 public class ExperimentNav extends AbstractNodeMain {
 
@@ -19,15 +21,23 @@ public class ExperimentNav extends AbstractNodeMain {
 
     Subscriber<Odometry> odom;
     Subscriber<PoseWithCovarianceStamped> expectedPose;
+    Subscriber<std_msgs.Bool> messages;
+
     Publisher<Twist> move;
     Logger logger;
     Logger checkpointLogger;
     ConnectedNode node;
     boolean newAmclData = false;
+    boolean realWorldMode;
 
     private Odometry[] odomArray = new Odometry[10];
     private PoseWithCovarianceStamped amclData;
     private Odometry lastMatchingOdom;
+    private Odometry latestOdom;
+
+    public ExperimentNav(boolean realWorld) {
+        realWorldMode = realWorld;
+    }
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
@@ -46,6 +56,21 @@ public class ExperimentNav extends AbstractNodeMain {
         }
         move = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
         odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
+
+        if (realWorldMode) {
+            messages = connectedNode.newSubscriber("message", std_msgs.Bool._TYPE);
+
+            messages.addMessageListener(new MessageListener<Bool>() {
+                @Override
+                public void onNewMessage(Bool t) {
+                    System.out.println("Received checkpoint message!");
+                    if (amclData != null) {
+                        checkpointReached(latestOdom);
+                    }
+                }
+            });
+        }
+
         expectedPose = connectedNode.newSubscriber("/amcl_pose", PoseWithCovarianceStamped._TYPE);
 
         expectedPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
@@ -58,131 +83,153 @@ public class ExperimentNav extends AbstractNodeMain {
         });
 
         odom.addMessageListener(new MessageListener<Odometry>() {
-
             int moveflag = 0;
 
             @Override
             public void onNewMessage(Odometry odom) {
-                odomArray[odom.getHeader().getStamp().nsecs / NSECS_DIVIDER] = odom;
-                if (amclData != null
-                        && odomArray[amclData.getHeader().getStamp().nsecs / NSECS_DIVIDER] != null
-                        && newAmclData) {
-                    int amclTime = amclData.getHeader().getStamp().nsecs / NSECS_DIVIDER;
-                    System.out.println(getTimeStampWithPoseString(amclData) + "\t\t" + getTimeStampWithPoseString(odomArray[amclTime]));
-                    if (LocalisationUtil.timeStampEqual(odomArray[amclTime].getHeader().getStamp(), amclData.getHeader().getStamp())) {
-                        System.out.println("logging");
-                        logger.logLine(getTimeStampWithPoseString(amclData) + "\t" +
-                                getTimeStampWithPoseString(odomArray[amclTime]));
-                        lastMatchingOdom = odomArray[amclTime];
-                    } else {
-                        System.out.println("ERROR! Something bad is happening inside onNewMessage()");
-                        System.err.println("ERROR! Something bad is happening inside onNewMessage()");
-                        logger.logLine("ERROR! Encountered inequality in timestamps: ");
-                        logger.logLine("AMCL: "+getTimeStampWithPoseString(amclData) + "\t\t" +
-                                "ODOM: " + getTimeStampWithPoseString(odomArray[amclTime]));
-                        checkpointLogger.logLine("ERROR! Encountered inequality in timestamps: ");
-                        checkpointLogger.logLine("AMCL: "+getTimeStampWithPoseString(amclData) + "\t\t" +
-                                "ODOM: " + getTimeStampWithPoseString(odomArray[amclTime]));
-                    }
-                    newAmclData = false;
+                if (realWorldMode) {
+                    realWorldLogging(odom);
+                } else {
+                    stageLogging(odom);
+                    double curX = odom.getPose().getPose().getPosition().getX();
+                    double curY = odom.getPose().getPose().getPosition().getY();
+                    double curHeading = AbstractLocaliser.getHeading(odom.getPose().getPose().getOrientation());
+
+                    moveflag = experimentPoints(curX, curY, curHeading, moveflag);
                 }
-                double curX = odom.getPose().getPose().getPosition().getX();
-                double curY = odom.getPose().getPose().getPosition().getY();
-                double curHeading = AbstractLocaliser.getHeading(odom.getPose().getPose().getOrientation());
-
-                Twist fwd = move.newMessage();
-                fwd.getLinear().setX(0.5);
-
-                Twist ccwRot = move.newMessage();
-                ccwRot.getAngular().setZ(0.5);
-                Twist cwRot = move.newMessage();
-                cwRot.getAngular().setZ(-0.5);
-                
-                if(curX < 6.10 && curY < 0.01 && moveflag == 0) {
-                    move.publish(fwd);
-                }
-
-                if (curX < 6.26 && curX > 6.24 && curY < 0.01 && moveflag == 0){
-                    moveflag = 1;
-                    checkpointReached();
-                }
-
-                if (curHeading > -1.00 && moveflag == 1) {
-                    move.publish(cwRot);
-                }
-
-                if (curHeading < -1.10 && curHeading > -1.20 && moveflag == 1){
-                    moveflag = 2;
-                    checkpointReached();
-                }
-
-                if (curX < 8.15 && moveflag == 2){
-                    move.publish(fwd);
-                }
-
-                if (curX < 8.22 && curX > 8.20 && curY < -4.37 && curY > -4.39 && moveflag == 2){
-                    moveflag = 3;
-                    checkpointReached();
-                }
-
-                if (curHeading > -2.45 && moveflag == 3){
-                    move.publish(cwRot);
-                }
-
-                if (curHeading > -2.60 && curHeading < -2.50 && moveflag == 3){
-                    moveflag = 4;
-                    checkpointReached();
-                }
-
-                if (curX > 5.81 && moveflag == 4){
-                    move.publish(fwd);
-                }
-
-                if (curX > 5.65 && curX < 5.75 && moveflag == 4){
-                    moveflag = 5;
-                    checkpointReached();
-                }
-
-                if (curHeading < -1.80 && moveflag == 5){
-                    move.publish(ccwRot);
-                }
-
-                if (curHeading < -1.60 && curHeading > -1.70 && moveflag == 5){
-                    moveflag = 6;
-                    checkpointReached();
-                }
-
-                if (curY > -9.25 && moveflag == 6){
-                    move.publish(fwd);
-                }
-
-                if (curY > -9.45 && curY < -9.35 && moveflag == 6){
-                    moveflag = 7;
-                    checkpointReached();
-                }
-
-                if (curHeading < -0.60 && moveflag == 7){
-                    move.publish(ccwRot);
-                }
-
-                if (curHeading > -0.55 && curHeading < -0.45 && moveflag == 7){
-                    moveflag = 8;
-                    checkpointReached();
-                }
-
-                if (curX < 8.50 && moveflag == 8) {
-                    move.publish(fwd);
-                }
-
-
-                if (curX > 8.55 && curX < 8.65 && curY < -11.05 && curY > -11.15 && moveflag == 8){
-                    checkpointReached();
-                    node.shutdown();
-                }
-
-
             }
         });
+    }
+
+    public void realWorldLogging(Odometry odom){
+        latestOdom = odom;
+        if (amclData != null && newAmclData) {
+            logger.logLine(getTimeStampWithPoseString(odom) + "\t\t" + getTimeStampWithPoseString(amclData));
+            newAmclData = false;
+        }
+    }
+
+    public void stageLogging(Odometry odom){
+        odomArray[odom.getHeader().getStamp().nsecs / NSECS_DIVIDER] = odom;
+        if (amclData != null
+                && odomArray[amclData.getHeader().getStamp().nsecs / NSECS_DIVIDER] != null
+                && newAmclData) {
+            int amclTime = amclData.getHeader().getStamp().nsecs / NSECS_DIVIDER;
+            System.out.println(getTimeStampWithPoseString(amclData) + "\t\t" + getTimeStampWithPoseString(odomArray[amclTime]));
+            if (LocalisationUtil.timeStampEqual(odomArray[amclTime].getHeader().getStamp(), amclData.getHeader().getStamp())) {
+                System.out.println("logging");
+                logger.logLine(getTimeStampWithPoseString(amclData) + "\t"
+                        + getTimeStampWithPoseString(odomArray[amclTime]));
+                lastMatchingOdom = odomArray[amclTime];
+            } else {
+                System.out.println("ERROR! Something bad is happening inside onNewMessage()");
+                System.err.println("ERROR! Something bad is happening inside onNewMessage()");
+                logger.logLine("ERROR! Encountered inequality in timestamps: ");
+                logger.logLine("AMCL: " + getTimeStampWithPoseString(amclData) + "\t\t"
+                        + "ODOM: " + getTimeStampWithPoseString(odomArray[amclTime]));
+                checkpointLogger.logLine("ERROR! Encountered inequality in timestamps: ");
+                checkpointLogger.logLine("AMCL: " + getTimeStampWithPoseString(amclData) + "\t\t"
+                        + "ODOM: " + getTimeStampWithPoseString(odomArray[amclTime]));
+            }
+            newAmclData = false;
+        }
+   
+    }
+
+    public int experimentPoints(double curX, double curY, double curHeading, int flag){
+        int moveflag = flag;
+        Twist fwd = move.newMessage();
+        fwd.getLinear().setX(0.5);
+
+        Twist ccwRot = move.newMessage();
+        ccwRot.getAngular().setZ(0.5);
+        Twist cwRot = move.newMessage();
+        cwRot.getAngular().setZ(-0.5);
+
+        if (curX < 6.10 && curY < 0.01 && moveflag == 0) {
+            move.publish(fwd);
+        }
+
+        if (curX < 6.26 && curX > 6.24 && curY < 0.01 && moveflag == 0) {
+            moveflag = 1;
+            checkpointReached();
+        }
+
+        if (curHeading > -1.00 && moveflag == 1) {
+            move.publish(cwRot);
+        }
+
+        if (curHeading < -1.10 && curHeading > -1.20 && moveflag == 1) {
+            moveflag = 2;
+            checkpointReached();
+        }
+
+        if (curX < 8.15 && moveflag == 2) {
+            move.publish(fwd);
+        }
+
+        if (curX < 8.22 && curX > 8.20 && curY < -4.37 && curY > -4.39 && moveflag == 2) {
+            moveflag = 3;
+            checkpointReached();
+        }
+
+        if (curHeading > -2.45 && moveflag == 3) {
+            move.publish(cwRot);
+        }
+
+        if (curHeading > -2.60 && curHeading < -2.50 && moveflag == 3) {
+            moveflag = 4;
+            checkpointReached();
+        }
+
+        if (curX > 5.81 && moveflag == 4) {
+            move.publish(fwd);
+        }
+
+        if (curX > 5.65 && curX < 5.75 && moveflag == 4) {
+            moveflag = 5;
+            checkpointReached();
+        }
+
+        if (curHeading < -1.80 && moveflag == 5) {
+            move.publish(ccwRot);
+        }
+
+        if (curHeading < -1.60 && curHeading > -1.70 && moveflag == 5) {
+            moveflag = 6;
+            checkpointReached();
+        }
+
+        if (curY > -9.25 && moveflag == 6) {
+            move.publish(fwd);
+        }
+
+        if (curY > -9.45 && curY < -9.35 && moveflag == 6) {
+            moveflag = 7;
+            checkpointReached();
+        }
+
+        if (curHeading < -0.60 && moveflag == 7) {
+            move.publish(ccwRot);
+        }
+
+        if (curHeading > -0.55 && curHeading < -0.45 && moveflag == 7) {
+            moveflag = 8;
+            checkpointReached();
+        }
+
+        if (curX < 8.50 && moveflag == 8) {
+            move.publish(fwd);
+        }
+
+
+        if (curX > 8.55 && curX < 8.65 && curY < -11.05 && curY > -11.15 && moveflag == 8) {
+            checkpointReached();
+            node.shutdown();
+        }
+
+        return moveflag;
+
     }
 
     public String getExperimentDescription() {
@@ -197,6 +244,11 @@ public class ExperimentNav extends AbstractNodeMain {
         desc += "AbstractLocaliser PositionNoise: "+AbstractLocaliser.getPositionNoise();
         desc += "\n\n";
         return desc;
+    }
+
+    public void checkpointReached(Odometry odom){
+        checkpointLogger.logLine(getTimeStampWithPoseString(amclData)
+                + "\t" + getTimeStampWithPoseString(odom));
     }
 
     public void checkpointReached() {

@@ -23,8 +23,9 @@ public class Launcher extends AbstractNodeMain {
         //exec.execute(new Logger(), conf);
         //exec.execute(new Avoider2(), conf);
         PFLocalisationNode.experimentMode = true;
+        PFLocalisationNode.realWorldMode = false;
         exec.execute(new PFLocalisationNode(), conf);
-        exec.execute(new ExperimentNav(), conf);
+        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
     }
 
     @Override
