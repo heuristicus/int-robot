@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
+import org.jboss.netty.buffer.ChannelBuffer;
 import pf.AbstractLocaliser;
 import pf.SensorModel;
 import sensor_msgs.LaserScan;
@@ -16,7 +17,7 @@ import sensor_msgs.LaserScan;
 public class PFLocaliser extends AbstractLocaliser {
 
     public static final int PARTICLE_NUMBER = 100;
-    public static final double ROTATION_NOISE = Math.PI/30;
+    public static final double ROTATION_NOISE = Math.PI/30.0;
     public static final double POSITION_NOISE = 0.15;
     
     // How far another point is before being considered a clustered point
@@ -30,7 +31,7 @@ public class PFLocaliser extends AbstractLocaliser {
     public double wslow = 0;
     public double wfast = 0;
     public double decayParamSlow = 0.1;
-    public double decayParamFast = 5;
+    public double decayParamFast = 6;
 
     public PFLocaliser() {
         super();
@@ -118,6 +119,11 @@ public class PFLocaliser extends AbstractLocaliser {
     @Override
     /** Called every time there is a laser scan reading. */
     public PoseArray updateParticleCloud(LaserScan scan, OccupancyGrid map, PoseArray particleCloud) {
+        // if running the augmented algorithm, use the update method for that instead
+        if (augmented) {
+            return augmented_updateParticleCloud(scan, map, particleCloud);
+        }
+        
         final int readings = scan.getRanges().length;
 
         // If we haven't moved since last call of this method,
@@ -125,6 +131,7 @@ public class PFLocaliser extends AbstractLocaliser {
         if (lastPoseList != null){
             List<Pose> newCloud = particleCloud.getPoses();
 
+            // THIS CAUSES SLOWDOWN?
             boolean allEqual = true;
             for (int i = 0; i < lastPoseList.size(); i++) {
                 boolean equal = LocalisationUtil.poseIsEqual(lastPoseList.get(i), newCloud.get(i));
@@ -155,12 +162,9 @@ public class PFLocaliser extends AbstractLocaliser {
 
         // New set of poses which are sampled from the previous
         // set and have had noise added to them.
-        ArrayList<Pose> sampledPoses = SamplingMethods.stackSample(poseList, weights, totalWeight, randGen);
-//        ArrayList<Pose> sampledPoses = new ArrayList<Pose>();
-//
-//        for (int i = 0; i < weights.length; i++) {
-//            sampledPoses.add(SamplingMethods.singleStackSample(poseList, weights, totalWeight, randGen));
-//        }
+ //       ArrayList<Pose> sampledPoses = SamplingMethods.stackSample(poseList, weights, totalWeight, randGen);
+//       ArrayList<Pose> sampledPoses = SamplingMethods.lowVarianceSample(poseList, weights, totalWeight, randGen);
+        ArrayList<Pose> sampledPoses = SamplingMethods.stratifiedSample(poseList, weights, totalWeight, randGen);
 
         ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
 
@@ -199,38 +203,41 @@ public class PFLocaliser extends AbstractLocaliser {
 
         double totalWeight = 0.0;
         double weight;
-        double weightavg = 0;
+        double weightavg = 0.0;
         for (int i = 0; i < weights.length; i++) {
             weight = SensorModel.getWeight(scan, map, poseList.get(i), readings);
             totalWeight += weight;
             weights[i] = weight;
-            weightavg += (1/weights.length) * weight;
+            weightavg += (1.0/weights.length) * weight;
         }
 
+        System.out.println("weightavg: " + weightavg);
         wslow += decayParamSlow * (weightavg - wslow);
         wfast += decayParamFast * (weightavg - wfast);
 
-       List<Pose> sampledPoses = messageFactory.newFromType(PoseArray._TYPE);
+        System.out.println("wslow: " + wslow + " wfast: " + wfast);
+
+       ArrayList<Pose> sampledPoses = new ArrayList<Pose>();
 
         for (int i= 0; i < poseList.size(); i++) {
             double pRand = 1.0 - wfast/wslow;
+            System.out.println("1.0-wfast/wslow = " + pRand);
             if (pRand > 0){
-                System.out.println("adding random pose");
+                System.out.println("Adding random pose");
+                //sampledPoses.add(LocalisationUtil.randomPose(map));
             } else {
+                System.out.println("Sampling from normal poses");
                 sampledPoses.add(SamplingMethods.singleStackSample(poseList, weights, totalWeight, randGen));
             }
         }
-//
-//
-//        ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
-//
+
+
+        ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
+
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
-        pa.setPoses(sampledPoses);
-//        pa.setPoses(noisyPoses);
-//
-//        lastPoseList = util.copyPoseArray(pa).getPoses();
-//
-//        return pa;
+        pa.setPoses(noisyPoses);
+
+        lastPoseList = util.copyPoseArray(pa).getPoses();
 
         return pa;
 

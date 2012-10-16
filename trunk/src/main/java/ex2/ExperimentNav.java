@@ -45,7 +45,7 @@ public class ExperimentNav extends AbstractNodeMain {
         try {
             System.out.println("Initialising logger...");
             logger = new Logger();
-            logger.setAutoFlushing(true);
+            logger.setAutoFlushing(false);
             logger.logLine(getExperimentDescription());
             checkpointLogger = new Logger("CheckpointLog-", true);
             checkpointLogger.setAutoFlushing(true);
@@ -117,7 +117,6 @@ public class ExperimentNav extends AbstractNodeMain {
             int amclTime = amclData.getHeader().getStamp().nsecs / NSECS_DIVIDER;
             System.out.println(getTimeStampWithPoseString(amclData) + "\t\t" + getTimeStampWithPoseString(odomArray[amclTime]));
             if (LocalisationUtil.timeStampEqual(odomArray[amclTime].getHeader().getStamp(), amclData.getHeader().getStamp())) {
-                System.out.println("logging");
                 logger.logLine(getTimeStampWithPoseString(amclData) + "\t"
                         + getTimeStampWithPoseString(odomArray[amclTime]));
                 lastMatchingOdom = odomArray[amclTime];

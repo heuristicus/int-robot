@@ -8,9 +8,12 @@ import geometry_msgs.Quaternion;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import nav_msgs.OccupancyGrid;
+import org.jboss.netty.buffer.ChannelBuffer;
 import org.ros.message.MessageFactory;
 import org.ros.message.Time;
 import pf.AbstractLocaliser;
+import pf.SensorModel;
 
 public class LocalisationUtil {
 
@@ -29,13 +32,18 @@ public class LocalisationUtil {
         this.rotationNoise = rotationNoise;
     }
 
+    public static double getGaussian(double mean, double stdDev, Random rGen){
+        double rand = rGen.nextGaussian();
+        rand *= stdDev;
+        rand += mean;
+
+        return rand;
+    }
+
     /** Calculates a random value under a distribution specified by the given
      * mean and standard deviation */
     public double getGaussian(double mean, double stdDev) {
-        double rand = randGen.nextGaussian();
-        rand *= stdDev;
-        rand += mean;
-        return rand;
+        return getGaussian(mean, stdDev, randGen);
     }
 
     /** Applies noise to all particles and returns a new noisier list */
@@ -142,11 +150,50 @@ public class LocalisationUtil {
     }
 
     public static boolean timeStampEqual(Time s1, Time s2){
-        System.out.println("s1: "+s1.secs+"."+s1.nsecs +
-                "\t\tAND s2: " + s2.secs + "." + s2.nsecs +
-                " AND secs.EQUAL=" +(s1.secs == s2.secs) +
-                " AND nsecs.EQUAL="+(s1.nsecs == s2.nsecs));
+        //System.out.println("s1: "+s1.secs+"."+s1.nsecs +
+        //        "\t\tAND s2: " + s2.secs + "." + s2.nsecs +
+        //        " AND secs.EQUAL=" +(s1.secs == s2.secs) +
+        //        " AND nsecs.EQUAL="+(s1.nsecs == s2.nsecs));
         return s1.nsecs == s2.nsecs && s1.secs == s2.secs;
+    }
+
+    public Pose randomPose(OccupancyGrid map){
+        ChannelBuffer buff = map.getData();
+        int mapHeight = map.getInfo().getHeight();
+        int mapWidth = map.getInfo().getWidth();
+        float mapRes = map.getInfo().getResolution();
+        boolean foundOpen = false;
+        double randX = 0;
+        double randY = 0;
+
+        while (!foundOpen){
+            randX = (randGen.nextDouble() * mapWidth) * mapRes;
+            randY = (randGen.nextDouble() * mapHeight) * mapRes;
+
+            // get the index in the array for this random point
+            int index = SensorModel.getMapIndex((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight);
+
+            if (index > 0 && index < buff.capacity()){
+                Byte cell = buff.getByte(index);
+
+                if (cell.byteValue() > 0 || cell.byteValue() < 65) {
+                    // We are inside the map bounds and the cell is not occupied.
+                    foundOpen = true;
+                }
+            } else {
+                foundOpen = false;
+            }
+        }
+
+        Pose rPose = messageFactory.newFromType(Pose._TYPE);
+        rPose.getPosition().setX(randX);
+        rPose.getPosition().setY(randY);
+        System.out.println("random pose at " + randX + "," + randY + "generated");
+        // check this
+        rPose.setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), LocalisationUtil.getGaussian(0, Math.PI, randGen)));
+
+        return rPose;
+
     }
 
 }

@@ -27,9 +27,9 @@ import nav_msgs.OccupancyGrid; // Map
 public class PFLocalisationNode extends AbstractNodeMain {
 
     // Whether we are performaing an automated | realworld experiment
-    public static boolean experimentMode = true;
+    public static boolean experimentMode = false;
     public static boolean realWorldMode = false;
-    
+    public static boolean augmented = false;
     // Settings
     private static final double PUBLISH_DELTA = 0.1; // // Minimum change (m/radians) before publishing new particle cloud and pose
 

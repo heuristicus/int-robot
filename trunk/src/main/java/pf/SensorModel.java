@@ -190,7 +190,7 @@ public class SensorModel {
     }
     
 
-    private static int getMapIndex(int x, int y, int width, int height) {
+    public static int getMapIndex(int x, int y, int width, int height) {
         // Given a map width and a location x,y, returns the index
         // of the linear map vector corresponding to this location
         // e.g. if x,y = 5,0 it should return the index 5 (6th element of the array)

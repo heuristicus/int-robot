@@ -10,7 +10,7 @@ import java.util.Calendar;
 
 public class Logger {
 
-    private static final String LOG_DIRECTORY = "/data/private/robot/workspace/robotics/logs/real_world";
+    private static final String LOG_DIRECTORY = "/data/private/robot/workspace/robotics/logs";
     private final String logFile;
     private File file;
     private PrintWriter writer;

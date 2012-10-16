@@ -42,7 +42,7 @@ public class PoseEstimationMethods {
         return averagePose(connectedParticles, messageFactory);
     }
 
-    public static Pose averagePose (ArrayList<Pose> poses, MessageFactory messageFactory){
+    private static Pose averagePose(ArrayList<Pose> poses, MessageFactory messageFactory) {
         double avgx = 0;
         double avgy = 0;
         double avgrot = 0;
