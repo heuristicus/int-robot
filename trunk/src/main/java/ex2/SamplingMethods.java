@@ -60,11 +60,11 @@ public class SamplingMethods {
         // Parameterised version of the lowVarianceSample method above.
         // This is to be used as a sub-sampling method for stratified sampling
 
-        System.out.println("LOW VARIANCE PARAMS: " +
-                "Weights.length: "+weights.length+
-                "\ttotalWeight: "+totalWeight+
-                "\tstartIndex: "+startIndex+
-                "\tnumOfParticles: "+numberOfParticles);
+//        System.out.println("LOW VARIANCE PARAMS: " +
+//                "Weights.length: "+weights.length+
+//                "\ttotalWeight: "+totalWeight+
+//                "\tstartIndex: "+startIndex+
+//                "\tnumOfParticles: "+numberOfParticles);
 
         final int M = numberOfParticles;
         final double stepSize = totalWeight / M;
@@ -148,7 +148,7 @@ public class SamplingMethods {
                 break;
             }
         }
-        LocalisationUtil.printPose(poseList.get(i));
+//        LocalisationUtil.printPose(poseList.get(i));
         return poseList.get(i);
     }
 

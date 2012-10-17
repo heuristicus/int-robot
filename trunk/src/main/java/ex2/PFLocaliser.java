@@ -28,10 +28,16 @@ public class PFLocaliser extends AbstractLocaliser {
     private Random randGen = new Random();
     private LocalisationUtil util;
 
-    public double wslow = 0;
-    public double wfast = 0;
-    public double decayParamSlow = 0.1;
-    public double decayParamFast = 6;
+    public double wslow = 0.0;
+    public double wfast = 0.0;
+    public double decayParamSlow = 0.01;
+    public double decayParamFast = 0.75;
+    public int randomParticleThreshold = (int) (PARTICLE_NUMBER * 0.6);
+    public boolean firstLoop = true;
+
+
+    public double particleMinWeightThreshold = 50.0;
+    public double cloudMinMeanWeightThreshold = 80.0;
 
     public PFLocaliser() {
         super();
@@ -163,10 +169,10 @@ public class PFLocaliser extends AbstractLocaliser {
         // New set of poses which are sampled from the previous
         // set and have had noise added to them.
  //       ArrayList<Pose> sampledPoses = SamplingMethods.stackSample(poseList, weights, totalWeight, randGen);
-//       ArrayList<Pose> sampledPoses = SamplingMethods.lowVarianceSample(poseList, weights, totalWeight, randGen);
-        ArrayList<Pose> sampledPoses = SamplingMethods.stratifiedSample(poseList, weights, totalWeight, randGen);
+       ArrayList<Pose> sampledPoses = SamplingMethods.lowVarianceSample(poseList, weights, totalWeight, randGen);
+//        ArrayList<Pose> sampledPoses = SamplingMethods.stratifiedSample(poseList, weights, totalWeight, randGen);
 
-        ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
+        List<Pose> noisyPoses = util.applyNoise(sampledPoses);
 
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
         pa.setPoses(noisyPoses);
@@ -203,36 +209,20 @@ public class PFLocaliser extends AbstractLocaliser {
 
         double totalWeight = 0.0;
         double weight;
-        double weightavg = 0.0;
+        double weightAvg = 0.0;
         for (int i = 0; i < weights.length; i++) {
             weight = SensorModel.getWeight(scan, map, poseList.get(i), readings);
             totalWeight += weight;
             weights[i] = weight;
-            weightavg += (1.0/weights.length) * weight;
-        }
-
-        System.out.println("weightavg: " + weightavg);
-        wslow += decayParamSlow * (weightavg - wslow);
-        wfast += decayParamFast * (weightavg - wfast);
-
-        System.out.println("wslow: " + wslow + " wfast: " + wfast);
-
-       ArrayList<Pose> sampledPoses = new ArrayList<Pose>();
-
-        for (int i= 0; i < poseList.size(); i++) {
-            double pRand = 1.0 - wfast/wslow;
-            System.out.println("1.0-wfast/wslow = " + pRand);
-            if (pRand > 0){
-                System.out.println("Adding random pose");
-                //sampledPoses.add(LocalisationUtil.randomPose(map));
-            } else {
-                System.out.println("Sampling from normal poses");
-                sampledPoses.add(SamplingMethods.singleStackSample(poseList, weights, totalWeight, randGen));
-            }
+            weightAvg += (1.0/weights.length) * weight;
         }
 
 
-        ArrayList<Pose> noisyPoses = util.applyNoise(sampledPoses);
+        ArrayList<Pose> sampledPoses = adaptiveLowVariance(map, poseList, weights, totalWeight, weightAvg);
+//        List<Pose> sampledPoses = particleThreshold(map, poseList, weights, totalWeight, weightAvg);
+//       ArrayList<Pose> sampledPoses = cloudThreshold(map, poseList, weights, totalWeight, weightAvg);
+
+        List<Pose> noisyPoses = util.applyNoise(sampledPoses);
 
         PoseArray pa = messageFactory.newFromType(PoseArray._TYPE);
         pa.setPoses(noisyPoses);
@@ -240,11 +230,94 @@ public class PFLocaliser extends AbstractLocaliser {
         lastPoseList = util.copyPoseArray(pa).getPoses();
 
         return pa;
+    }
 
+    public List<Pose> particleThreshold(OccupancyGrid map, List<Pose> poseList, double[] weights, double totalWeight, double weightAvg){
+        if (weightAvg > cloudMinMeanWeightThreshold) {
+            return poseList;
+        }
+
+        ArrayList<Pose> sampledPoses = new ArrayList<Pose>();
+
+        final ChannelBuffer buff = map.getData();
+
+        final int mapHeight = map.getInfo().getHeight();
+        final int mapWidth = map.getInfo().getWidth();
+        final float mapRes = map.getInfo().getResolution();
+
+        for (int i= 0; i < weights.length; i++) {
+            if (weights[i] < particleMinWeightThreshold && randGen.nextDouble() < 0.25) {
+                System.out.println("ParticleWeight is "+weights[i]+" thus random");
+                sampledPoses.add(util.randomPose(mapWidth, mapHeight, mapRes, randGen, messageFactory, buff));
+            //} else {
+            //    sampledPoses.add(poseList.get(i));
+            }
+        }
+
+        ArrayList<Pose> lowVarianceSampledPoses =
+                SamplingMethods.lowVarianceSubSample(poseList, weights,
+                totalWeight, 0, weights.length-sampledPoses.size(), randGen);
+        sampledPoses.addAll(lowVarianceSampledPoses);
+
+        return sampledPoses;
+
+    }
+
+    public ArrayList<Pose> cloudThreshold(OccupancyGrid map, List<Pose> poseList, double[] weights, double totalWeight, double weightavg){
+        ArrayList<Pose> sampledPoses = new ArrayList<Pose>();
+
+        int randomParticles = 0;
+
+        if (weightavg < cloudMinMeanWeightThreshold){
+            randomParticles = (int) (poseList.size() * randomParticleThreshold);
+            sampledPoses.addAll(util.getRandomPoses(map, randomParticles, randGen, messageFactory));
+        }
+
+        sampledPoses = SamplingMethods.lowVarianceSubSample(poseList, weights, totalWeight, poseList.size() - randomParticles, randomParticleThreshold, randGen);
+
+        return sampledPoses;
+
+    }
+
+    public ArrayList<Pose> adaptiveLowVariance(OccupancyGrid map, List<Pose> poseList, double[] weights, double totalWeight, double weightavg){
+
+        if (firstLoop){
+            wslow = weightavg;
+            wfast = weightavg;
+            firstLoop = false;
+        }
+
+        System.out.println("weightavg: " + weightavg);
+        wslow += decayParamSlow * (weightavg - wslow);
+        wfast += decayParamFast * (weightavg - wfast);
+
+        System.out.println("wslow: " + wslow + " wfast: " + wfast + "  1.0-wfast/wslow = " + (1.0 - (wfast/wslow)));
+
+        int randomPoses = 0;
+        // If wfast is smaller than wslow, pRand is high. If wfast ~= wslow, pRand is small.
+        double pRand = 1.0 - wfast / wslow;
+
+        for (int i= 0; i < poseList.size() && randomPoses <= randomParticleThreshold; i++) {
+            // Generate a random pose with probability pRand
+            if (randGen.nextDouble() < pRand){
+                randomPoses++;
+            }
+        }
+
+
+        // Get the required number of random poses.
+        ArrayList<Pose> sampledPoses = LocalisationUtil.getRandomPoses(map, randomPoses, randGen, messageFactory);
+        // The rest of the particles are sampled normally using low variance sampling.
+        sampledPoses.addAll(SamplingMethods.lowVarianceSubSample(poseList, weights, totalWeight, 0, poseList.size() - randomPoses, randGen));
+
+        System.out.println("Sampled " + randomPoses + " random poses and " + (poseList.size() - randomPoses) + " normal poses.");
+        
+        return sampledPoses;
     }
 
     @Override
     public Pose updatePose(PoseArray particleCloud) {
         return PoseEstimationMethods.clusterAverage(particleCloud, CLUSTER_THRESHOLD, messageFactory);
+
     }
 }

@@ -47,7 +47,7 @@ public class LocalisationUtil {
     }
 
     /** Applies noise to all particles and returns a new noisier list */
-    public ArrayList<Pose> applyNoise(ArrayList<Pose> poses) {
+    public List<Pose> applyNoise(List<Pose> poses) {
         ArrayList<Pose> newPoses = new ArrayList<Pose>(poses.size());
         for (int i = 0; i < poses.size(); i++) {
             Pose newPose = applyNoise(poses.get(i));
@@ -157,39 +157,48 @@ public class LocalisationUtil {
         return s1.nsecs == s2.nsecs && s1.secs == s2.secs;
     }
 
-    public Pose randomPose(OccupancyGrid map){
-        ChannelBuffer buff = map.getData();
-        int mapHeight = map.getInfo().getHeight();
-        int mapWidth = map.getInfo().getWidth();
-        float mapRes = map.getInfo().getResolution();
+    public static ArrayList<Pose> getRandomPoses(OccupancyGrid map, final int numToGet, Random randGen, MessageFactory messageFactory){
+        final ChannelBuffer buff = map.getData();
+
+        ArrayList<Pose> randomPoses = new ArrayList<Pose>();
+
+        final int mapHeight = map.getInfo().getHeight();
+        final int mapWidth = map.getInfo().getWidth();
+        final float mapRes = map.getInfo().getResolution();
+
+        for (int i = 0; i < numToGet; i++) {
+            randomPoses.add(randomPose(mapWidth, mapHeight, mapRes, randGen, messageFactory, buff));
+        }
+
+        return randomPoses;
+
+    }
+
+    public static Pose randomPose(int mapWidth, int mapHeight, float mapRes, Random randGen, MessageFactory messageFactory, ChannelBuffer buff){
         boolean foundOpen = false;
         double randX = 0;
         double randY = 0;
+        final int buffLength = buff.capacity();
 
         while (!foundOpen){
-            randX = (randGen.nextDouble() * mapWidth) * mapRes;
-            randY = (randGen.nextDouble() * mapHeight) * mapRes;
+            randX = (randGen.nextDouble() * mapWidth);
+            randY = (randGen.nextDouble() * mapHeight);
 
             // get the index in the array for this random point
-            int index = SensorModel.getMapIndex((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight);
-
-            if (index > 0 && index < buff.capacity()){
+            int index = SensorModel.getMapIndex((int) Math.round(randX), (int) Math.round(randY), (int) mapWidth, (int) mapHeight);
+            if (index > 0 && index < buffLength){
                 Byte cell = buff.getByte(index);
-
-                if (cell.byteValue() > 0 || cell.byteValue() < 65) {
+                if (cell.byteValue() == 0) {
                     // We are inside the map bounds and the cell is not occupied.
                     foundOpen = true;
                 }
-            } else {
-                foundOpen = false;
             }
         }
 
         Pose rPose = messageFactory.newFromType(Pose._TYPE);
-        rPose.getPosition().setX(randX);
-        rPose.getPosition().setY(randY);
-        System.out.println("random pose at " + randX + "," + randY + "generated");
-        // check this
+        rPose.getPosition().setX(randX * mapRes);
+        rPose.getPosition().setY(randY * mapRes);
+//        System.out.println("random pose at " + randX + "," + randY + " generated");
         rPose.setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), LocalisationUtil.getGaussian(0, Math.PI, randGen)));
 
         return rPose;
