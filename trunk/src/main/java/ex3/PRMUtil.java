@@ -4,20 +4,23 @@ import java.util.ArrayList;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.ros.message.MessageFactory;
 
 public class PRMUtil {
 
     Random randGen;
+    MessageFactory factory;
 
-    public PRMUtil(Random randGen){
+    public PRMUtil(Random randGen, MessageFactory factory){
         this.randGen = randGen;
+        this.factory = factory;
     }
 
     /*
      * Gets the euclidean distance between two points
      */
     public static double getEuclideanDistance(Vertex v1, Vertex v2){
-        return Math.sqrt(Math.pow(v1.getX() - v2.getX(), 2) + Math.pow(v1.getY() - v2.getY(), 2));
+        return Math.sqrt(Math.pow(v1.getLocation().getX() - v2.getLocation().getX(), 2) + Math.pow(v1.getLocation().getY() - v2.getLocation().getY(), 2));
     }
 
     /*
@@ -53,14 +56,14 @@ public class PRMUtil {
      */
     public Vertex getRandomVertex(int mapWidth, int mapHeight, float mapRes, ChannelBuffer buff){
         boolean foundOpen = false;
-        double randX = 0;
-        double randY = 0;
+        float randX = 0;
+        float randY = 0;
         final int buffLength = buff.capacity();
         int index;
 
         while (!foundOpen){
-            randX = (randGen.nextDouble() * mapWidth);
-            randY = (randGen.nextDouble() * mapHeight);
+            randX = (randGen.nextFloat() * mapWidth);
+            randY = (randGen.nextFloat() * mapHeight);
 
             // get the index in the array for this random point
             index = getMapIndex((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight);
@@ -73,7 +76,7 @@ public class PRMUtil {
             }
         }
 
-        return new Vertex(randX, randY);
+        return new Vertex(randX * mapRes, randY * mapRes, factory);
     }
 
     /*
