@@ -31,8 +31,8 @@ public class PFLocaliser extends AbstractLocaliser {
     public double wslow = 0.0;
     public double wfast = 0.0;
     public double decayParamSlow = 0.01;
-    public double decayParamFast = 0.75;
-    public int randomParticleThreshold = (int) (PARTICLE_NUMBER * 0.6);
+    public double decayParamFast = 0.50;
+    public double randomParticleThreshold = 0.6;
     public boolean firstLoop = true;
 
 
@@ -218,9 +218,9 @@ public class PFLocaliser extends AbstractLocaliser {
         }
 
 
-        ArrayList<Pose> sampledPoses = adaptiveLowVariance(map, poseList, weights, totalWeight, weightAvg);
+       // ArrayList<Pose> sampledPoses = adaptiveLowVariance(map, poseList, weights, totalWeight, weightAvg);
 //        List<Pose> sampledPoses = particleThreshold(map, poseList, weights, totalWeight, weightAvg);
-//       ArrayList<Pose> sampledPoses = cloudThreshold(map, poseList, weights, totalWeight, weightAvg);
+       ArrayList<Pose> sampledPoses = cloudThreshold(map, poseList, weights, totalWeight, weightAvg);
 
         List<Pose> noisyPoses = util.applyNoise(sampledPoses);
 
@@ -273,7 +273,7 @@ public class PFLocaliser extends AbstractLocaliser {
             sampledPoses.addAll(util.getRandomPoses(map, randomParticles, randGen, messageFactory));
         }
 
-        sampledPoses = SamplingMethods.lowVarianceSubSample(poseList, weights, totalWeight, poseList.size() - randomParticles, randomParticleThreshold, randGen);
+        sampledPoses.addAll(SamplingMethods.lowVarianceSubSample(poseList, weights, totalWeight, 0, poseList.size() - randomParticles, randGen));
 
         return sampledPoses;
 
@@ -297,7 +297,7 @@ public class PFLocaliser extends AbstractLocaliser {
         // If wfast is smaller than wslow, pRand is high. If wfast ~= wslow, pRand is small.
         double pRand = 1.0 - wfast / wslow;
 
-        for (int i= 0; i < poseList.size() && randomPoses <= randomParticleThreshold; i++) {
+        for (int i= 0; i < poseList.size() && randomPoses <= (int) (poseList.size() * randomParticleThreshold); i++) {
             // Generate a random pose with probability pRand
             if (randGen.nextDouble() < pRand){
                 randomPoses++;

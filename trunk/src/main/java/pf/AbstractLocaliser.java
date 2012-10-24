@@ -118,7 +118,7 @@ public abstract class AbstractLocaliser extends PFLocalisationNode {
         // Insert correct timestamp in particlecloud and estimatedpose,
         // so extending subclasses don't need to worry about this, but can
         // just concentrate on updating actual particle and pose locations
-        particlecloud.getHeader().setStamp(currentTime);
+    particlecloud.getHeader().setStamp(currentTime);
         particlecloud.getHeader().setFrameId("/map");
         estimatedpose.getHeader().setStamp(currentTime);
         estimatedpose.getHeader().setFrameId("/map");
