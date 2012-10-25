@@ -5,7 +5,6 @@ import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import nav_msgs.OccupancyGrid;
-import org.ros.internal.message.DefaultMessageFactory;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;
@@ -15,6 +14,7 @@ import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import sensor_msgs.PointCloud;
+import visualization_msgs.Marker;
 
 public class PRM extends AbstractNodeMain {
 
@@ -24,10 +24,12 @@ public class PRM extends AbstractNodeMain {
     boolean mapReceived = false;
     public static ConnectedNode node;
     OccupancyGrid map;
-    public static final int NUMBER_OF_VERTICES = 300;
+    public static final int NUMBER_OF_VERTICES = 400;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 2.0;
 
     Subscriber<OccupancyGrid> grid;
     Publisher<PointCloud> roadMap;
+    Publisher<Marker> lines;
 
     public PRM(){
         
@@ -49,7 +51,6 @@ public class PRM extends AbstractNodeMain {
         PRM.node = node;
 
         final MessageFactory factory = node.getTopicMessageFactory();
-
         grid.addMessageListener(new MessageListener<OccupancyGrid>() {
             @Override
             public void onNewMessage(OccupancyGrid message) {
@@ -64,21 +65,23 @@ public class PRM extends AbstractNodeMain {
 
     /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
+       
         util = new PRMUtil(new Random(), factory);
-        graph = new PRMGraph(util, map, NUMBER_OF_VERTICES);
-
+        graph = new PRMGraph(util, map, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD);
         PointCloud p = factory.newFromType(PointCloud._TYPE);
         p.setPoints(graph.getVertexLocations());
         p.getHeader().setFrameId("/map");
 
-        while(true){
+        try {
             roadMap.publish(p);
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(PRM.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            Thread.sleep(200);
+            roadMap.publish(p);
+            Thread.sleep(200);
+            roadMap.publish(p);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(PRM.class.getName()).log(Level.SEVERE, null, ex);
         }
+
     }
 
     /* Sets the search algorithm to be used by the graph to search for the

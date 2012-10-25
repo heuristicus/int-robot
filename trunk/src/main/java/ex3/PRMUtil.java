@@ -27,7 +27,7 @@ public class PRMUtil {
      * Calculates the weight of an edge.
      */
     public static double getEdgeWeight(Edge e){
-        return getEuclideanDistance(e.v1, e.v2);
+        return getEuclideanDistance(e.a, e.b);
     }
 
     /*
@@ -80,10 +80,25 @@ public class PRMUtil {
     }
 
     /*
-     * Connects vertices in an array with edges, and weights the edges appropriately.
+     * Connects all vertices to all other vertices within a euclidean distance of
+     * distanceThreshold.
      */
-    public ArrayList<Edge> connectVertices(ArrayList<Vertex> vertices){
-        return null;
+    public void connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
+        for (Vertex vertex : vertices) {
+            connectVertex(vertex, vertices, distanceThreshold);
+        }
+    }
+
+    /*
+     * Connects a vertex to other vertices within distanceThreshold euclidean distance
+     * of the specified vertex.
+     */
+    public void connectVertex(Vertex v, ArrayList<Vertex> graph, double distanceThreshold) {
+        for (Vertex vert : graph) {
+            if (getEuclideanDistance(v, vert) <= distanceThreshold) {
+                v.addConnectedVertex(vert);
+            }
+        }
     }
 
     /*

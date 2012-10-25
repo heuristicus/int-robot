@@ -9,8 +9,10 @@ public class PRMGraph {
 
     ArrayList<Vertex> vertices;
     ArrayList<Edge> edges;
+    double distanceThreshold;
 
-    public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices){
+    public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices, double distanceThreshold){
+        this.distanceThreshold = distanceThreshold;
         generatePRM(util, map, numVertices);
     }
 
@@ -19,7 +21,7 @@ public class PRMGraph {
      */
     public void generatePRM(PRMUtil util, OccupancyGrid map, int numVertices){
         vertices = util.generateRandomVertices(map, numVertices);
-        edges = util.connectVertices(vertices);
+        util.connectVertices(vertices, distanceThreshold);
     }
 
     public ArrayList<Edge> getEdges() {
