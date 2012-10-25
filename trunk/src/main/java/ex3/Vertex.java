@@ -1,22 +1,22 @@
 package ex3;
 
-import geometry_msgs.Point32;
+import geometry_msgs.Point;
 import java.util.ArrayList;
 import org.ros.message.MessageFactory;
 
 public class Vertex {
 
     ArrayList<Vertex> connectedVertices;
-    Point32 location;
+    Point location;
 
     public Vertex (float x, float y, MessageFactory factory){
-        location = factory.newFromType(Point32._TYPE);
+        location = factory.newFromType(Point._TYPE);
         location.setX(x);
         location.setY(y);
         connectedVertices = new ArrayList<Vertex>();
     }
 
-    public Vertex(Point32 location){
+    public Vertex(Point location){
         this.location = location;
     }
 
@@ -28,7 +28,7 @@ public class Vertex {
         location.setY(y);
     }
 
-    public Point32 getLocation() {
+    public Point getLocation() {
         return location;
     }
 

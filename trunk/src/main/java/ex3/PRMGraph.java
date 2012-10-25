@@ -1,7 +1,6 @@
 package ex3;
 
-import ex3.search.SearchAlgorithm;
-import geometry_msgs.Point32;
+import geometry_msgs.Point;
 import java.util.ArrayList;
 import nav_msgs.OccupancyGrid;
 
@@ -32,8 +31,8 @@ public class PRMGraph {
         return vertices;
     }
 
-    public ArrayList<Point32> getVertexLocations(){
-        ArrayList<Point32> points = new ArrayList<Point32>();
+    public ArrayList<Point> getVertexLocations(){
+        ArrayList<Point> points = new ArrayList<Point>();
         for (Vertex vertex : vertices) {
             points.add(vertex.getLocation());
         }

@@ -13,8 +13,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
-import sensor_msgs.PointCloud;
-import visualization_msgs.Marker;
+import visualization_msgs.MarkerArray;
 
 public class PRM extends AbstractNodeMain {
 
@@ -24,12 +23,11 @@ public class PRM extends AbstractNodeMain {
     boolean mapReceived = false;
     public static ConnectedNode node;
     OccupancyGrid map;
-    public static final int NUMBER_OF_VERTICES = 400;
-    public static final double PROXIMITY_DISTANCE_THRESHOLD = 2.0;
+    public static final int NUMBER_OF_VERTICES = 100;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.0;
 
     Subscriber<OccupancyGrid> grid;
-    Publisher<PointCloud> roadMap;
-    Publisher<Marker> lines;
+    Publisher<MarkerArray> markers;
 
     public PRM(){
         
@@ -47,7 +45,7 @@ public class PRM extends AbstractNodeMain {
     @Override
     public void onStart(final ConnectedNode node) {
         grid = node.newSubscriber("map", OccupancyGrid._TYPE);
-        roadMap = node.newPublisher("PRMGraph", PointCloud._TYPE);
+        markers = node.newPublisher("markers", MarkerArray._TYPE);
         PRM.node = node;
 
         final MessageFactory factory = node.getTopicMessageFactory();
@@ -68,21 +66,60 @@ public class PRM extends AbstractNodeMain {
        
         util = new PRMUtil(new Random(), factory);
         graph = new PRMGraph(util, map, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD);
-        PointCloud p = factory.newFromType(PointCloud._TYPE);
-        p.setPoints(graph.getVertexLocations());
-        p.getHeader().setFrameId("/map");
 
-        try {
-            roadMap.publish(p);
-            Thread.sleep(200);
-            roadMap.publish(p);
-            Thread.sleep(200);
-            roadMap.publish(p);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(PRM.class.getName()).log(Level.SEVERE, null, ex);
+        publishMarkers(graph);
+
+    }
+
+    public void publishMarkers(PRMGraph graph){
+        MarkerArray array = markers.newMessage();
+
+        array.setMarkers(util.getGraphMarkers(graph, "/map"));
+
+        for (int i = 0; i < 10; i++) {
+            markers.publish(array);
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(PRM.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
 
     }
+
+//    public void publishLines_arrow(MessageFactory factory) {
+//        ArrayList<Marker> markers = new ArrayList<Marker>();
+//        Marker m = factory.newFromType(Marker._TYPE);
+//
+//        m.getHeader().setFrameId("/map");
+//        m.getHeader().setStamp(node.getCurrentTime());
+//
+//        m.setNs("edges");
+//        m.setId(0);
+//        m.setType(Marker.ARROW);
+//        m.setAction(m.ADD);
+//
+//
+//        m.getPose().getPosition().setX(20);
+//        m.getPose().getPosition().setY(30);
+//        m.getPose().getPosition().setZ(0.0);
+//        m.getPose().getOrientation().setW(1.0);
+//        m.getPose().getOrientation().setX(0.0);
+//        m.getPose().getOrientation().setY(0.0);
+//        m.getPose().getOrientation().setZ(0.0);
+//
+//        m.getScale().setX(20);
+//        m.getScale().setY(5);
+//        m.getScale().setZ(0);
+//
+//        m.getColor().setA(1.0f);
+//        m.getColor().setR(1.0f);
+//        m.setLifetime(Duration.fromMillis(100000));
+//
+//
+//        this.markers.publish(m);
+//
+//    }
 
     /* Sets the search algorithm to be used by the graph to search for the
      * shortest path from one vertex in the graph to another */
