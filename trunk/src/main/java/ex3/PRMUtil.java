@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.ros.message.MessageFactory;
+import org.ros.node.topic.Publisher;
 import visualization_msgs.Marker;
 
 public class PRMUtil {
@@ -185,22 +187,54 @@ public class PRMUtil {
         return mList;
     }
 
-    Marker getPointMarker(PRMGraph graph, MessageFactory factory, String frameID) {
-        Marker m = factory.newFromType(Marker._TYPE);
+    /*
+     * Inflates the map so that obstacles are increased in size to the extent that
+     * if the robot stays in the remaining free space, it will not collide with obstacles.
+     * The actual obstacles are replaced with unknown space, and a certain area in the proxi-
+     * mity of the obstacle is converted to obstacle space.
+     */
+    OccupancyGrid inflateMap(OccupancyGrid grid, Publisher<OccupancyGrid> pub) {
+        /*
+         * Copy data in the grid to a new channel buffer. We use this to check
+         * what data was in the original buffer at each point.
+         */
+        ChannelBuffer original = ChannelBuffers.copiedBuffer(grid.getData());
 
-        setMarkerHeader(m, frameID, "points", 1, m.ADD, m.POINTS);
+        // Get an occupancy grid for us to put modified data into.
+        OccupancyGrid inflatedMap = pub.newMessage();
+        // Set the height, width and resolution to the same as that of the original.
+        inflatedMap.setInfo(grid.getInfo());
+        // Copy the data in the original buffer into the newly created grid.
+        inflatedMap.setData(ChannelBuffers.copiedBuffer(grid.getData()));
 
-        m.getPose().getOrientation().setZ(1.0f);
-        m.getScale().setX(0.1f);
-        m.getColor().setA(1.0f);
-        m.getColor().setR(1.0f);
-
-        for (Vertex v : graph.getVertices()) {
-            m.getPoints().add(v.getLocation());
+        for (int i = 0; i < original.capacity(); i++) {
+            // If data in the map indicates an obstacle, widen the obstacle by some amount
+            if (original.getByte(i) == 100) {
+                for (int j = i - 5; j < i + 5; j++) {
+                    // If there is an obstacle very close to the zeroth index, avoid
+                    // exceptions
+                    if (j < 0) {
+                        j = 0;
+                    }
+                    // Also avoid going over capacity
+                    if (j == original.capacity()) {
+                        break;
+                    }
+                    // No point widening obstacles into unknown space or something
+                    // which is already an obstacle
+                    if (original.getByte(j) == -1 || original.getByte(j) == 100){
+                        continue;
+                    }
+                    // Set the byte to an obstacle in the inflated map
+                    inflatedMap.getData().setByte(j, 100);
+                }
+                // Set the original obstacle position to unknown space just to
+                // keep track of where it was before.
+                inflatedMap.getData().setByte(i, -1);
+            }
         }
-        
-        return m;
+
+        return inflatedMap;
     }
 
-    
 }

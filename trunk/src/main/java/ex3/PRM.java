@@ -23,11 +23,13 @@ public class PRM extends AbstractNodeMain {
     boolean mapReceived = false;
     public static ConnectedNode node;
     OccupancyGrid map;
+    OccupancyGrid inflatedMap;
     public static final int NUMBER_OF_VERTICES = 100;
     public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.0;
 
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> markers;
+    Publisher<OccupancyGrid> inflatedMapPublisher;
 
     public PRM(){
         
@@ -45,6 +47,7 @@ public class PRM extends AbstractNodeMain {
     @Override
     public void onStart(final ConnectedNode node) {
         grid = node.newSubscriber("map", OccupancyGrid._TYPE);
+        inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         markers = node.newPublisher("markers", MarkerArray._TYPE);
         PRM.node = node;
 
@@ -68,7 +71,9 @@ public class PRM extends AbstractNodeMain {
         graph = new PRMGraph(util, map, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD);
 
         publishMarkers(graph);
-
+        inflatedMap = util.inflateMap(map, inflatedMapPublisher);
+        inflatedMapPublisher.setLatchMode(true);
+        inflatedMapPublisher.publish(inflatedMap);
     }
 
     public void publishMarkers(PRMGraph graph){
@@ -87,40 +92,6 @@ public class PRM extends AbstractNodeMain {
 
     }
 
-//    public void publishLines_arrow(MessageFactory factory) {
-//        ArrayList<Marker> markers = new ArrayList<Marker>();
-//        Marker m = factory.newFromType(Marker._TYPE);
-//
-//        m.getHeader().setFrameId("/map");
-//        m.getHeader().setStamp(node.getCurrentTime());
-//
-//        m.setNs("edges");
-//        m.setId(0);
-//        m.setType(Marker.ARROW);
-//        m.setAction(m.ADD);
-//
-//
-//        m.getPose().getPosition().setX(20);
-//        m.getPose().getPosition().setY(30);
-//        m.getPose().getPosition().setZ(0.0);
-//        m.getPose().getOrientation().setW(1.0);
-//        m.getPose().getOrientation().setX(0.0);
-//        m.getPose().getOrientation().setY(0.0);
-//        m.getPose().getOrientation().setZ(0.0);
-//
-//        m.getScale().setX(20);
-//        m.getScale().setY(5);
-//        m.getScale().setZ(0);
-//
-//        m.getColor().setA(1.0f);
-//        m.getColor().setR(1.0f);
-//        m.setLifetime(Duration.fromMillis(100000));
-//
-//
-//        this.markers.publish(m);
-//
-//    }
-
     /* Sets the search algorithm to be used by the graph to search for the
      * shortest path from one vertex in the graph to another */
     public void setSearchAlgorithm(SearchAlgorithm searchAlg) {
@@ -131,9 +102,5 @@ public class PRM extends AbstractNodeMain {
     public void onShutdownComplete(Node node) {
         System.out.println("PRM node successfully shut down.");
     }
-
-
-
-
 
 }
