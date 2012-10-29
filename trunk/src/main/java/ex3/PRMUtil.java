@@ -3,6 +3,7 @@ package ex3;
 import geometry_msgs.Point;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -90,21 +91,51 @@ public class PRMUtil {
      */
     public void connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
         for (Vertex vertex : vertices) {
-            connectVertex(vertex, vertices, distanceThreshold);
+            connectVertex_nearestN(vertex, vertices, distanceThreshold);
         }
     }
 
     /*
      * Connects a vertex to other vertices within distanceThreshold euclidean distance
-     * of the specified vertex.
+     * of the specified vertex. Will not make more than maxConnections connections. The 
+     * vertex will not be connected to nodes that it is already connected to indirectly.
      */
-    public void connectVertex(Vertex v, ArrayList<Vertex> graph, double distanceThreshold) {
-        for (Vertex vert : graph) {
-            if (getEuclideanDistance(v, vert) <= distanceThreshold) {
+    public void connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
+	int connectedCount = 0;
+	for (Vertex vert : graph) {
+            if (getEuclideanDistance(v, vert) <= distanceThreshold && !connected(v, vert)) {
                 v.addConnectedVertex(vert);
-            }
-        }
+		connectedCount++;
+	    }
+	    if (connectedCount == maxConnections){
+		break;
+	    }
+	}
     }
+
+    /*
+     * Checks if v1 is connected v2, either directly or indirectly.
+     * IMPROVE RUNTIME USING HASHMAP
+     */
+    public boolean connected(Vertex v1, Vertex v2){
+	Queue<Vertex> toDo = new Queue<Vertex>();
+	ArrayList<Vertex> done = new ArrayList<Vertex>();
+	
+	toDo.offer(v1);
+		
+	while(toDo.size() != 0){
+	    Vertex check = toDo.remove();
+	    done.add(check);
+	    for (Vertex connV : check.getConnectedVertices()){
+		if (check.isEqual(v2)){
+		    return true;
+		} else if (!done.contains(connV) && !toDo.contains(connV)){
+		    toDo.add(connV);
+		}
+	    }
+	}
+    }
+
 
     /*
      * Gets the index of a specific point on the map.
