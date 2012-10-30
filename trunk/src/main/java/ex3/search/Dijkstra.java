@@ -1,10 +1,12 @@
 package ex3.search;
 
 import ex3.PRMGraph;
+import ex3.PRMUtil;
 import ex3.Vertex;
 import ex3.heuristics.Heuristic;
 import java.util.LinkedList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class Dijkstra implements SearchAlgorithm {
 
@@ -15,13 +17,13 @@ public class Dijkstra implements SearchAlgorithm {
     }
 
     @Override
-    public static LinkedList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
+    public LinkedList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
         HashMap<Vertex, DijkstraTuple> map = new HashMap<Vertex, DijkstraTuple>();
 	HashSet<Vertex> unchecked = new HashSet<Vertex>();
 	
         for (Vertex inGraph : graph.getVertices()) {
             map.put(inGraph, new DijkstraTuple(Double.MAX_VALUE, null));
-	    unchecked.put(inGraph);
+	    unchecked.add(inGraph);
 	}
 
         map.get(v1).setDistance(0);
@@ -56,7 +58,7 @@ public class Dijkstra implements SearchAlgorithm {
 	    }
 	    
 	    for (Vertex neighbour : minVertex.getConnectedVertices()){
-		if (!unchecked.contains(neigbour)){
+		if (!unchecked.contains(neighbour)){
 		    continue; // skip the node if we've already visited it.
 		}
 		
@@ -83,7 +85,7 @@ public class Dijkstra implements SearchAlgorithm {
      * Finds the node in the map which has the shortest distance.
      */
     private Vertex shortestDistance(HashMap<Vertex, DijkstraTuple> map){
-	double minDist = Integer.MAX_INT;
+	double minDist = Double.MAX_VALUE;
 	double curDist = minDist;
 	Vertex minVertex = null;
 	
