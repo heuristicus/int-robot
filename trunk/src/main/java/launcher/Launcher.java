@@ -1,6 +1,8 @@
 package launcher;
 
-import ex2.ExperimentNav;
+import ex3.PRM;
+import ex3.heuristics.SimpleHeuristic;
+import ex3.search.Dijkstra;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -8,7 +10,6 @@ import org.ros.node.DefaultNodeMainExecutor;
 import org.ros.node.Node;
 import org.ros.node.NodeConfiguration;
 import org.ros.node.NodeMainExecutor;
-import pf.PFLocalisationNode;
 
 public class Launcher extends AbstractNodeMain {
 
@@ -22,10 +23,11 @@ public class Launcher extends AbstractNodeMain {
         // Start up the specified nodes
         //exec.execute(new Logger(), conf);
         //exec.execute(new Avoider2(), conf);
-  //      PFLocalisationNode.experimentMode = true;
-    //    PFLocalisationNode.realWorldMode = false;
-        PFLocalisationNode.augmented = false;
-        exec.execute(new PFLocalisationNode(), conf);
+//        PFLocalisationNode.experimentMode = true;
+//        PFLocalisationNode.realWorldMode = false;
+//        PFLocalisationNode.augmented = true;
+//        exec.execute(new PFLocalisationNode(), conf);
+        exec.execute(new PRM(null/*new Dijkstra(new SimpleHeuristic())*/), conf);
 //        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
     }
 
@@ -43,7 +45,6 @@ public class Launcher extends AbstractNodeMain {
         System.out.println("Launcher Shutting down...");
         System.out.println("Node " + this.getDefaultNodeName() + " successfully shut down.");
     }
-
 
     @Override
     public GraphName getDefaultNodeName() {

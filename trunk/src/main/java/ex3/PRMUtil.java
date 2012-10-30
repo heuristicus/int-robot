@@ -2,6 +2,8 @@ package ex3;
 
 import geometry_msgs.Point;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
@@ -14,12 +16,17 @@ import visualization_msgs.Marker;
 
 public class PRMUtil {
 
+    public static final int MAX_CONNECTIONS = 20;
+    public static final int INFLATION_RADIUS = 5;
+
     Random randGen;
     MessageFactory factory;
+    OccupancyGrid inflatedMap;
 
-    public PRMUtil(Random randGen, MessageFactory factory){
+    public PRMUtil(Random randGen, MessageFactory factory, OccupancyGrid inflatedMap){
         this.randGen = randGen;
         this.factory = factory;
+        this.inflatedMap = inflatedMap;
     }
 
     /*
@@ -91,56 +98,59 @@ public class PRMUtil {
      */
     public void connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
         for (Vertex vertex : vertices) {
-            connectVertex_nearestN(vertex, vertices, distanceThreshold);
+            connectVertex_nearestN(vertex, vertices, distanceThreshold, MAX_CONNECTIONS);
         }
     }
 
     /*
      * Connects a vertex to other vertices within distanceThreshold euclidean distance
-     * of the specified vertex. Will not make more than maxConnections connections. The 
+     * of the specified vertex. Will not make more than maxConnections connections. The
      * vertex will not be connected to nodes that it is already connected to indirectly.
      */
     public void connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
 	int connectedCount = 0;
-	for (Vertex vert : graph) {
-            if (getEuclideanDistance(v, vert) <= distanceThreshold && !connected(v, vert)) {
-                v.addConnectedVertex(vert);
-		connectedCount++;
-	    }
+        double distance = 0;
+        for (Vertex vert : graph) {
+            distance = getEuclideanDistance(v, vert);
+            if (distance <= distanceThreshold && !isConnected(v, vert) && v != vert) {
+                if (connectedInFreeSpace(inflatedMap,
+                        v.getLocation().getX(),
+                        v.getLocation().getY(),
+                        vert.getLocation().getX(),
+                        vert.getLocation().getY(), distance)) {
+
+                    v.addConnectedVertex(vert);
+                    connectedCount++;
+                }
+            }
 	    if (connectedCount == maxConnections){
 		break;
-	    }
-	}
+            }
+        }
     }
 
-    /*
-     * Checks if v1 is connected v2, either directly or indirectly.
-     * IMPROVE RUNTIME USING HASHMAP
-     */
-    public boolean connected(Vertex v1, Vertex v2){
-	Queue<Vertex> toDo = new Queue<Vertex>();
-	ArrayList<Vertex> done = new ArrayList<Vertex>();
-	
-	toDo.offer(v1);
-		
-	while(toDo.size() != 0){
+    /* Checks if v1 is connected v2, either directly or indirectly. */
+    public boolean isConnected(Vertex v1, Vertex v2){
+	Queue<Vertex> toDo = new LinkedList<Vertex>();
+	HashSet<Vertex> done = new HashSet<Vertex>();
+
+	toDo.add(v1);
+
+	while(! toDo.isEmpty()){
 	    Vertex check = toDo.remove();
 	    done.add(check);
 	    for (Vertex connV : check.getConnectedVertices()){
-		if (check.isEqual(v2)){
+		if (connV.isEqual(v2)){
 		    return true;
 		} else if (!done.contains(connV) && !toDo.contains(connV)){
 		    toDo.add(connV);
 		}
 	    }
 	}
-	return false;
+        return false;
     }
 
-
-    /*
-     * Gets the index of a specific point on the map.
-     */
+    /* Gets the index of a specific point on the map. */
     public static int getMapIndex(int x, int y, int width, int height){
         if (x < 0 || y < 0 || x > width || y > height) {
             // If requested location is out of the bounds of the map
@@ -179,14 +189,14 @@ public class PRMUtil {
         m.getScale().setX(0.2f);
         m.getScale().setY(0.2f);
         m.getColor().setA(1.0f);
-        m.getColor().setB(1.0f);
+        m.getColor().setB(0.0f);
         m.getColor().setG(1.0f);
-        m.getColor().setR(1.0f);
+        m.getColor().setR(0.0f);
 
         return m;
     }
 
-    List<Marker> getGraphMarkers(PRMGraph graph, String frameID) {
+    List<Marker> getGraphMarkers(PRMGraph graph, OccupancyGrid map, String frameID) {
         Marker edgeMarker = setUpEdgeMarker(frameID, "edges", 0, Marker.ADD, Marker.LINE_LIST);
         Marker pointMarker = setUpPointMarker(frameID, "edges", 0, Marker.ADD, Marker.POINTS);
 
@@ -194,12 +204,10 @@ public class PRMUtil {
             // Add the vertices to the graph.
             pointMarker.getPoints().add(v.getLocation());
             for (Vertex connected : v.getConnectedVertices()) {
-                /*
-                 * Add a line from the current vertex to each connected vertex
+                /* Add a line from the current vertex to each connected vertex
                  * For some reason the coordinates must be reversed for this to
                  * display correctly in rviz. Probably some error with transforms
-                 * or suchlike.
-                 */
+                 * or suchlike. */
                 Point cur = factory.newFromType(Point._TYPE);
                 cur.setX(-v.getLocation().getX());
                 cur.setY(-v.getLocation().getY());
@@ -225,7 +233,7 @@ public class PRMUtil {
      * The actual obstacles are replaced with unknown space, and a certain area in the proxi-
      * mity of the obstacle is converted to obstacle space.
      */
-    OccupancyGrid inflateMap(OccupancyGrid grid, Publisher<OccupancyGrid> pub) {
+    public static OccupancyGrid inflateMap(OccupancyGrid grid, Publisher<OccupancyGrid> pub) {
         /*
          * Copy data in the grid to a new channel buffer. We use this to check
          * what data was in the original buffer at each point.
@@ -242,23 +250,28 @@ public class PRMUtil {
         for (int i = 0; i < original.capacity(); i++) {
             // If data in the map indicates an obstacle, widen the obstacle by some amount
             if (original.getByte(i) == 100) {
-                for (int j = i - 5; j < i + 5; j++) {
-                    // If there is an obstacle very close to the zeroth index, avoid
-                    // exceptions
-                    if (j < 0) {
-                        j = 0;
+                for (int yOffset = -INFLATION_RADIUS; yOffset <= INFLATION_RADIUS; yOffset++) {
+                    int xOffset = grid.getInfo().getWidth() * yOffset;
+                    //xRadius = RADIUS -
+                    
+                    for (int j = i + xOffset - INFLATION_RADIUS; j <= i + xOffset + INFLATION_RADIUS; j++) {
+                        // If there is an obstacle very close to the zeroth index, avoid
+                        // exceptions
+                        if (j < 0) {
+                            j = 0;
+                        }
+                        // Also avoid going over capacity
+                        if (j >= original.capacity()) {
+                            break;
+                        }
+                        // No point widening obstacles into unknown space or something
+                        // which is already an obstacle
+                        if (original.getByte(j) == -1 || original.getByte(j) == 100) {
+                            continue;
+                        }
+                        // Set the byte to an obstacle in the inflated map
+                        inflatedMap.getData().setByte(j, 100);
                     }
-                    // Also avoid going over capacity
-                    if (j == original.capacity()) {
-                        break;
-                    }
-                    // No point widening obstacles into unknown space or something
-                    // which is already an obstacle
-                    if (original.getByte(j) == -1 || original.getByte(j) == 100){
-                        continue;
-                    }
-                    // Set the byte to an obstacle in the inflated map
-                    inflatedMap.getData().setByte(j, 100);
                 }
                 // Set the original obstacle position to unknown space just to
                 // keep track of where it was before.
@@ -267,6 +280,76 @@ public class PRMUtil {
         }
 
         return inflatedMap;
+    }
+
+    /** Given a line (provided by two points), checks whether or not the line
+     * intersects with obstacles on the map, returning true only if there is
+     * a fully clear path between the two points (i.e. the line is in free space). */
+    public static boolean connectedInFreeSpace(OccupancyGrid map, 
+            double x1, double y1, double x2, double y2, double distance) {
+        ChannelBuffer data = map.getData();
+        int width = map.getInfo().getWidth();
+        int height = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution();
+
+        x1 = x1 / mapRes;
+        x2 = x2 / mapRes;
+        y1 = y1 / mapRes;
+        y2 = y2 / mapRes;
+        distance = distance / mapRes;
+
+        double yDiff = y2 - y1;
+        double xDiff = x2 - x1;
+        double xGradient = Math.abs(xDiff / distance);
+        double yGradient = yDiff / distance;
+
+        double x;
+        double y;
+        double bigX;
+        if (x1 < x2) {
+            x = x1;
+            y = y1;
+            bigX = x2;
+        } else {
+            x = x2;
+            y = y2;
+            bigX = x1;
+            yGradient = -yGradient; // Invert gradient
+        }
+
+        boolean connectedFreely = true; // False when found obstacle
+
+        //System.out.println("x1: " + x1 + " y1: " + y1 + " x2: " + x2 + " y2: " + y2);
+        //System.out.println("xDiff: "+xDiff+" yDiff: "+yDiff+" distance: "+distance);
+        //System.out.println("xGradient: "+xGradient+" yGradient: "+yGradient);
+        while (x <= bigX && connectedFreely) {
+            int index = getMapIndex((int)Math.round(x), (int)Math.round(y), (int) width, (int) height);
+
+            if (index > 0 && index < data.capacity()) {
+                //System.out.println("Index: "+index+" x: "+x+" y: "+y);
+
+                // If we are on the map to begin with...
+                Byte cellData = data.getByte(index);
+
+                if (cellData.byteValue() < 0 || cellData.byteValue() > 65) {
+                    // If we're on the map, but the map has no data, or there is an obstacle...
+                    connectedFreely = false;
+                    break;
+                }
+            } else {
+                System.out.println("ERROR! This shouldn't happen. ConnectedInFreeSpace "
+                        + "called with out of bounds values. Do not ignore this MICHAL");
+                System.out.println("Index: "+index+" x: "+x+" y: "+y);
+                System.out.println("x1: "+x1+" y1: "+y1+" x2: "+x2+" y2: "+y2);
+                connectedFreely = false;
+                break;
+            }
+
+            x += xGradient;
+            y += yGradient;
+        }
+
+        return connectedFreely;
     }
 
 }

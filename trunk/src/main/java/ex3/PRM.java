@@ -25,15 +25,13 @@ public class PRM extends AbstractNodeMain {
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
     public static final int NUMBER_OF_VERTICES = 100;
-    public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.0;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 9.0;
 
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> markers;
     Publisher<OccupancyGrid> inflatedMapPublisher;
 
-    public PRM(){
-        
-    }
+    public PRM(){}
 
     public PRM(SearchAlgorithm search){
         this.search = search;
@@ -49,6 +47,7 @@ public class PRM extends AbstractNodeMain {
         grid = node.newSubscriber("map", OccupancyGrid._TYPE);
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         markers = node.newPublisher("markers", MarkerArray._TYPE);
+        markers.setLatchMode(true);
         PRM.node = node;
 
         final MessageFactory factory = node.getTopicMessageFactory();
@@ -66,12 +65,11 @@ public class PRM extends AbstractNodeMain {
 
     /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
-       
-        util = new PRMUtil(new Random(), factory);
-        graph = new PRMGraph(util, map, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD);
+        inflatedMap = util.inflateMap(map, inflatedMapPublisher);
+        util = new PRMUtil(new Random(), factory, inflatedMap);
+        graph = new PRMGraph(util, inflatedMap, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD);
 
         publishMarkers(graph);
-        inflatedMap = util.inflateMap(map, inflatedMapPublisher);
         inflatedMapPublisher.setLatchMode(true);
         inflatedMapPublisher.publish(inflatedMap);
     }
@@ -79,7 +77,7 @@ public class PRM extends AbstractNodeMain {
     public void publishMarkers(PRMGraph graph){
         MarkerArray array = markers.newMessage();
 
-        array.setMarkers(util.getGraphMarkers(graph, "/map"));
+        array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
 
         for (int i = 0; i < 10; i++) {
             markers.publish(array);

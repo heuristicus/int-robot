@@ -1,9 +1,8 @@
 package ex3.search;
 
-import ex3.Edge;
 import ex3.PRMGraph;
 import ex3.Vertex;
-import java.util.ArrayList;
+import java.util.LinkedList;
 
 public interface SearchAlgorithm {
 
