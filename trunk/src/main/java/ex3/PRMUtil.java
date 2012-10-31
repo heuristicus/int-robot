@@ -20,7 +20,7 @@ import visualization_msgs.Marker;
 
 public class PRMUtil {
 
-    public static final int MAX_CONNECTIONS = 20;
+
     public static final int INFLATION_RADIUS = 5;
 
     public static final float MARKER_EDGE_WIDTH = 0.1f;
@@ -79,42 +79,80 @@ public class PRMUtil {
         float randX = 0;
         float randY = 0;
         final int buffLength = buff.capacity();
-        int index;
 
         while (!foundOpen){
             randX = (randGen.nextFloat() * mapWidth);
             randY = (randGen.nextFloat() * mapHeight);
 
-            // get the index in the array for this random point
-            index = getMapIndex((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight);
-            if (index > 0 && index < buffLength){
-                Byte cell = buff.getByte(index);
-                if (cell.byteValue() == 0) {
-                    // We are inside the map bounds and the cell is not occupied.
-                    foundOpen = true;
-                }
-            }
+            foundOpen = checkPositionValidity((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
+
         }
 
         return new Vertex(randX * mapRes, randY * mapRes, factory);
     }
 
     /*
+     * Checks whether the given pose is in free space on the given map.
+     */
+    public boolean checkPositionValidity(Pose p, OccupancyGrid map){
+        int mapWidth = map.getInfo().getWidth();
+        int mapHeight = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution();
+        return checkPositionValidity((int) Math.round(p.getPosition().getX() / mapRes),
+                (int) Math.round(p.getPosition().getY() / mapRes),
+                mapWidth,
+                mapHeight,
+                map.getData(),
+                map.getData().capacity());
+    }
+
+    /*
+     * Checks whether the position specified by the given x and y coordinates is
+     * a valid position on the given map.
+     */
+    public boolean checkPositionValidity(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
+        // get the index in the array for this random point
+        int index = getMapIndex(x, y, mapWidth, mapHeight);
+        if (index > 0 && index < buffLength) {
+            Byte cell = buff.getByte(index);
+            if (cell.byteValue() == 0) {
+                // We are inside the map bounds and the cell is not occupied.
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+
+    /*
      * Connects all vertices to all other vertices within a euclidean distance of
      * distanceThreshold. Also creates representative edges.
      */
-    public ArrayList<Edge> connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
+    public ArrayList<Edge> connectVertices(ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
         ArrayList<Edge> edges = new ArrayList<Edge>();
         ArrayList<Edge> temp = new ArrayList<Edge>();
         
         for (Vertex vertex : vertices) {
-            temp = connectVertex_nearestN(vertex, vertices, distanceThreshold, MAX_CONNECTIONS);
+            temp = connectVertexToGraph(vertex, vertices, distanceThreshold, maxConnections);
             for (Edge edge : temp) {
                 if (!edges.contains(edge)) {
                     edges.add(edge);
                 }
             }
         }
+
+        return edges;
+    }
+
+    /*
+     * Connect a vertex to other vertices in the graph.
+     */
+    public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
+
+        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, distanceThreshold, maxConnections);
 
         return edges;
     }
@@ -129,6 +167,10 @@ public class PRMUtil {
         double distance = 0;
         ArrayList<Edge> connections = new ArrayList<Edge>();
         for (Vertex vert : graph) {
+            if (vert.getConnectedVertices().contains(v)){
+                // If we've already been connected to this node, carry on.
+                continue;
+            }
             distance = getEuclideanDistance(v, vert);
             if (distance <= distanceThreshold && !isConnected(v, vert) && v != vert) {
                 if (connectedInFreeSpace(inflatedMap,
@@ -138,6 +180,7 @@ public class PRMUtil {
                         vert.getLocation().getY(), distance)) {
 
                     v.addConnectedVertex(vert);
+                    vert.addConnectedVertex(v);
                     connections.add(new Edge(v, vert, distance));
                     connectedCount++;
                 }
@@ -152,6 +195,12 @@ public class PRMUtil {
 
     /* Checks if v1 is connected v2, either directly or indirectly. */
     public boolean isConnected(Vertex v1, Vertex v2){
+
+        // If the node has no connections, then just return.
+        if (v1.getConnectedVertices().isEmpty()){
+            return false;
+        }
+
 	Queue<Vertex> toDo = new LinkedList<Vertex>();
 	HashSet<Vertex> done = new HashSet<Vertex>();
 

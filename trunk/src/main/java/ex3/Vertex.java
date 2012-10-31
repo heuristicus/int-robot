@@ -18,6 +18,7 @@ public class Vertex {
 
     public Vertex(Point location){
         this.location = location;
+        connectedVertices = new ArrayList<Vertex>();
     }
 
     public void setX(float x) {

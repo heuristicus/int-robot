@@ -6,11 +6,14 @@ import nav_msgs.OccupancyGrid;
 
 public class PRMGraph {
 
+    public final int MAX_CONNECTIONS;
+
     ArrayList<Vertex> vertices;
     ArrayList<Edge> edges;
     double distanceThreshold;
 
-    public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices, double distanceThreshold){
+    public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices, double distanceThreshold, int max_connections){
+        this.MAX_CONNECTIONS = max_connections;
         this.distanceThreshold = distanceThreshold;
         generatePRM(util, map, numVertices);
     }
@@ -20,7 +23,19 @@ public class PRMGraph {
      */
     public void generatePRM(PRMUtil util, OccupancyGrid map, int numVertices){
         vertices = util.generateRandomVertices(map, numVertices);
-        this.edges = util.connectVertices(vertices, distanceThreshold);
+        this.edges = util.connectVertices(vertices, distanceThreshold, MAX_CONNECTIONS);
+    }
+
+    public boolean addVertex(Vertex v, PRMUtil util){
+        if (vertices.contains(v)){
+            // If we've added the vertex before.
+            return false;
+        }
+        vertices.add(v);
+
+        edges.addAll(util.connectVertexToGraph(v, vertices, distanceThreshold, MAX_CONNECTIONS));
+
+        return true;
     }
 
     public ArrayList<Edge> getEdges() {
