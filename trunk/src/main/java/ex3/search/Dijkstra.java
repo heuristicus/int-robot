@@ -33,7 +33,7 @@ public class Dijkstra implements SearchAlgorithm {
 	    DijkstraTuple vData = map.get(minVertex);
 	    unchecked.remove(minVertex);
 	    
-	    if (minVertex.isEqual(v2)){ // If we found the destination
+	    if (minVertex.equals(v2)){ // If we found the destination
 		LinkedList<Vertex> path = new LinkedList<Vertex>();
 		path.addFirst(minVertex); // Add the end vertex to the list
 		

@@ -31,6 +31,7 @@ public class Edge {
         return b;
     }
 
+
     /*
      * Checks if two edges are equal for edges e1 and e2. Equality is defined as follows:
      * e1.a == e2.a && e1.b == e2.b
@@ -38,8 +39,22 @@ public class Edge {
      * A path that starts at a and ends at b is equivalent to one that starts at
      * b and ends at a.
      */
-    public boolean isEqual(Edge e){
-        return (e.getVertexA().isEqual(this.a) && e.getVertexB().isEqual(this.b)) || (e.getVertexA().isEqual(this.b) && e.getVertexB().isEqual(this.a));
+    @Override
+    public boolean equals(Object obj) {
+        try {
+            Edge e = (Edge) obj;
+            return (e.getVertexA().equals(this.a) && e.getVertexB().equals(this.b)) || (e.getVertexA().equals(this.b) && e.getVertexB().equals(this.a));
+        } catch (ClassCastException ex){
+            return false;
+        }
+
     }
-    
+
+    @Override
+    public String toString() {
+        return "Point a: " + this.a.toString() + ", Point b: " + this.b.toString() + "Weight: " + this.weight;
+    }
+
+
+
 }

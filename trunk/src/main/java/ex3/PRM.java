@@ -1,6 +1,7 @@
 package ex3;
 
 import ex3.search.SearchAlgorithm;
+import java.util.LinkedList;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,7 +26,7 @@ public class PRM extends AbstractNodeMain {
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
     public static final int NUMBER_OF_VERTICES = 100;
-    public static final double PROXIMITY_DISTANCE_THRESHOLD = 9.0;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.5;
 
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> markers;
@@ -72,6 +73,12 @@ public class PRM extends AbstractNodeMain {
         publishMarkers(graph);
         inflatedMapPublisher.setLatchMode(true);
         inflatedMapPublisher.publish(inflatedMap);
+
+        System.out.println("Average path length: " + util.averageConnectionLength(graph));
+    }
+
+    public LinkedList<Vertex> findRoute(Vertex v1, Vertex v2){
+        return search.shortestPath(v1, v2, graph, util);
     }
 
     public void publishMarkers(PRMGraph graph){

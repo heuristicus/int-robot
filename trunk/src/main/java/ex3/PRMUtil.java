@@ -94,12 +94,22 @@ public class PRMUtil {
 
     /*
      * Connects all vertices to all other vertices within a euclidean distance of
-     * distanceThreshold.
+     * distanceThreshold. Also creates representative edges.
      */
-    public void connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
+    public ArrayList<Edge> connectVertices(ArrayList<Vertex> vertices, double distanceThreshold){
+        ArrayList<Edge> edges = new ArrayList<Edge>();
+        ArrayList<Edge> temp = new ArrayList<Edge>();
+        
         for (Vertex vertex : vertices) {
-            connectVertex_nearestN(vertex, vertices, distanceThreshold, MAX_CONNECTIONS);
+            temp = connectVertex_nearestN(vertex, vertices, distanceThreshold, MAX_CONNECTIONS);
+            for (Edge edge : temp) {
+                if (!edges.contains(edge)) {
+                    edges.add(edge);
+                }
+            }
         }
+
+        return edges;
     }
 
     /*
@@ -107,9 +117,10 @@ public class PRMUtil {
      * of the specified vertex. Will not make more than maxConnections connections. The
      * vertex will not be connected to nodes that it is already connected to indirectly.
      */
-    public void connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
+    public ArrayList<Edge> connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
 	int connectedCount = 0;
         double distance = 0;
+        ArrayList<Edge> connections = new ArrayList<Edge>();
         for (Vertex vert : graph) {
             distance = getEuclideanDistance(v, vert);
             if (distance <= distanceThreshold && !isConnected(v, vert) && v != vert) {
@@ -120,6 +131,7 @@ public class PRMUtil {
                         vert.getLocation().getY(), distance)) {
 
                     v.addConnectedVertex(vert);
+                    connections.add(new Edge(v, vert, distance));
                     connectedCount++;
                 }
             }
@@ -127,6 +139,8 @@ public class PRMUtil {
 		break;
             }
         }
+
+        return connections;
     }
 
     /* Checks if v1 is connected v2, either directly or indirectly. */
@@ -140,7 +154,7 @@ public class PRMUtil {
 	    Vertex check = toDo.remove();
 	    done.add(check);
 	    for (Vertex connV : check.getConnectedVertices()){
-		if (connV.isEqual(v2)){
+		if (connV.equals(v2)){
 		    return true;
 		} else if (!done.contains(connV) && !toDo.contains(connV)){
 		    toDo.add(connV);
@@ -225,6 +239,17 @@ public class PRMUtil {
         mList.add(pointMarker);
 
         return mList;
+    }
+
+    public double averageConnectionLength(PRMGraph graph){
+        double sum = 0;
+
+        for (Edge e : graph.getEdges()) {
+            System.out.println(e);
+            sum += e.edgeWeight();
+        }
+
+        return sum/graph.getEdges().size();
     }
 
     /*

@@ -20,7 +20,7 @@ public class PRMGraph {
      */
     public void generatePRM(PRMUtil util, OccupancyGrid map, int numVertices){
         vertices = util.generateRandomVertices(map, numVertices);
-        util.connectVertices(vertices, distanceThreshold);
+        this.edges = util.connectVertices(vertices, distanceThreshold);
     }
 
     public ArrayList<Edge> getEdges() {

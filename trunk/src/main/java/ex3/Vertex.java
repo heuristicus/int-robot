@@ -40,8 +40,21 @@ public class Vertex {
         connectedVertices.add(v);
     }
 
-    public boolean isEqual(Vertex v) {
-        return v.getLocation().getX() == this.location.getX() && v.getLocation().getY() == this.location.getY();
+    @Override
+    public boolean equals(Object obj) {
+        try {
+            Vertex v = (Vertex) obj;
+            return v.getLocation().getX() == this.location.getX() && v.getLocation().getY() == this.location.getY();
+        } catch (ClassCastException ex) {
+            return false;
+        }
     }
+
+    @Override
+    public String toString() {
+        return "(" + this.location.getX() + ", " + this.location.getY() + ")";
+    }
+
+
 
 }
