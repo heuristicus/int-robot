@@ -8,7 +8,6 @@ import ex3.Vertex;
  */
 public class DijkstraTuple {
 
-    private Vertex current;
     private double distance;
     private Vertex previous;
 

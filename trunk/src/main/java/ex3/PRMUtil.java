@@ -1,6 +1,9 @@
 package ex3;
 
 import geometry_msgs.Point;
+import geometry_msgs.Pose;
+import geometry_msgs.Quaternion;
+import geometry_msgs.Vector3;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -12,12 +15,16 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.ros.message.MessageFactory;
 import org.ros.node.topic.Publisher;
+import std_msgs.ColorRGBA;
 import visualization_msgs.Marker;
 
 public class PRMUtil {
 
     public static final int MAX_CONNECTIONS = 20;
     public static final int INFLATION_RADIUS = 5;
+
+    public static final float MARKER_EDGE_WIDTH = 0.1f;
+    public static final float MARKER_POINT_WIDTH = 0.2f;
 
     Random randGen;
     MessageFactory factory;
@@ -182,37 +189,50 @@ public class PRMUtil {
         m.setType(type);
     }
 
-    Marker setUpEdgeMarker(String frameID, String namespace, int ID, int action, int type){
+    Marker setUpMarker(String frameID, String namespace, int ID, int action, int type, ColorRGBA colour, Pose pose, Vector3 vector){
         Marker m = factory.newFromType(Marker._TYPE);
-        setMarkerHeader(m, frameID, "edges", 0, action, type);
+        setMarkerHeader(m, frameID, namespace, ID, action, type);
+
+        if (pose != null) {
+            m.setPose(pose);
+        }
+
+        if (vector != null){
+            m.setScale(vector);
+        }
+
+        if (colour != null) {
+            m.setColor(colour);
+        }
         
-        m.getPose().getPosition().setX(0.0f);
-        m.getPose().getPosition().setY(0.0f);
-        m.getPose().getOrientation().setZ(1.0f);
-        m.getScale().setX(0.1f);
-        m.getColor().setA(1.0f);
-        m.getColor().setR(1.0f);
-
-        return m;
-    }
-
-    Marker setUpPointMarker(String frameID, String namespace, int ID, int action, int type) {
-        Marker m = factory.newFromType(Marker._TYPE);
-        setMarkerHeader(m, frameID, "points", 1, action, type);
-
-        m.getScale().setX(0.2f);
-        m.getScale().setY(0.2f);
-        m.getColor().setA(1.0f);
-        m.getColor().setB(0.0f);
-        m.getColor().setG(1.0f);
-        m.getColor().setR(0.0f);
-
         return m;
     }
 
     List<Marker> getGraphMarkers(PRMGraph graph, OccupancyGrid map, String frameID) {
-        Marker edgeMarker = setUpEdgeMarker(frameID, "edges", 0, Marker.ADD, Marker.LINE_LIST);
-        Marker pointMarker = setUpPointMarker(frameID, "edges", 0, Marker.ADD, Marker.POINTS);
+        Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
+        edgeVector.setX(MARKER_EDGE_WIDTH);
+
+        Pose edgePose = factory.newFromType(Pose._TYPE);
+        edgePose.getPosition().setX(0.0f);
+        edgePose.getPosition().setY(0.0f);
+        edgePose.getOrientation().setZ(1.0f);
+        
+        ColorRGBA edgeColour = factory.newFromType(ColorRGBA._TYPE);
+        edgeColour.setA(1.0f);
+        edgeColour.setR(1.0f);
+
+        Vector3 pointVector = factory.newFromType(Vector3._TYPE);
+        pointVector.setX(MARKER_POINT_WIDTH);
+        pointVector.setY(MARKER_POINT_WIDTH);
+        
+        ColorRGBA pointColour = factory.newFromType(ColorRGBA._TYPE);
+        pointColour.setA(1.0f);
+        pointColour.setB(0.0f);
+        pointColour.setG(1.0f);
+        pointColour.setR(0.0f);
+
+        Marker edgeMarker = setUpMarker(frameID, "edges", 0, Marker.ADD, Marker.LINE_LIST, edgeColour, edgePose, edgeVector);
+        Marker pointMarker = setUpMarker(frameID, "points", 1, Marker.ADD, Marker.POINTS, pointColour, null, pointVector);
 
         for (Vertex v : graph.getVertices()) {
             // Add the vertices to the graph.
