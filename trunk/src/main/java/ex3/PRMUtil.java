@@ -208,6 +208,32 @@ public class PRMUtil {
         return m;
     }
 
+    public Marker makePathMarker(LinkedList<Vertex> path){
+        Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
+        edgeVector.setX(MARKER_EDGE_WIDTH);
+
+        Pose edgePose = factory.newFromType(Pose._TYPE);
+        edgePose.getPosition().setX(0.0f);
+        edgePose.getPosition().setY(0.0f);
+        edgePose.getOrientation().setZ(1.0f);
+
+        ColorRGBA edgeColour = factory.newFromType(ColorRGBA._TYPE);
+        edgeColour.setA(1.0f);
+        edgeColour.setB(1.0f);
+
+        Marker rtMarker = setUpMarker("/map", "path", 2, Marker.ADD, Marker.LINE_STRIP, edgeColour, edgePose, edgeVector);
+
+        for (Vertex vertex : path) {
+            System.out.println("Adding vertex " + vertex);
+            Point tmp = factory.newFromType(Point._TYPE);
+            tmp.setX(-vertex.getLocation().getX());
+            tmp.setY(-vertex.getLocation().getY());
+            rtMarker.getPoints().add(tmp);
+        }
+
+        return rtMarker;
+    }
+
     List<Marker> getGraphMarkers(PRMGraph graph, OccupancyGrid map, String frameID) {
         Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
         edgeVector.setX(MARKER_EDGE_WIDTH);
@@ -218,7 +244,7 @@ public class PRMUtil {
         edgePose.getOrientation().setZ(1.0f);
         
         ColorRGBA edgeColour = factory.newFromType(ColorRGBA._TYPE);
-        edgeColour.setA(1.0f);
+        edgeColour.setA(0.5f);
         edgeColour.setR(1.0f);
 
         Vector3 pointVector = factory.newFromType(Vector3._TYPE);
@@ -226,7 +252,7 @@ public class PRMUtil {
         pointVector.setY(MARKER_POINT_WIDTH);
         
         ColorRGBA pointColour = factory.newFromType(ColorRGBA._TYPE);
-        pointColour.setA(1.0f);
+        pointColour.setA(0.5f);
         pointColour.setB(0.0f);
         pointColour.setG(1.0f);
         pointColour.setR(0.0f);

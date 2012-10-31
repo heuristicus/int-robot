@@ -14,6 +14,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+import visualization_msgs.Marker;
 import visualization_msgs.MarkerArray;
 
 public class PRM extends AbstractNodeMain {
@@ -25,11 +26,12 @@ public class PRM extends AbstractNodeMain {
     public static ConnectedNode node;
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
-    public static final int NUMBER_OF_VERTICES = 100;
+    public static final int NUMBER_OF_VERTICES = 50;
     public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.5;
 
     Subscriber<OccupancyGrid> grid;
-    Publisher<MarkerArray> markers;
+    Publisher<MarkerArray> PRMMarkers;
+    Publisher<Marker> pathMarkers;
     Publisher<OccupancyGrid> inflatedMapPublisher;
 
     public PRM(){}
@@ -47,8 +49,10 @@ public class PRM extends AbstractNodeMain {
     public void onStart(final ConnectedNode node) {
         grid = node.newSubscriber("map", OccupancyGrid._TYPE);
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
-        markers = node.newPublisher("markers", MarkerArray._TYPE);
-        markers.setLatchMode(true);
+        PRMMarkers = node.newPublisher("markers", MarkerArray._TYPE);
+        PRMMarkers.setLatchMode(true);
+        pathMarkers = node.newPublisher("pathMarkers", Marker._TYPE);
+        pathMarkers.setLatchMode(true);
         PRM.node = node;
 
         final MessageFactory factory = node.getTopicMessageFactory();
@@ -75,6 +79,20 @@ public class PRM extends AbstractNodeMain {
         inflatedMapPublisher.publish(inflatedMap);
 
         System.out.println("Average path length: " + util.averageConnectionLength(graph));
+
+        int start = (int) (Math.random() * NUMBER_OF_VERTICES);
+        int goal = (int) (Math.random() * NUMBER_OF_VERTICES);
+
+        LinkedList<Vertex> rt = findRoute(graph.vertices.get(start), graph.getVertices().get(goal));
+
+        if (rt.size() == 0){
+            System.out.println("Could not find route!");
+        } else {
+            pathMarkers.publish(util.makePathMarker(rt));
+        }
+
+
+
     }
 
     public LinkedList<Vertex> findRoute(Vertex v1, Vertex v2){
@@ -82,12 +100,12 @@ public class PRM extends AbstractNodeMain {
     }
 
     public void publishMarkers(PRMGraph graph){
-        MarkerArray array = markers.newMessage();
+        MarkerArray array = PRMMarkers.newMessage();
 
         array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
 
         for (int i = 0; i < 10; i++) {
-            markers.publish(array);
+            PRMMarkers.publish(array);
             try {
                 Thread.sleep(200);
             } catch (InterruptedException ex) {

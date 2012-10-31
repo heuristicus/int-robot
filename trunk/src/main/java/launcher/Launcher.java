@@ -27,7 +27,7 @@ public class Launcher extends AbstractNodeMain {
 //        PFLocalisationNode.realWorldMode = false;
 //        PFLocalisationNode.augmented = true;
 //        exec.execute(new PFLocalisationNode(), conf);
-        exec.execute(new PRM(null/*new Dijkstra(new SimpleHeuristic())*/), conf);
+        exec.execute(new PRM(new Dijkstra()), conf);
 //        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
     }
 

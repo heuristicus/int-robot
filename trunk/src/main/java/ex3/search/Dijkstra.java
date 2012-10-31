@@ -10,30 +10,38 @@ import java.util.HashSet;
 
 public class Dijkstra implements SearchAlgorithm {
 
-    Heuristic heuristic;
-
-    public Dijkstra(Heuristic h){
-        this.heuristic = h;
-    }
-
     @Override
     public LinkedList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
         HashMap<Vertex, DijkstraTuple> map = new HashMap<Vertex, DijkstraTuple>();
-	HashSet<Vertex> unchecked = new HashSet<Vertex>();
+	HashMap<Vertex, DijkstraTuple> unchecked = new HashMap<Vertex, DijkstraTuple>();
 	
         for (Vertex inGraph : graph.getVertices()) {
             map.put(inGraph, new DijkstraTuple(Double.MAX_VALUE, null));
-	    unchecked.add(inGraph);
+            unchecked.put(inGraph, new DijkstraTuple(Double.MAX_VALUE, null));
 	}
 
         map.get(v1).setDistance(0);
+        unchecked.get(v1).setDistance(0);
 
 	while(!unchecked.isEmpty()){
-	    Vertex minVertex = shortestDistance(map);
-	    DijkstraTuple vData = map.get(minVertex);
-	    unchecked.remove(minVertex);
-	    
+
+            System.out.println(" unchecked size: " + unchecked.size());
+
+	    Vertex minVertex = shortestDistance(unchecked);
+
+            // Break if remaining vertices inaccessible from this node
+	    if (minVertex == null){
+//                System.out.println("Cannot access other vertices from this vertex...");
+		break;
+	    }
+
+            DijkstraTuple vData = unchecked.remove(minVertex);
+
+            System.out.println(minVertex + " goal " + v2);
+
+            //System.out.println("Removed " + minVertex + " with tentative distance " + vData.getDistance());
 	    if (minVertex.equals(v2)){ // If we found the destination
+                System.out.println("Found the goal vertex!");
 		LinkedList<Vertex> path = new LinkedList<Vertex>();
 		path.addFirst(minVertex); // Add the end vertex to the list
 		
@@ -41,38 +49,48 @@ public class Dijkstra implements SearchAlgorithm {
 		DijkstraTuple curData = vData;
 		
                 // Go back through the list and construct the path
-		while (curData != null){
+		while (curData.getPrevious() != null){
 		    current = curData.getPrevious();
 		    curData = map.get(current);
 		    
 		    path.addFirst(current);
 		}
-						
+
+                for (Vertex vertex : path) {
+                    System.out.print(vertex + "->");
+                }
+                System.out.println("");
+
 		return path;
 		
 	    }
 	    
-	    // Break if remaining vertices inaccessible from this node
-	    if (vData.getDistance() == Double.MAX_VALUE){
-		break;
-	    }
+	    
 	    
 	    for (Vertex neighbour : minVertex.getConnectedVertices()){
-		if (!unchecked.contains(neighbour)){
+		if (!unchecked.containsKey(neighbour)){
+//                    System.out.println("Skipping already visited vertex.");
 		    continue; // skip the node if we've already visited it.
 		}
 		
 		// Get the distance through the current vertex to the neighbour
 		double altDist = vData.getDistance() + util.getEuclideanDistance(minVertex, neighbour);
-		
-		DijkstraTuple nData = map.get(neighbour);
-		
+//                System.out.println("Distance through this vertex to vertex at " + neighbour + " is " + altDist);
+		DijkstraTuple mapData = map.get(neighbour);
+		DijkstraTuple uncheckedData = unchecked.get(neighbour);
+                
 		// If the distance through the current node to the neighbour is shorter than the
 		// current tentative distance we have for that neighbour
-		if (altDist < nData.getDistance()){
-		    nData.setDistance(altDist);
-		    nData.setPrevious(minVertex);
-		}
+		if (altDist < mapData.getDistance()){
+//                    System.out.println(altDist + " is smaller than " + mapData.getDistance() + " updating.");
+                    mapData.setDistance(altDist);
+		    mapData.setPrevious(minVertex);
+
+                    uncheckedData.setDistance(altDist);
+                    uncheckedData.setPrevious(minVertex);
+		} else {
+//                    System.out.println("No improvement on path through this vertex.");
+                }
 		
 	    }
 	}
