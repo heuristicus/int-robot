@@ -2,7 +2,6 @@ package ex3;
 
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
-import geometry_msgs.Quaternion;
 import geometry_msgs.Vector3;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -55,7 +54,7 @@ public class PRMUtil {
      * on the map. This version of the method does not take into account the size
      * or orientation of the robot.
      */
-    public ArrayList<Vertex> generateRandomVertices(OccupancyGrid map, int vertexNum){
+    public ArrayList<Vertex> randomSample(OccupancyGrid map, int vertexNum){
         final ChannelBuffer buff = map.getData();
 
         ArrayList<Vertex> randomVertices = new ArrayList<Vertex>();
@@ -89,6 +88,58 @@ public class PRMUtil {
         }
 
         return new Vertex(randX * mapRes, randY * mapRes, factory);
+    }
+
+    /*
+     * Samples vertices for the road map based on a grid. xstep and ystep specify
+     * the distribution of particles in the grid. The first particle generated
+     * will be at 0,0, and subsequent particles will be at n*xstep, n*ystep, where
+     * xstep and ystep are specified in metres.
+     */
+    public ArrayList<Vertex> gridSample(OccupancyGrid map, double xStep, double yStep){
+        ArrayList<Vertex> vertices = new ArrayList<Vertex>();
+
+        // Axis limits
+        int mapWidth = map.getInfo().getWidth();
+        int mapHeight = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution();
+
+        // Convert step sizes to sizes that are easy to work with in map space.
+        double mapXStep = xStep / map.getInfo().getResolution();
+        double mapYStep = yStep / map.getInfo().getResolution();
+
+        double curY = 0;
+        double curX = 0;
+
+        for (int i = 0; curX < mapWidth; i++) {
+            curY = 0;
+            for (int j = 0; curY < mapHeight; j++) {
+                boolean valid = checkPositionValidity((int) Math.round(curX),
+                        (int) Math.round(curY),
+                        mapWidth,
+                        mapHeight,
+                        map.getData(),
+                        map.getData().capacity());
+                if (valid){
+                    vertices.add(new Vertex((float) curX * mapRes, (float) curY * mapRes, factory));
+                }
+                curY += mapYStep;
+            }
+            curX += mapXStep;
+        }
+
+        return vertices;
+    }
+
+    /*
+     * Samples points for the road map based on a cell sampling strategy. The map
+     * is divided into cells. Each cell will have the same number of particles
+     * randomly placed within it, so long as such generation is possible.
+     */
+    public ArrayList<Vertex> cellSample(OccupancyGrid map, int vertexNum){
+        ArrayList<Vertex> vertices = new ArrayList<Vertex>();
+
+        return vertices;
     }
 
     /*
@@ -126,7 +177,6 @@ public class PRMUtil {
         }
     }
 
-
     /*
      * Connects all vertices to all other vertices within a euclidean distance of
      * distanceThreshold. Also creates representative edges.
@@ -147,32 +197,11 @@ public class PRMUtil {
         return edges;
     }
 
-    /* Takes a list of vertices (a path) and removes intermediate points which
-     * do not help us go around an obstacle. That is, if a is connected to b,
-     * and b is connected to c, we check if there is a path from a to c and
-     * if so, remove b from the path. We do this for the whole path until we
-     * have as straight a path as possible */
-    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path) {
-        ArrayList<Vertex> flatPath = (ArrayList) path.clone();
-        boolean pathModified = true;
-        while (pathModified) {
-            pathModified = false;
-            for (int i = 0; i < flatPath.size() - 2; i++) {
-                // Check if current node can connect to the node after next
-                Vertex a = flatPath.get(i);
-                Vertex c = flatPath.get(i + 2);
-                if (connectedInFreeSpace(inflatedMap, a, c)) {
-                    flatPath.remove(i + 1); // Remove b
-                    pathModified = true;
-                }
-            }
-        }
-        return flatPath;
-    }
-
+    
     /* Connect a vertex to other vertices in the graph. */
     public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
-        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
+//        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
+        ArrayList<Edge> edges = connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
         return edges;
     }
 
@@ -289,6 +318,55 @@ public class PRMUtil {
         }
         
         return connections;
+    }
+
+    /* Takes a list of vertices (a path) and removes intermediate points which
+     * do not help us go around an obstacle. That is, if a is connected to b,
+     * and b is connected to c, we check if there is a path from a to c and
+     * if so, remove b from the path. We do this for the whole path until we
+     * have as straight a path as possible */
+    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path) {
+        ArrayList<Vertex> flatPath = (ArrayList) path.clone();
+        boolean pathModified = true;
+        while (pathModified) {
+            pathModified = false;
+            for (int i = 0; i < flatPath.size() - 2; i++) {
+                // Check if current node can connect to the node after next
+                Vertex a = flatPath.get(i);
+                Vertex c = flatPath.get(i + 2);
+                if (connectedInFreeSpace(inflatedMap, a, c)) {
+                    flatPath.remove(i + 1); // Remove b
+                    pathModified = true;
+                }
+            }
+        }
+        return flatPath;
+    }
+
+    /* Takes a list of vertices (a path) and removes intermediate points which
+     * do not help us go around an obstacle. That is, if a is connected to b,
+     * and b is connected to c, we check if there is a path from a to c and
+     * if so, remove b from the path. This version of the method will iterate
+     * over the path the specified number of times. If -1 is passed, the iteration
+     * will continue until the path cannot be flattened any more.
+     */
+    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path, int iterations) {
+        if (iterations == -1){
+            return flattenDrunkenPath(path);
+        }
+        ArrayList<Vertex> flatPath = (ArrayList) path.clone();
+        for (int j = 0; j < iterations; j++) {
+            for (int i = 0; i < flatPath.size() - 2; i++) {
+                // Check if current node can connect to the node after next
+                Vertex a = flatPath.get(i);
+                Vertex c = flatPath.get(i + 2);
+                if (connectedInFreeSpace(inflatedMap, a, c)) {
+                    flatPath.remove(i + 1); // Remove b
+                }
+            }
+        }
+
+        return flatPath;
     }
 
     /* Checks if v1 is connected v2, either directly or indirectly. */
@@ -445,7 +523,7 @@ public class PRMUtil {
         double sum = 0;
 
         for (Edge e : graph.getEdges()) {
-            System.out.println(e);
+         //   System.out.println(e);
             sum += e.edgeWeight();
         }
 

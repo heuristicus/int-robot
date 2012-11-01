@@ -25,7 +25,7 @@ public class Dijkstra implements SearchAlgorithm {
 
 	while(!unchecked.isEmpty()){
 
-            System.out.println(" unchecked size: " + unchecked.size());
+            //System.out.println(" unchecked size: " + unchecked.size());
 
 	    Vertex minVertex = shortestDistance(unchecked);
 
@@ -37,7 +37,7 @@ public class Dijkstra implements SearchAlgorithm {
 
             DijkstraTuple vData = unchecked.remove(minVertex);
 
-            System.out.println(minVertex + " goal " + v2);
+            //System.out.println(minVertex + " goal " + v2);
 
             //System.out.println("Removed " + minVertex + " with tentative distance " + vData.getDistance());
 	    if (minVertex.equals(v2)){ // If we found the destination
@@ -56,10 +56,10 @@ public class Dijkstra implements SearchAlgorithm {
 		    path.addFirst(current);
 		}
 
-                for (Vertex vertex : path) {
-                    System.out.print(vertex + "->");
-                }
-                System.out.println("");
+//                for (Vertex vertex : path) {
+//                    System.out.print(vertex + "->");
+//                }
+//                System.out.println("");
 
                 return new ArrayList(path);
 	    }
@@ -114,5 +114,12 @@ public class Dijkstra implements SearchAlgorithm {
 	}
 	return minVertex;
     }
+
+    @Override
+    public String toString() {
+        return "Dijkstra";
+    }
+
+
 
 }

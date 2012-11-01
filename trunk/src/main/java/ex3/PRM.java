@@ -120,8 +120,10 @@ public class PRM extends AbstractNodeMain {
                     System.out.println("Could not find route!");
                 } else {
                     System.out.println("Found route of size: "+routeToGoal.size()+". Flattening...");
-                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal);
+                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1);
                     System.out.println("Flattened to size: "+flatRouteToGoal.size());
+                    double percentage = (double)flatRouteToGoal.size()/(double)routeToGoal.size();
+                    System.out.printf("New path is %.2f times the size of the original.\n", percentage);
                     MarkerArray paths = pathMarkers.newMessage();
                     ArrayList<Marker> pathList = new ArrayList<Marker>();
                     pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
@@ -165,21 +167,13 @@ public class PRM extends AbstractNodeMain {
 
         System.out.println("Average path length: " + util.averageConnectionLength(graph));
 
-//        int start = (int) (Math.random() * NUMBER_OF_VERTICES);
-//        int goal = (int) (Math.random() * NUMBER_OF_VERTICES);
-//
-//        LinkedList<Vertex> rt = findRoute(graph.vertices.get(start), graph.getVertices().get(goal));
-//
-//        if (rt == null){
-//            System.out.println("Could not find route!");
-//        } else {
-//            pathMarkers.publish(util.makePathMarker(rt));
-//        }
-
     }
 
     public ArrayList<Vertex> findRoute(Vertex v1, Vertex v2){
-        return search.shortestPath(v1, v2, graph, util);
+        double start = System.currentTimeMillis();
+        ArrayList<Vertex> path =  search.shortestPath(v1, v2, graph, util);
+        System.out.println(search + " search took " + (System.currentTimeMillis() - start) + "ms.");
+        return path;
     }
 
     public void publishMarkers(PRMGraph graph){
