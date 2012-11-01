@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import nav_msgs.OccupancyGrid;
@@ -19,7 +20,6 @@ import std_msgs.ColorRGBA;
 import visualization_msgs.Marker;
 
 public class PRMUtil {
-
 
     public static final int INFLATION_RADIUS = 5;
 
@@ -134,7 +134,7 @@ public class PRMUtil {
     public ArrayList<Edge> connectVertices(ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
         ArrayList<Edge> edges = new ArrayList<Edge>();
         ArrayList<Edge> temp = new ArrayList<Edge>();
-        
+
         for (Vertex vertex : vertices) {
             temp = connectVertexToGraph(vertex, vertices, distanceThreshold, maxConnections);
             for (Edge edge : temp) {
@@ -147,13 +147,9 @@ public class PRMUtil {
         return edges;
     }
 
-    /*
-     * Connect a vertex to other vertices in the graph.
-     */
+    /* Connect a vertex to other vertices in the graph. */
     public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
-
-        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, distanceThreshold, maxConnections);
-
+        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
         return edges;
     }
 
@@ -161,13 +157,17 @@ public class PRMUtil {
      * Connects a vertex to other vertices within distanceThreshold euclidean distance
      * of the specified vertex. Will not make more than maxConnections connections. The
      * vertex will not be connected to nodes that it is already connected to indirectly.
+     * The node will be connected to nodes which are within the given threshold
+     * based on their position in the array. The nodes with lower array indexes
+     * are much more likely to be connected to.
      */
-    public ArrayList<Edge> connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
+    public ArrayList<Edge> connectVertex_firstNInThreshold(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
 	int connectedCount = 0;
         double distance = 0;
         ArrayList<Edge> connections = new ArrayList<Edge>();
         for (Vertex vert : graph) {
-            if (vert.getConnectedVertices().contains(v)){
+            if (vert.connectedVertices.size() >= maxConnections
+                    || vert.getConnectedVertices().contains(v)){
                 // If we've already been connected to this node, carry on.
                 continue;
             }
@@ -190,6 +190,82 @@ public class PRMUtil {
             }
         }
 
+        return connections;
+    }
+
+
+    /*
+     * Used to order vertices in a priority queue.
+     */
+    private class VertexTuple implements Comparable<VertexTuple> {
+        public final Vertex v1;
+        public final double distance;
+
+        public VertexTuple(Vertex v1, double distance){
+            this.v1 = v1;
+            this.distance = distance;
+        }
+
+        /*
+         * Compares two distances. Smaller distances are considered to be higher
+         * priority than larger ones. If the distance in this object is smaller
+         * than the one passed in, the value returned is +1.
+         */
+        @Override
+        public int compareTo(VertexTuple o) {
+            return Double.compare(distance, o.distance);
+        }
+    }
+
+    /*
+     * Attempts to connect the given node to the closest n nodes to it, starting
+     * from the node that is closest, by checking distance to all vertices and
+     * then attempting to make connections to the closest n of those.
+     */
+    public ArrayList<Edge> connectVertex_nearestN(Vertex v, ArrayList<Vertex> graph, int maxConnections, int maxAttempts) {
+        PriorityQueue<VertexTuple> closestNodes = new PriorityQueue<VertexTuple>(graph.size());
+
+        for (Vertex vert : graph) {
+            if (vert == v || vert.connectedVertices.size() >= maxConnections){
+                continue;
+            }
+            closestNodes.add(new VertexTuple(vert, getEuclideanDistance(v, vert)));
+        }
+
+        ArrayList<Edge> connections = new ArrayList<Edge>();
+
+        int connectionAttempts = 0;
+        int connectionCount = v.connectedVertices.size();
+        while (connectionAttempts < maxAttempts && connectionCount < maxConnections) {
+            VertexTuple vt = closestNodes.poll();
+            System.out.println(vt.distance);
+            // Run out of nodes to check so exit.
+            if (vt == null){
+                break;
+            }
+            Vertex vert = vt.v1;
+
+            if (vert.getConnectedVertices().contains(v)){
+                // If we've already been connected to this node, carry on.
+                continue;
+            }
+            
+            if (!isConnected(v, vert)) {
+                if (connectedInFreeSpace(inflatedMap,
+                        v.getLocation().getX(),
+                        v.getLocation().getY(),
+                        vert.getLocation().getX(),
+                        vert.getLocation().getY(), vt.distance)) {
+
+                    v.addConnectedVertex(vert);
+                    vert.addConnectedVertex(v);
+                    connections.add(new Edge(v, vert, vt.distance));
+                    connectionCount++;
+                }
+            }
+            connectionAttempts++;
+        }
+        
         return connections;
     }
 

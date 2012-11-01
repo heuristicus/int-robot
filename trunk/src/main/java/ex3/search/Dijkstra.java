@@ -3,18 +3,17 @@ package ex3.search;
 import ex3.PRMGraph;
 import ex3.PRMUtil;
 import ex3.Vertex;
-import ex3.heuristics.Heuristic;
 import java.util.LinkedList;
 import java.util.HashMap;
-import java.util.HashSet;
 
 public class Dijkstra implements SearchAlgorithm {
 
     @Override
     public LinkedList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
-        HashMap<Vertex, DijkstraTuple> map = new HashMap<Vertex, DijkstraTuple>();
-	HashMap<Vertex, DijkstraTuple> unchecked = new HashMap<Vertex, DijkstraTuple>();
-	
+        HashMap<Vertex, DijkstraTuple> map = new HashMap<Vertex, DijkstraTuple>(); // Tuple graph
+        HashMap<Vertex, DijkstraTuple> unchecked = new HashMap<Vertex, DijkstraTuple>();
+
+        // Create tuples for each point in graph. Add everything to unchecked.
         for (Vertex inGraph : graph.getVertices()) {
             map.put(inGraph, new DijkstraTuple(Double.MAX_VALUE, null));
             unchecked.put(inGraph, new DijkstraTuple(Double.MAX_VALUE, null));

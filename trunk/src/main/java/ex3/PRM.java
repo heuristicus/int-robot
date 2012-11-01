@@ -22,9 +22,9 @@ import visualization_msgs.MarkerArray;
 
 public class PRM extends AbstractNodeMain {
 
-    public static final int NUMBER_OF_VERTICES = 100;
-    public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.5;
-    public final int MAX_CONNECTIONS = 20;
+    public static final int NUMBER_OF_VERTICES = 1000;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 1.0;
+    public final int MAX_CONNECTIONS = 5;
     
     PRMUtil util;
     PRMGraph graph;
@@ -37,7 +37,6 @@ public class PRM extends AbstractNodeMain {
     LinkedList<Vertex> routeToGoal;
     Pose currentPosition;
     
-
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> PRMMarkers;
     Publisher<Marker> pathMarkers;
