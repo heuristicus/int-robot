@@ -3,13 +3,14 @@ package ex3.search;
 import ex3.PRMGraph;
 import ex3.PRMUtil;
 import ex3.Vertex;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.HashMap;
 
 public class Dijkstra implements SearchAlgorithm {
 
     @Override
-    public LinkedList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
+    public ArrayList<Vertex> shortestPath(Vertex v1, Vertex v2, PRMGraph graph, PRMUtil util) {
         HashMap<Vertex, DijkstraTuple> map = new HashMap<Vertex, DijkstraTuple>(); // Tuple graph
         HashMap<Vertex, DijkstraTuple> unchecked = new HashMap<Vertex, DijkstraTuple>();
 
@@ -60,11 +61,8 @@ public class Dijkstra implements SearchAlgorithm {
                 }
                 System.out.println("");
 
-		return path;
-		
+                return new ArrayList(path);
 	    }
-	    
-	    
 	    
 	    for (Vertex neighbour : minVertex.getConnectedVertices()){
 		if (!unchecked.containsKey(neighbour)){

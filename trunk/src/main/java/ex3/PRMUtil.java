@@ -147,6 +147,29 @@ public class PRMUtil {
         return edges;
     }
 
+    /* Takes a list of vertices (a path) and removes intermediate points which
+     * do not help us go around an obstacle. That is, if a is connected to b,
+     * and b is connected to c, we check if there is a path from a to c and
+     * if so, remove b from the path. We do this for the whole path until we
+     * have as straight a path as possible */
+    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path) {
+        ArrayList<Vertex> flatPath = (ArrayList) path.clone();
+        boolean pathModified = true;
+        while (pathModified) {
+            pathModified = false;
+            for (int i = 0; i < flatPath.size() - 2; i++) {
+                // Check if current node can connect to the node after next
+                Vertex a = flatPath.get(i);
+                Vertex c = flatPath.get(i + 2);
+                if (connectedInFreeSpace(inflatedMap, a, c)) {
+                    flatPath.remove(i + 1); // Remove b
+                    pathModified = true;
+                }
+            }
+        }
+        return flatPath;
+    }
+
     /* Connect a vertex to other vertices in the graph. */
     public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
         ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
@@ -238,7 +261,6 @@ public class PRMUtil {
         int connectionCount = v.connectedVertices.size();
         while (connectionAttempts < maxAttempts && connectionCount < maxConnections) {
             VertexTuple vt = closestNodes.poll();
-            System.out.println(vt.distance);
             // Run out of nodes to check so exit.
             if (vt == null){
                 break;
@@ -333,7 +355,7 @@ public class PRMUtil {
         return m;
     }
 
-    public Marker makePathMarker(LinkedList<Vertex> path){
+    public Marker makePathMarker(List<Vertex> path, String namespace, String colour){
         Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
         edgeVector.setX(MARKER_EDGE_WIDTH);
 
@@ -344,12 +366,19 @@ public class PRMUtil {
 
         ColorRGBA edgeColour = factory.newFromType(ColorRGBA._TYPE);
         edgeColour.setA(1.0f);
-        edgeColour.setB(1.0f);
+        if (colour.equals("blue")){
+            edgeColour.setB(1.0f);
+        } else if (colour.equals("green")){
+            edgeColour.setG(1.0f);
+        } else {
+            edgeColour.setR(1.0f);
+        }
 
-        Marker rtMarker = setUpMarker("/map", "path", 2, Marker.ADD, Marker.LINE_STRIP, edgeColour, edgePose, edgeVector);
+
+        Marker rtMarker = setUpMarker("/map", namespace, 2, Marker.ADD, Marker.LINE_STRIP, edgeColour, edgePose, edgeVector);
 
         for (Vertex vertex : path) {
-            System.out.println("Adding vertex " + vertex);
+//            System.out.println("Adding vertex " + vertex);
             Point tmp = factory.newFromType(Point._TYPE);
             tmp.setX(-vertex.getLocation().getX());
             tmp.setY(-vertex.getLocation().getY());
@@ -476,6 +505,16 @@ public class PRMUtil {
         }
 
         return inflatedMap;
+    }
+
+    public static boolean connectedInFreeSpace(OccupancyGrid map,
+            Vertex a, Vertex b) {
+        return connectedInFreeSpace(map,
+                a.getLocation().getX(),
+                a.getLocation().getY(),
+                b.getLocation().getX(),
+                b.getLocation().getY(),
+                getEuclideanDistance(a, b));
     }
 
     /** Given a line (provided by two points), checks whether or not the line

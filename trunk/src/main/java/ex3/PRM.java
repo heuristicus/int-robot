@@ -4,7 +4,8 @@ import ex3.search.SearchAlgorithm;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,8 +23,8 @@ import visualization_msgs.MarkerArray;
 
 public class PRM extends AbstractNodeMain {
 
-    public static final int NUMBER_OF_VERTICES = 1000;
-    public static final double PROXIMITY_DISTANCE_THRESHOLD = 1.0;
+    public static final int NUMBER_OF_VERTICES = 500;
+    public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.0;
     public final int MAX_CONNECTIONS = 5;
     
     PRMUtil util;
@@ -34,12 +35,12 @@ public class PRM extends AbstractNodeMain {
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
 
-    LinkedList<Vertex> routeToGoal;
+    ArrayList<Vertex> routeToGoal;
     Pose currentPosition;
     
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> PRMMarkers;
-    Publisher<Marker> pathMarkers;
+    Publisher<MarkerArray> pathMarkers;
     Publisher<OccupancyGrid> inflatedMapPublisher;
     Subscriber<PoseStamped> goals;
     Subscriber<PoseWithCovarianceStamped> initialPosition;
@@ -63,7 +64,7 @@ public class PRM extends AbstractNodeMain {
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         PRMMarkers = node.newPublisher("markers", MarkerArray._TYPE);
         PRMMarkers.setLatchMode(true);
-        pathMarkers = node.newPublisher("pathMarkers", Marker._TYPE);
+        pathMarkers = node.newPublisher("pathMarkers", MarkerArray._TYPE);
         pathMarkers.setLatchMode(true);
         PRM.node = node;
 
@@ -118,7 +119,16 @@ public class PRM extends AbstractNodeMain {
                 if (routeToGoal == null){
                     System.out.println("Could not find route!");
                 } else {
-                    pathMarkers.publish(util.makePathMarker(routeToGoal));
+                    System.out.println("Found route of size: "+routeToGoal.size()+". Flattening...");
+                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal);
+                    System.out.println("Flattened to size: "+flatRouteToGoal.size());
+                    MarkerArray paths = pathMarkers.newMessage();
+                    ArrayList<Marker> pathList = new ArrayList<Marker>();
+                    pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
+                    pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "green"));
+
+                    paths.setMarkers(pathList);
+                    pathMarkers.publish(paths);
                 }
 
             }
@@ -168,7 +178,7 @@ public class PRM extends AbstractNodeMain {
 
     }
 
-    public LinkedList<Vertex> findRoute(Vertex v1, Vertex v2){
+    public ArrayList<Vertex> findRoute(Vertex v1, Vertex v2){
         return search.shortestPath(v1, v2, graph, util);
     }
 
