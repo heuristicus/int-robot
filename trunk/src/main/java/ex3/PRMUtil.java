@@ -176,8 +176,6 @@ public class PRMUtil {
         for (int i = 0; i < mapWidth; i += cellWidthMap) {
             for (int j = 0; j < mapHeight; j += cellWidthMap) {
                 int freePixelsInCell = freePointsInCell(i, j, cellWidthMap, mapWidth, mapHeight, buf, bufLength);
-                System.out.println("Free points in cell start point " + i + ", " + j + ": " + freePixelsInCell);
-
                 if (freePixelsInCell > targetPerCell) {
                     for (int points = 0; points < targetPerCell; points++) {
                         Vertex v = getRandomVertex(i, j, cellWidthMap, map);

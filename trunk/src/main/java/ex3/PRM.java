@@ -26,6 +26,8 @@ public class PRM extends AbstractNodeMain {
     public static final int NUMBER_OF_VERTICES = 500;
     public static final double PROXIMITY_DISTANCE_THRESHOLD = 3.0;
     public final int MAX_CONNECTIONS = 5;
+
+    public final int MAX_REGENERATION_ATTEMPTS = 200;
     
     PRMUtil util;
     PRMGraph graph;
@@ -97,7 +99,7 @@ public class PRM extends AbstractNodeMain {
                 int attempts = 0;
                 routeToGoal = null; // Start with no path
                 // Try to find a path or regenerate graph until able to
-                while (routeToGoal == null) {
+                while (routeToGoal == null && attempts < MAX_REGENERATION_ATTEMPTS) {
                     System.out.println("Finding route attempt: "+ ++attempts);
 
                     Vertex start = new Vertex(currentPosition.getPosition());
@@ -118,6 +120,12 @@ public class PRM extends AbstractNodeMain {
                         System.out.println("Goal point added to the graph");
                     }
                     routeToGoal = findRoute(start, goal);
+                }
+
+                if (routeToGoal == null) {
+                    System.out.println("Could not find a path. Are you sure "
+                            + "the destination is reachable?");
+                    return;
                 }
 
                 System.out.println("Found route of size: " + routeToGoal.size() + ". Flattening...");

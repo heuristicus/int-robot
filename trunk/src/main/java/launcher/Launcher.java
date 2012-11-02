@@ -1,7 +1,6 @@
 package launcher;
 
 import ex3.PRM;
-import ex3.heuristics.SimpleHeuristic;
 import ex3.search.Dijkstra;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
