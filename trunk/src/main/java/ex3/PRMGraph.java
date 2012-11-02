@@ -15,7 +15,6 @@ public class PRMGraph {
     public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices, double distanceThreshold, int max_connections){
         this.MAX_CONNECTIONS = max_connections;
         this.distanceThreshold = distanceThreshold;
-        generatePRM(util, map, numVertices);
     }
 
     /* Generates the road map using the provided map and vertex number. */

@@ -94,48 +94,45 @@ public class PRM extends AbstractNodeMain {
                     return; // If the pose is not in free space, we reject this goal.
                 }
                 
-                Vertex start = new Vertex(currentPosition.getPosition());
-                Vertex goal = new Vertex(t.getPose().getPosition());
-
-                // Try and add the start point to the graph
-                boolean startAdded = graph.addVertex(start, util);
-
-                // Try and add the goal point to the graph
-                boolean goalAdded = graph.addVertex(goal, util);
-
-                if (!startAdded){
-                    System.out.println("Start point is already in the graph.");
-                    start = graph.getVertices().get(graph.getVertices().indexOf(start));
-                }
-
-                if (!goalAdded){
-                    System.out.println("Goal point is already in the graph");
-                    goal = graph.getVertices().get(graph.getVertices().indexOf(goal));
-                }
-
-                routeToGoal = findRoute(start, goal);
-                int i = 1;
+                int attempts = 0;
+                routeToGoal = null; // Start with no path
+                // Try to find a path or regenerate graph until able to
                 while (routeToGoal == null) {
-                    System.out.println("Could not find route! Trying again. Attempt "+ ++i);
+                    System.out.println("Finding route attempt: "+ ++attempts);
+
+                    Vertex start = new Vertex(currentPosition.getPosition());
+                    Vertex goal = new Vertex(t.getPose().getPosition());
+
+                    // Try and add the start and goal points to the graph
+                    boolean startAdded = graph.addVertex(start, util);
+                    boolean goalAdded = graph.addVertex(goal, util);
+
+                    if (!startAdded) {
+                        start = graph.getVertices().get(graph.getVertices().indexOf(start));
+                    } else {
+                        System.out.println("Start point added to the graph.");
+                    }
+                    if (!goalAdded) {
+                        goal = graph.getVertices().get(graph.getVertices().indexOf(goal));
+                    } else {
+                        System.out.println("Goal point added to the graph");
+                    }
                     routeToGoal = findRoute(start, goal);
                 }
-                if (routeToGoal == null){
-                    
-                } else {
-                    System.out.println("Found route of size: "+routeToGoal.size()+". Flattening...");
-                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, 2);
-                    System.out.println("Flattened to size: "+flatRouteToGoal.size());
-                    double percentage = (double)flatRouteToGoal.size()/(double)routeToGoal.size();
-                    System.out.printf("New path is %.2f times the size of the original.\n", percentage);
-                    MarkerArray paths = pathMarkers.newMessage();
-                    ArrayList<Marker> pathList = new ArrayList<Marker>();
-                    pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
-                    pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "green"));
 
-                    paths.setMarkers(pathList);
-                    pathMarkers.publish(paths);
-                }
+                System.out.println("Found route of size: " + routeToGoal.size() + ". Flattening...");
+                List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1); // -1 is flatten fully
+                System.out.println("Flattened to size: " + flatRouteToGoal.size());
+                double percentage = (double) flatRouteToGoal.size() / (double) routeToGoal.size();
+                System.out.printf("New path is %.2f times the size of the original.\n", percentage);
+                MarkerArray paths = pathMarkers.newMessage();
+                ArrayList<Marker> pathList = new ArrayList<Marker>();
+                pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
+                pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "green"));
 
+                paths.setMarkers(pathList);
+                pathMarkers.setLatchMode(true);
+                pathMarkers.publish(paths);
             }
         });
 
@@ -163,6 +160,7 @@ public class PRM extends AbstractNodeMain {
         inflatedMap = util.inflateMap(map, inflatedMapPublisher);
         util = new PRMUtil(new Random(), factory, inflatedMap);
         graph = new PRMGraph(util, inflatedMap, NUMBER_OF_VERTICES, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS);
+        graph.generatePRM(util, inflatedMap, NUMBER_OF_VERTICES);
 
         publishMarkers(graph);
         inflatedMapPublisher.setLatchMode(true);
