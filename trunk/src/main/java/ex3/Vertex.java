@@ -44,6 +44,11 @@ public class Vertex {
     @Override
     public boolean equals(Object obj) {
         try {
+            if (obj == null) {
+                return false;
+            } else if (this == obj) {
+                return true;
+            }
             Vertex v = (Vertex) obj;
             return v.getLocation().getX() == this.location.getX() && v.getLocation().getY() == this.location.getY();
         } catch (ClassCastException ex) {

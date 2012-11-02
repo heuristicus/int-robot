@@ -83,14 +83,12 @@ public class PRM extends AbstractNodeMain {
 
             @Override
             public void onNewMessage(PoseStamped t) {
-
                 if (currentPosition == null) {
                     System.out.println("Starting position unset!");
                     return;
                 }
 
                 boolean inFreeSpace = util.checkPositionValidity(t.getPose(), inflatedMap);
-
                 if (!inFreeSpace){
                     System.out.println("Cannot move to specified location. In a wall or outside the map.");
                     return; // If the pose is not in free space, we reject this goal.
@@ -116,11 +114,16 @@ public class PRM extends AbstractNodeMain {
                 }
 
                 routeToGoal = findRoute(start, goal);
+                int i = 1;
+                while (routeToGoal == null) {
+                    System.out.println("Could not find route! Trying again. Attempt "+ ++i);
+                    routeToGoal = findRoute(start, goal);
+                }
                 if (routeToGoal == null){
-                    System.out.println("Could not find route!");
+                    
                 } else {
                     System.out.println("Found route of size: "+routeToGoal.size()+". Flattening...");
-                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1);
+                    List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, 2);
                     System.out.println("Flattened to size: "+flatRouteToGoal.size());
                     double percentage = (double)flatRouteToGoal.size()/(double)routeToGoal.size();
                     System.out.printf("New path is %.2f times the size of the original.\n", percentage);

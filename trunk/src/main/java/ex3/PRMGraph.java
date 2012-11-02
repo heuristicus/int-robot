@@ -21,7 +21,8 @@ public class PRMGraph {
     /* Generates the road map using the provided map and vertex number. */
     public void generatePRM(PRMUtil util, OccupancyGrid map, int numVertices){
         //vertices = util.randomSample(map, numVertices);
-        vertices = util.gridSample(map, 0.5, 0.5);
+        //vertices = util.gridSample(map, 0.5, 0.5);
+        vertices = util.cellSample(map, 1.0, 5);
         long start = System.currentTimeMillis();
         this.edges = util.connectVertices(vertices, distanceThreshold, MAX_CONNECTIONS);
         System.out.println("All vertices connected in: "+(System.currentTimeMillis()-start)+" ms");

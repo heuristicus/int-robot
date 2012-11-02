@@ -90,6 +90,29 @@ public class PRMUtil {
         return new Vertex(randX * mapRes, randY * mapRes, factory);
     }
 
+    /** Generate a random vertex in free space within the bounds given */
+    public Vertex getRandomVertex(int startX, int startY, int cellWidth, OccupancyGrid map){
+        int mapWidth = map.getInfo().getWidth();
+        int mapHeight = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution();
+
+        boolean foundOpen = false;
+        float randX = 0;
+        float randY = 0;
+        ChannelBuffer buff = map.getData();
+        final int buffLength = buff.capacity();
+
+        while (!foundOpen){
+            randX = (randGen.nextFloat() * cellWidth) + startX;
+            randY = (randGen.nextFloat() * mapHeight);
+
+            foundOpen = checkPositionValidity((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
+
+        }
+
+        return new Vertex(randX * mapRes, randY * mapRes, factory);
+    }
+
     /*
      * Samples vertices for the road map based on a grid. xstep and ystep specify
      * the distribution of particles in the grid. The first particle generated
@@ -134,12 +157,64 @@ public class PRMUtil {
     /*
      * Samples points for the road map based on a cell sampling strategy. The map
      * is divided into cells. Each cell will have the same number of particles
-     * randomly placed within it, so long as such generation is possible.
+     * randomly placed within it, so long as such generation is possible. The
+     * cell width given in metres specifies the size of the square cell in which
+     * vertices will be generated.
      */
-    public ArrayList<Vertex> cellSample(OccupancyGrid map, int vertexNum){
+    public ArrayList<Vertex> cellSample(OccupancyGrid map, double cellWidth, int targetPerCell){
         ArrayList<Vertex> vertices = new ArrayList<Vertex>();
 
+        final int mapWidth = map.getInfo().getWidth();
+        final int mapHeight = map.getInfo().getHeight();
+        final float mapRes = map.getInfo().getResolution();
+        final ChannelBuffer buf = map.getData();
+        final int bufLength = map.getData().capacity();
+
+        int cellWidthMap = (int) Math.round(cellWidth / mapRes);
+        System.out.println("Cell width metres: " + cellWidth + ", cell width map space: " + cellWidthMap);
+
+        for (int i = 0; i < mapWidth; i += cellWidthMap) {
+            for (int j = 0; j < mapHeight; j += cellWidthMap) {
+                int freePixelsInCell = freePointsInCell(i, j, cellWidthMap, mapWidth, mapHeight, buf, bufLength);
+                System.out.println("Free points in cell start point " + i + ", " + j + ": " + freePixelsInCell);
+
+                if (freePixelsInCell > targetPerCell) {
+                    for (int points = 0; points < targetPerCell; points++) {
+                        Vertex v = getRandomVertex(i, j, cellWidthMap, map);
+                        if (! vertices.contains(v)) {
+                            vertices.add(v);
+                        }
+                    }
+                }
+            }
+        }
+
         return vertices;
+    }
+
+    /*
+     * Checks the number of free points in a given cell, where the start point
+     * is the top left corner of the cell, and the cellwidth is the width of the
+     * cell in the map space.
+     */
+    public int freePointsInCell(final int startX, final int startY, final int cellWidth, final int mapWidth, final int mapHeight, ChannelBuffer buff, int buffLength) {
+        int freeCount = 0;
+
+        for (int i = startX; i < startX + cellWidth; i++) {
+            if (i > mapWidth || i < 0){
+                break;
+            }
+            for (int j = startY; j < startY + cellWidth; j++) {
+                if (j > mapHeight || j < 0) {
+                    break;
+                }
+                if (checkPositionValidity(i, j, mapWidth, mapHeight, buff, buffLength)){
+                    freeCount++;
+                }
+            }
+        }
+
+        return freeCount;
     }
 
     /*
@@ -200,8 +275,8 @@ public class PRMUtil {
     
     /* Connect a vertex to other vertices in the graph. */
     public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
-//        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
-        ArrayList<Edge> edges = connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
+        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
+        //ArrayList<Edge> edges = connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
         return edges;
     }
 
@@ -453,14 +528,20 @@ public class PRMUtil {
         }
 
 
-        Marker rtMarker = setUpMarker("/map", namespace, 2, Marker.ADD, Marker.LINE_STRIP, edgeColour, edgePose, edgeVector);
+        Marker rtMarker = setUpMarker("/map", namespace, 2, Marker.ADD, Marker.LINE_LIST, edgeColour, edgePose, edgeVector);
 
-        for (Vertex vertex : path) {
+        for (int i = 0; i < path.size() - 1; i++) {
 //            System.out.println("Adding vertex " + vertex);
             Point tmp = factory.newFromType(Point._TYPE);
-            tmp.setX(-vertex.getLocation().getX());
-            tmp.setY(-vertex.getLocation().getY());
+            tmp.setX(-path.get(i).getLocation().getX());
+            tmp.setY(-path.get(i).getLocation().getY());
+
+            Point tmp2 = factory.newFromType(Point._TYPE);
+            tmp2.setX(-path.get(i + 1).getLocation().getX());
+            tmp2.setY(-path.get(i + 1).getLocation().getY());
+
             rtMarker.getPoints().add(tmp);
+            rtMarker.getPoints().add(tmp2);
         }
 
         return rtMarker;
