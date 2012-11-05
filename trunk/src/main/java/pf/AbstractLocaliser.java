@@ -396,5 +396,7 @@ public abstract class AbstractLocaliser extends PFLocalisationNode {
         return POSITION_NOISE;
     }
 
-
+    public static void setFactory(MessageFactory factory) {
+        messageFactory = factory;
+    }
 }

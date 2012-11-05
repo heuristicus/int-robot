@@ -8,6 +8,9 @@ import geometry_msgs.Point;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import launcher.RunParams;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
@@ -26,16 +29,18 @@ public class BatchExperimenter {
     private static Publisher<PoseStamped> goalPub;
 
     private static PRM prm;
-    private static int valueArrayIndex;
-    private static String[] valuesArray;
+//    private static int valueArrayIndex;
+//    private static String[] valuesArray;
     private static ConnectedNode node;
     private static int expNum;
+    /** Maps minor expNums to lists of values that will vary for each minor exp */
+    private static List<List<String>> expValues;
+    private static int[] expMinorNums;
     private static String key;
 
     public static void runAllExperiments(ConnectedNode connectedNode) {
         System.out.println("runAllExperiments called");
         node = connectedNode;
-        expNum = 0;
 
         initialPosePub = node.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
 //        initialPosePub.setLatchMode(true);
@@ -49,23 +54,73 @@ public class BatchExperimenter {
                 processPath();
             }
         });
-        runNextExperiment();
-    }
-    
-    public static void runNextExperiment() {
-        expNum++;
-        key = RunParams.get("EXPERIMENT_" + expNum + "_KEY");
-        System.out.println("Experimenting with: EXPERIMENT_" + expNum + "_KEY");
-        if (key == null) {
-            System.out.println("No more experiments in Params file. Exiting");
-            System.exit(0);
+
+        expNum = 1;
+        boolean experimentsToDo = initialiseExperiments(expNum);
+        if (experimentsToDo) {
+            runNextExperiment();
         }
+    }
 
-        String expSampling = RunParams.get("EXPERIMENT_" + expNum + "_SAMPLING");
-        RunParams.overrideProperty("SAMPLING_METHOD", expSampling);
+    /** Sets up values in the expValues field. Returns whether there are 
+     * more minor experiments to do. I.e. if it returns false, don't call
+     * runNextExperiment() */
+    public static boolean initialiseExperiments(int expNumber) {
+        int minorNum = 1;
 
-        valuesArray = RunParams.get("EXPERIMENT_" + expNum + "_VALUES").split(",");
-        runExperimentOverValues();
+        expValues = new ArrayList<List<String>>();
+        while (true) {
+            key = RunParams.get("EXPERIMENT_" + expNumber + "_KEY_" + minorNum);
+            if (key == null) {
+                if (minorNum == 1) {
+                    return false;
+                }
+                break;
+            }
+            String[] valuesArray = RunParams.get("EXPERIMENT_" + expNumber + "_VALUES_" + minorNum).split(",");
+            List valuesList = Arrays.asList(valuesArray);
+            expValues.add(valuesList);
+            minorNum++;
+        }
+        expMinorNums = new int[minorNum - 1];
+        Arrays.fill(expMinorNums, 0);
+        System.out.println("VauesArray populated for expNum: "+expNumber);
+        return true;
+    }
+
+    public static void runNextExperiment() {
+        // Loop over keys which have a range of values and load in the
+        // current value for each key, before running the experiment
+        for (int minor = 1; minor < expMinorNums.length+1; minor++) {
+            System.out.println("RunNext: EXPERIMENT_" + expNum + "_KEY_" + minor);
+            key = RunParams.get("EXPERIMENT_" + expNum + "_KEY_" + minor);
+            List<String> listForKey = expValues.get(minor-1);
+            String currentValueForKey = listForKey.get(expMinorNums[minor-1]);
+
+            System.out.println("Overriding property " + key + "=" + currentValueForKey);
+            System.out.println("Value before override: " + RunParams.get(key));
+            RunParams.overrideProperty(key, currentValueForKey);
+            System.out.println("Value after override: " + RunParams.get(key));
+        }
+        runExperimentForValues();
+    }
+
+    /** The MinorNums array contains values for which minor experiment
+     * we are currently performing. We want to increment the end value,
+     * but if that has reached the maximum value, set it to 0 and go back
+     * one index in the array. */
+    public static boolean incrementMinorNums(int index) {
+        if (expMinorNums[index] == expValues.get(index).size()-1) {
+            if (index != 0) {
+                expMinorNums[index] = 0;
+                return incrementMinorNums(index - 1);
+            } else {
+                return false;
+            }
+        } else {
+            expMinorNums[index]++;
+            return true;
+        }
     }
 
     // Create a default configuration for the nodes that we will be creating
@@ -73,17 +128,7 @@ public class BatchExperimenter {
     // Create an executor to use to execute nodes.
     private static NodeMainExecutor exec = DefaultNodeMainExecutor.newDefault();
 
-    public static void runExperimentOverValues() {
-        valueArrayIndex = 0;
-        runExperimentForValue(key, valuesArray[0]);
-    }
-
-    public static void runExperimentForValue(String key, String value) {
-        System.out.println("Overriding property " + key + "=" + value);
-        System.out.println("Value of num_vertices before override: " + RunParams.getInt("NUMBER_OF_VERTICES"));
-        RunParams.overrideProperty(key, value);
-        System.out.println("Value of num_vertices after override: " + RunParams.getInt("NUMBER_OF_VERTICES"));
-
+    public static void runExperimentForValues() {
         System.out.println("creating new prm");
         prm = new PRM(new Dijkstra());
         System.out.println("executing prm");
@@ -114,7 +159,7 @@ public class BatchExperimenter {
             System.out.println("");
         } catch (InterruptedException e) {
         }
-        
+
         System.out.println("constructing goal pose message");
         PoseStamped goal = goalPub.newMessage();
         goal = getGoalPose(goal, node.getTopicMessageFactory(), expNum);
@@ -126,12 +171,20 @@ public class BatchExperimenter {
         ArrayList<Vertex> routeToGoal = prm.getRouteToGoal();
         double length = PRMUtil.getPathLength(routeToGoal);
         System.out.println("Experiment: Path of length " + length + " found and recorded.");
-        valueArrayIndex++;
-        if (valueArrayIndex < valuesArray.length){
-            runExperimentForValue(key, valuesArray[valueArrayIndex]);
-        } else {
-            runNextExperiment();
+        System.out.println("Moreover, regeneration attempts: "+prm.getRegenerationsForLastSearch());
+
+        boolean moreMinorExperiments = incrementMinorNums(expMinorNums.length-1);
+        if (! moreMinorExperiments) {
+            expNum++;
+            System.out.println("No more minor experiments. Setting expNum to: "+expNum);
+            boolean experimentsToDo = initialiseExperiments(expNum);
+            if (! experimentsToDo) {
+                System.out.println("No more experiments to do. Goodbye cruel world.");
+                System.exit(0);
+            }
         }
+
+        runNextExperiment();
     }
 
     public static PoseWithCovarianceStamped getStartPose(PoseWithCovarianceStamped pose, MessageFactory factory, int expNum) {

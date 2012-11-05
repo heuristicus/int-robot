@@ -24,9 +24,6 @@ import visualization_msgs.MarkerArray;
 
 public class PRM extends AbstractNodeMain {
 
-    public int NUMBER_OF_VERTICES = RunParams.getInt("NUMBER_OF_VERTICES");//500;
-    public int MAX_CONNECTIONS = RunParams.getInt("MAX_CONNECTIONS");//5;
-
     public int MAX_REGENERATION_ATTEMPTS = RunParams.getInt("MAX_REGENERATION_ATTEMPTS");//200;
     
     PRMUtil util;
@@ -34,6 +31,7 @@ public class PRM extends AbstractNodeMain {
     SearchAlgorithm search;
     boolean mapReceived = false;
     boolean graphGenerationComplete = false;
+    private int regenerationAttempts = 0;
     public static ConnectedNode node;
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
@@ -48,11 +46,6 @@ public class PRM extends AbstractNodeMain {
     Publisher<OccupancyGrid> inflatedMapPublisher;
     Subscriber<PoseStamped> goals;
     Subscriber<PoseWithCovarianceStamped> initialPosition;
-
-    public PRM(SearchAlgorithm search, int numVertices, int maxConnections){
-        this.NUMBER_OF_VERTICES = numVertices;
-        this.MAX_CONNECTIONS = maxConnections;
-    }
 
     public PRM(SearchAlgorithm search){
         this.search = search;
@@ -101,12 +94,17 @@ public class PRM extends AbstractNodeMain {
                     System.out.println("Cannot move to specified location. In a wall or outside the map.");
                     return; // If the pose is not in free space, we reject this goal.
                 }
-                
-                int attempts = 0;
+
+                regenerationAttempts = 0;
                 routeToGoal = null; // Start with no path
                 // Try to find a path or regenerate graph until able to
-                while (routeToGoal == null && attempts < MAX_REGENERATION_ATTEMPTS) {
-                    System.out.println("Finding route attempt: "+ ++attempts);
+                while (routeToGoal == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
+                    System.out.println("Finding route attempt: "+ ++regenerationAttempts);
+
+                    if (regenerationAttempts > 1) {
+                        // Regenerate graph
+                        graph.generatePRM(util, inflatedMap);
+                    }
 
                     Vertex start = new Vertex(currentPosition.getPosition());
                     Vertex goal = new Vertex(t.getPose().getPosition());
@@ -127,6 +125,8 @@ public class PRM extends AbstractNodeMain {
                         System.out.println("Goal point added to the graph: "
                                 + goal.getLocation().getX() + ", " + goal.getLocation().getY());
                     }
+                    
+                    publishMarkers(graph);
                     routeToGoal = findRoute(start, goal);
                 }
 
@@ -180,6 +180,12 @@ public class PRM extends AbstractNodeMain {
         return goalPosition;
     }
 
+    /** How many times we regenerated the graph the last time we searched
+     * for a path. */
+    public int getRegenerationsForLastSearch() {
+        return regenerationAttempts;
+    }
+
         /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
         inflatedMap = util.inflateMap(map, inflatedMapPublisher);
@@ -204,18 +210,8 @@ public class PRM extends AbstractNodeMain {
 
     public void publishMarkers(PRMGraph graph){
         MarkerArray array = PRMMarkers.newMessage();
-
         array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
-
-        for (int i = 0; i < 10; i++) {
-            PRMMarkers.publish(array);
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(PRM.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-
+        PRMMarkers.publish(array);
     }
 
     public ArrayList<Vertex> getRouteToGoal() {

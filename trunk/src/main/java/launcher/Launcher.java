@@ -1,6 +1,7 @@
 package launcher;
 
 import ex3.PRM;
+import ex3.experiment.BatchExperimenter;
 import ex3.search.Dijkstra;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
@@ -11,6 +12,11 @@ import org.ros.node.NodeConfiguration;
 import org.ros.node.NodeMainExecutor;
 
 public class Launcher extends AbstractNodeMain {
+
+    static {
+        System.setProperty("org.apache.commons.logging.Log",
+                         "org.apache.commons.logging.impl.NoOpLog");
+    }
 
     // Create a default configuration for the nodes that we will be creating
     NodeConfiguration conf = NodeConfiguration.newPrivate();
@@ -26,7 +32,8 @@ public class Launcher extends AbstractNodeMain {
 //        PFLocalisationNode.realWorldMode = false;
 //        PFLocalisationNode.augmented = true;
 //        exec.execute(new PFLocalisationNode(), conf);
-        exec.execute(new PRM(new Dijkstra()), conf);
+//       exec.execute(new PRM(new Dijkstra()), conf);
+        BatchExperimenter.runAllExperiments(connectedNode);
 //        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
     }
 

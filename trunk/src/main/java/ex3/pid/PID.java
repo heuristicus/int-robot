@@ -2,8 +2,6 @@ package ex3.pid;
 
 import geometry_msgs.PoseStamped;
 import geometry_msgs.Quaternion;
-import java.util.HashSet;
-import java.util.Set;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
 import org.ros.namespace.GraphName;

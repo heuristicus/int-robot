@@ -14,6 +14,7 @@ public class PRMGraph {
     public double Y_STEP = RunParams.getDouble("Y_STEP");//5;
     public double PROXIMITY_DISTANCE_THRESHOLD = RunParams.getDouble("PROXIMITY_DISTANCE_THRESHOLD");
     public int MAX_CONNECTIONS = RunParams.getInt("MAX_CONNECTIONS");
+    public String SAMPLING_METHOD = RunParams.get("SAMPLING_METHOD");
 
     ArrayList<Vertex> vertices;
     ArrayList<Edge> edges;
@@ -24,15 +25,14 @@ public class PRMGraph {
 
     /* Generates the road map using the provided map and vertex number. */
     public void generatePRM(PRMUtil util, OccupancyGrid map){
-        String samplingMethod = RunParams.get("SAMPLING_METHOD");
-        if (samplingMethod.equalsIgnoreCase("random")) {
+        if (SAMPLING_METHOD.equalsIgnoreCase("random")) {
             vertices = util.randomSample(map, NUMBER_OF_VERTICES);
-        } else if (samplingMethod.equalsIgnoreCase("grid")) {
+        } else if (SAMPLING_METHOD.equalsIgnoreCase("grid")) {
             vertices = util.gridSample(map, X_STEP, Y_STEP);
-        } else if (samplingMethod.equalsIgnoreCase("cell")) {
+        } else if (SAMPLING_METHOD.equalsIgnoreCase("cell")) {
             vertices = util.cellSample(map, CELL_WIDTH, TARGET_PER_CELL);
         } else {
-
+            throw new IllegalStateException("Sampling method: " + SAMPLING_METHOD + " not known");
         }
 
         long start = System.currentTimeMillis();
