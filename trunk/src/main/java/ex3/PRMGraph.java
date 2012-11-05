@@ -2,28 +2,41 @@ package ex3;
 
 import geometry_msgs.Point;
 import java.util.ArrayList;
+import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 
 public class PRMGraph {
 
-    public final int MAX_CONNECTIONS;
+    public int NUMBER_OF_VERTICES = RunParams.getInt("NUMBER_OF_VERTICES");
+    public int TARGET_PER_CELL = RunParams.getInt("TARGET_PER_CELL");//5;
+    public double CELL_WIDTH = RunParams.getDouble("CELL_WIDTH");//1.0;
+    public double X_STEP = RunParams.getDouble("X_STEP");//5;
+    public double Y_STEP = RunParams.getDouble("Y_STEP");//5;
+    public double PROXIMITY_DISTANCE_THRESHOLD = RunParams.getDouble("PROXIMITY_DISTANCE_THRESHOLD");
+    public int MAX_CONNECTIONS = RunParams.getInt("MAX_CONNECTIONS");
 
     ArrayList<Vertex> vertices;
     ArrayList<Edge> edges;
-    double distanceThreshold;
 
-    public PRMGraph(PRMUtil util, OccupancyGrid map, int numVertices, double distanceThreshold, int max_connections){
-        this.MAX_CONNECTIONS = max_connections;
-        this.distanceThreshold = distanceThreshold;
+    public PRMGraph() {
+        // Empty
     }
 
     /* Generates the road map using the provided map and vertex number. */
-    public void generatePRM(PRMUtil util, OccupancyGrid map, int numVertices){
-        //vertices = util.randomSample(map, numVertices);
-        //vertices = util.gridSample(map, 0.5, 0.5);
-        vertices = util.cellSample(map, 1.0, 5);
+    public void generatePRM(PRMUtil util, OccupancyGrid map){
+        String samplingMethod = RunParams.get("SAMPLING_METHOD");
+        if (samplingMethod.equalsIgnoreCase("random")) {
+            vertices = util.randomSample(map, NUMBER_OF_VERTICES);
+        } else if (samplingMethod.equalsIgnoreCase("grid")) {
+            vertices = util.gridSample(map, X_STEP, Y_STEP);
+        } else if (samplingMethod.equalsIgnoreCase("cell")) {
+            vertices = util.cellSample(map, CELL_WIDTH, TARGET_PER_CELL);
+        } else {
+
+        }
+
         long start = System.currentTimeMillis();
-        this.edges = util.connectVertices(vertices, distanceThreshold, MAX_CONNECTIONS);
+        this.edges = util.connectVertices(vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS);
         System.out.println("All vertices connected in: "+(System.currentTimeMillis()-start)+" ms");
     }
 
@@ -34,7 +47,7 @@ public class PRMGraph {
         }
         vertices.add(v);
 
-        edges.addAll(util.connectVertexToGraph(v, vertices, distanceThreshold, MAX_CONNECTIONS));
+        edges.addAll(util.connectVertexToGraph(v, vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS));
 
         return true;
     }

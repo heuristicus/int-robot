@@ -3,6 +3,7 @@ package ex3;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.Vector3;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
+import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -20,10 +22,9 @@ import visualization_msgs.Marker;
 
 public class PRMUtil {
 
-    public static final int INFLATION_RADIUS = 5;
-
-    public static final float MARKER_EDGE_WIDTH = 0.1f;
-    public static final float MARKER_POINT_WIDTH = 0.2f;
+    public static final int INFLATION_RADIUS = RunParams.getInt("INFLATION_RADIUS");
+    public static final float MARKER_EDGE_WIDTH = RunParams.getFloat("MARKER_EDGE_WIDTH");
+    public static final float MARKER_POINT_WIDTH = RunParams.getFloat("MARKER_POINT_WIDTH");
 
     Random randGen;
     MessageFactory factory;
@@ -35,25 +36,19 @@ public class PRMUtil {
         this.inflatedMap = inflatedMap;
     }
 
-    /*
-     * Gets the euclidean distance between two points
-     */
+    /* Gets the euclidean distance between two points */
     public static double getEuclideanDistance(Vertex v1, Vertex v2){
         return Math.sqrt(Math.pow(v1.getLocation().getX() - v2.getLocation().getX(), 2) + Math.pow(v1.getLocation().getY() - v2.getLocation().getY(), 2));
     }
 
-    /*
-     * Calculates the weight of an edge.
-     */
+    /* Calculates the weight of an edge. */
     public static double getEdgeWeight(Edge e){
         return getEuclideanDistance(e.a, e.b);
     }
 
-    /*
-     * Generates a set of random vertices which are guaranteed to be in free space
+    /* Generates a set of random vertices which are guaranteed to be in free space
      * on the map. This version of the method does not take into account the size
-     * or orientation of the robot.
-     */
+     * or orientation of the robot. */
     public ArrayList<Vertex> randomSample(OccupancyGrid map, int vertexNum){
         final ChannelBuffer buff = map.getData();
 
@@ -70,9 +65,7 @@ public class PRMUtil {
         return randomVertices;
     }
 
-    /*
-     * Generates random points on the map until one that is valid is found.
-     */
+    /** Generates random points on the map until one that is valid is found. */
     public Vertex getRandomVertex(int mapWidth, int mapHeight, float mapRes, ChannelBuffer buff){
         boolean foundOpen = false;
         float randX = 0;
@@ -113,12 +106,10 @@ public class PRMUtil {
         return new Vertex(randX * mapRes, randY * mapRes, factory);
     }
 
-    /*
-     * Samples vertices for the road map based on a grid. xstep and ystep specify
+    /** Samples vertices for the road map based on a grid. xstep and ystep specify
      * the distribution of particles in the grid. The first particle generated
      * will be at 0,0, and subsequent particles will be at n*xstep, n*ystep, where
-     * xstep and ystep are specified in metres.
-     */
+     * xstep and ystep are specified in metres. */
     public ArrayList<Vertex> gridSample(OccupancyGrid map, double xStep, double yStep){
         ArrayList<Vertex> vertices = new ArrayList<Vertex>();
 
@@ -154,7 +145,7 @@ public class PRMUtil {
         return vertices;
     }
 
-    /*
+    /**
      * Samples points for the road map based on a cell sampling strategy. The map
      * is divided into cells. Each cell will have the same number of particles
      * randomly placed within it, so long as such generation is possible. The
@@ -521,6 +512,9 @@ public class PRMUtil {
             edgeColour.setB(1.0f);
         } else if (colour.equals("green")){
             edgeColour.setG(1.0f);
+        } else if (colour.equals("orange")){
+            edgeColour.setR(1.0f);
+            edgeColour.setG(0.8f); // I'm sorry
         } else {
             edgeColour.setR(1.0f);
         }
@@ -598,7 +592,7 @@ public class PRMUtil {
         return mList;
     }
 
-    public double averageConnectionLength(PRMGraph graph){
+    public static double averageConnectionLength(PRMGraph graph){
         double sum = 0;
 
         for (Edge e : graph.getEdges()) {
@@ -607,6 +601,14 @@ public class PRMUtil {
         }
 
         return sum/graph.getEdges().size();
+    }
+
+    public static double getPathLength(ArrayList<Vertex> path) {
+        double totalLength = 0.0;
+        for (int i = 0; i < path.size() - 1; i++) {
+            totalLength += getEuclideanDistance(path.get(i), path.get(i+1));
+        }
+        return totalLength;
     }
 
     /*
