@@ -2,8 +2,8 @@ package ex3;
 
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
+import geometry_msgs.PoseArray;
 import geometry_msgs.Vector3;
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -18,6 +18,7 @@ import org.jboss.netty.buffer.ChannelBuffers;
 import org.ros.message.MessageFactory;
 import org.ros.node.topic.Publisher;
 import std_msgs.ColorRGBA;
+import sun.org.mozilla.javascript.xml.XMLLib.Factory;
 import visualization_msgs.Marker;
 
 public class PRMUtil {
@@ -25,6 +26,7 @@ public class PRMUtil {
     public static final int INFLATION_RADIUS = RunParams.getInt("INFLATION_RADIUS");
     public static final float MARKER_EDGE_WIDTH = RunParams.getFloat("MARKER_EDGE_WIDTH");
     public static final float MARKER_POINT_WIDTH = RunParams.getFloat("MARKER_POINT_WIDTH");
+    public static final String CONNECTION_METHOD = RunParams.get("CONNECTION_METHOD");
 
     Random randGen;
     MessageFactory factory;
@@ -38,7 +40,11 @@ public class PRMUtil {
 
     /* Gets the euclidean distance between two points */
     public static double getEuclideanDistance(Vertex v1, Vertex v2){
-        return Math.sqrt(Math.pow(v1.getLocation().getX() - v2.getLocation().getX(), 2) + Math.pow(v1.getLocation().getY() - v2.getLocation().getY(), 2));
+        return getEuclideanDistance(v1.getLocation(), v2.getLocation());
+    }
+
+    public static double getEuclideanDistance(Point p1, Point p2){
+        return Math.sqrt(Math.pow(p1.getX() - p2.getX(), 2) + Math.pow(p1.getY() - p2.getY(), 2));
     }
 
     /* Calculates the weight of an edge. */
@@ -264,9 +270,13 @@ public class PRMUtil {
     
     /* Connect a vertex to other vertices in the graph. */
     public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
-        ArrayList<Edge> edges = connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
-        //ArrayList<Edge> edges = connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
-        return edges;
+        if ("nearestN".equalsIgnoreCase(CONNECTION_METHOD)) {
+            return connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
+        } else if ("threshold".equalsIgnoreCase(CONNECTION_METHOD)) {
+            return connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
+        } else {
+            throw new IllegalStateException("Illegal connection method specified");
+        }
     }
 
     /*
@@ -470,6 +480,26 @@ public class PRMUtil {
         }
     }
 
+    /*
+     * Converts an arraylist of vertices to a pose array
+     */
+    public PoseArray convertVertexList(ArrayList<Vertex> varr){
+        PoseArray pose = factory.newFromType(PoseArray._TYPE);
+
+        ArrayList<Pose> arr = new ArrayList<Pose>();
+
+        for (Vertex v : varr) {
+            arr.add(v.makePose(factory));
+        }
+
+        pose.setPoses(arr);
+
+        return pose;
+    }
+
+    /*
+     * Sets the header of a specific marker to the given values.
+     */
     void setMarkerHeader(Marker m, String frameID, String namespace, int ID, int action, int type){
         m.getHeader().setFrameId(frameID);
         m.setNs(namespace);
@@ -478,6 +508,9 @@ public class PRMUtil {
         m.setType(type);
     }
 
+    /*
+     * Creates a marker message using the given values
+     */
     Marker setUpMarker(String frameID, String namespace, int ID, int action, int type, ColorRGBA colour, Pose pose, Vector3 vector){
         Marker m = factory.newFromType(Marker._TYPE);
         setMarkerHeader(m, frameID, namespace, ID, action, type);
@@ -497,6 +530,10 @@ public class PRMUtil {
         return m;
     }
 
+    /*
+     * Makes a list of markers out of a path list, so that the path can be displayed
+     * in rviz.
+     */
     public Marker makePathMarker(List<Vertex> path, String namespace, String colour){
         Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
         edgeVector.setX(MARKER_EDGE_WIDTH);
@@ -539,6 +576,9 @@ public class PRMUtil {
         return rtMarker;
     }
 
+    /*
+     * Makes the graph into a set of markers so that it can be displayed in rviz
+     */
     List<Marker> getGraphMarkers(PRMGraph graph, OccupancyGrid map, String frameID) {
         Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
         edgeVector.setX(MARKER_EDGE_WIDTH);
@@ -592,6 +632,9 @@ public class PRMUtil {
         return mList;
     }
 
+    /*
+     * Calculates the average connection length in the graph.
+     */
     public static double averageConnectionLength(PRMGraph graph){
         double sum = 0;
 

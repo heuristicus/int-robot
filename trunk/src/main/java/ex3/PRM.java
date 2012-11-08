@@ -2,13 +2,11 @@ package ex3;
 
 import ex3.search.SearchAlgorithm;
 import geometry_msgs.Pose;
+import geometry_msgs.PoseArray;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 import org.ros.message.MessageFactory;
@@ -31,20 +29,22 @@ public class PRM extends AbstractNodeMain {
     SearchAlgorithm search;
     boolean mapReceived = false;
     boolean graphGenerationComplete = false;
+    boolean routeFound = false;
     private int regenerationAttempts = 0;
     public static ConnectedNode node;
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
     private boolean experimentMode = false;
 
-    ArrayList<Vertex> routeToGoal;
-    ArrayList<Vertex> flatRouteToGoal;
+    ArrayList<Vertex> route;
+    ArrayList<Vertex> flatRoute;
     Pose currentPosition;
     Pose goalPosition;
     
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> PRMMarkers;
     Publisher<MarkerArray> pathMarkers;
+    Publisher<PoseArray> routePub;
     Publisher<OccupancyGrid> inflatedMapPublisher;
     Subscriber<PoseStamped> goals;
     Subscriber<PoseWithCovarianceStamped> initialPosition;
@@ -66,6 +66,8 @@ public class PRM extends AbstractNodeMain {
         initialPosition = node.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         PRMMarkers = node.newPublisher("markers", MarkerArray._TYPE);
+        routePub = node.newPublisher("route", PoseArray._TYPE);
+
         pathMarkers = node.newPublisher("pathMarkers", MarkerArray._TYPE);
         if (! experimentMode) {
             PRMMarkers.setLatchMode(true);
@@ -100,7 +102,7 @@ public class PRM extends AbstractNodeMain {
                     return; // If the pose is not in free space, we reject this goal.
                 }
 
-                generateAndPublishRouteToGoal();
+                generateRoute();
             }
         });
 
@@ -121,11 +123,11 @@ public class PRM extends AbstractNodeMain {
     }
 
     /** Generates route to goal, regenerating the graph if necessary. */
-    public ArrayList<Vertex> generateAndPublishRouteToGoal() {
+    public void generateRoute() {
         regenerationAttempts = 0;
-        routeToGoal = null; // Start with no path
+        route = null; // Start with no path
         // Try to find a path or regenerate graph until able to
-        while (routeToGoal == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
+        while (route == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
             System.out.println("Finding route attempt: " + ++regenerationAttempts);
 
             if (regenerationAttempts > 1) {
@@ -140,6 +142,9 @@ public class PRM extends AbstractNodeMain {
             boolean startAdded = graph.addVertex(start, util);
             boolean goalAdded = graph.addVertex(goal, util);
 
+
+            // Check to see if we've already added the start or goal points to the
+            // graph before, and if not, we add them.
             if (!startAdded) {
                 start = graph.getVertices().get(graph.getVertices().indexOf(start));
             } else {
@@ -156,55 +161,42 @@ public class PRM extends AbstractNodeMain {
             System.out.println("Publishing markers for graph...");
             publishMarkers(graph);
             System.out.println("Finding route to goal...");
-            routeToGoal = findRoute(start, goal);
+            route = findRoute(start, goal);
         }
 
-        if (routeToGoal == null) {
+
+        /*
+         * What the hell are we doing here?
+         */
+        if (route == null) {
             System.out.println("Could not find a path. Are you sure "
                     + "the destination is reachable?");
             MarkerArray paths = pathMarkers.newMessage();
             ArrayList<Marker> pathList = new ArrayList<Marker>();
             paths.setMarkers(pathList);
             pathMarkers.publish(paths);
-            routeToGoal = new ArrayList<Vertex>();
-            return null;
+            route = new ArrayList<Vertex>();
         }
 
-        System.out.println("Found route of size: " + routeToGoal.size() + ". Flattening...");
-        flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1); // -1 is flatten fully
-        System.out.println("Flattened to size: " + flatRouteToGoal.size());
-        double percentage = (double) flatRouteToGoal.size() / (double) routeToGoal.size();
+        // Find a flattened path and print some information about it
+        System.out.println("Found route of size: " + route.size() + ". Flattening...");
+        flatRoute = util.flattenDrunkenPath(route, -1); // -1 is flatten fully
+        System.out.println("Flattened to size: " + flatRoute.size());
+        double percentage = (double) flatRoute.size() / (double) route.size();
         System.out.printf("New path is %.2f times the size of the original.\n", percentage);
         MarkerArray paths = pathMarkers.newMessage();
         ArrayList<Marker> pathList = new ArrayList<Marker>();
-        pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
-        pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "orange"));
+        pathList.add(util.makePathMarker(route, "originalPath", "blue"));
+        pathList.add(util.makePathMarker(flatRoute, "flattenedPath", "orange"));
 
         paths.setMarkers(pathList);
         pathMarkers.publish(paths);
-        return flatRouteToGoal;
-    }
+        routeFound = true;
+        
+        // Publish the flattened route so that it can be used by others.
+        publishRoute(flatRoute);
+//        publishRoute(route);
 
-    public Pose getCurrentPosition() {
-        return currentPosition;
-    }
-
-    public Pose getGoalPosition() {
-        return goalPosition;
-    }
-
-    public void setCurrentPosition(Pose currentPosition) {
-        this.currentPosition = currentPosition;
-    }
-
-    public void setGoalPosition(Pose goalPosition) {
-        this.goalPosition = goalPosition;
-    }
-
-    /** How many times we regenerated the graph the last time we searched
-     * for a path. */
-    public int getRegenerationsForLastSearch() {
-        return regenerationAttempts;
     }
 
         /* Initialises the PRM with a utility object and a graph. */
@@ -224,21 +216,66 @@ public class PRM extends AbstractNodeMain {
         graphGenerationComplete = true;
     }
 
-    public ArrayList<Vertex> findRoute(Vertex v1, Vertex v2){
+    /*
+     * Helper method for finding a route which times how long it takes for the
+     * route to be found.
+     */
+    private ArrayList<Vertex> findRoute(Vertex v1, Vertex v2){
         double start = System.currentTimeMillis();
         ArrayList<Vertex> path =  search.shortestPath(v1, v2, graph, util);
         System.out.println(search + " search took " + (System.currentTimeMillis() - start) + "ms.");
         return path;
     }
 
+    /*
+     * Publishes the graph markers.
+     */
     public void publishMarkers(PRMGraph graph){
         MarkerArray array = PRMMarkers.newMessage();
         array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
         PRMMarkers.publish(array);
     }
 
-    public ArrayList<Vertex> getRouteToGoal() {
-        return routeToGoal;
+    /*
+     * Converts the given arraylist of vertices into poses and then publishes it
+     */
+    public void publishRoute(ArrayList<Vertex> rt){
+        PoseArray pa = util.convertVertexList(rt);
+        routePub.publish(pa);
+    }
+
+    public boolean routeFound() {
+        return routeFound;
+    }
+
+    public ArrayList<Vertex> getRoute() {
+        return route;
+    }
+
+    public ArrayList<Vertex> getFlatRoute(){
+        return flatRoute;
+    }
+
+        public Pose getCurrentPosition() {
+        return currentPosition;
+    }
+
+    public Pose getGoalPosition() {
+        return goalPosition;
+    }
+
+    public void setCurrentPosition(Pose currentPosition) {
+        this.currentPosition = currentPosition;
+    }
+
+    public void setGoalPosition(Pose goalPosition) {
+        this.goalPosition = goalPosition;
+    }
+
+    /** How many times we regenerated the graph the last time we searched
+     * for a path. */
+    public int getRegenerationsForLastSearch() {
+        return regenerationAttempts;
     }
 
     /* Sets the search algorithm to be used by the graph to search for the

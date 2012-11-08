@@ -1,6 +1,7 @@
 package ex3;
 
 import geometry_msgs.Point;
+import geometry_msgs.Pose;
 import java.util.ArrayList;
 import org.ros.message.MessageFactory;
 
@@ -39,6 +40,13 @@ public class Vertex {
 
     public void addConnectedVertex(Vertex v){
         connectedVertices.add(v);
+    }
+
+    public Pose makePose(MessageFactory factory){
+        Pose p = factory.newFromType(Pose._TYPE);
+        p.getPosition().setX(this.location.getX());
+        p.getPosition().setY(this.location.getY());
+        return p;
     }
 
     @Override
