@@ -35,8 +35,10 @@ public class PRM extends AbstractNodeMain {
     public static ConnectedNode node;
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
+    private boolean experimentMode = false;
 
     ArrayList<Vertex> routeToGoal;
+    ArrayList<Vertex> flatRouteToGoal;
     Pose currentPosition;
     Pose goalPosition;
     
@@ -47,11 +49,12 @@ public class PRM extends AbstractNodeMain {
     Subscriber<PoseStamped> goals;
     Subscriber<PoseWithCovarianceStamped> initialPosition;
 
-    public PRM(SearchAlgorithm search){
+    public PRM(SearchAlgorithm search, boolean experimentMode){
         this.search = search;
+        this.experimentMode = experimentMode;
     }
 
-        @Override
+    @Override
     public GraphName getDefaultNodeName() {
         return GraphName.of("PRMnode");
     }
@@ -63,8 +66,10 @@ public class PRM extends AbstractNodeMain {
         initialPosition = node.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         PRMMarkers = node.newPublisher("markers", MarkerArray._TYPE);
-        PRMMarkers.setLatchMode(true);
         pathMarkers = node.newPublisher("pathMarkers", MarkerArray._TYPE);
+        if (! experimentMode) {
+            PRMMarkers.setLatchMode(true);
+        }
         pathMarkers.setLatchMode(true);
         PRM.node = node;
 
@@ -87,72 +92,15 @@ public class PRM extends AbstractNodeMain {
                     return;
                 }
 
-                goalPosition = t.getPose();
-
                 boolean inFreeSpace = util.checkPositionValidity(t.getPose(), inflatedMap);
-                if (!inFreeSpace){
+                if (inFreeSpace){
+                    goalPosition = t.getPose();
+                } else {
                     System.out.println("Cannot move to specified location. In a wall or outside the map.");
                     return; // If the pose is not in free space, we reject this goal.
                 }
 
-                regenerationAttempts = 0;
-                routeToGoal = null; // Start with no path
-                // Try to find a path or regenerate graph until able to
-                while (routeToGoal == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
-                    System.out.println("Finding route attempt: "+ ++regenerationAttempts);
-
-                    if (regenerationAttempts > 1) {
-                        // Regenerate graph
-                        graph.generatePRM(util, inflatedMap);
-                    }
-
-                    Vertex start = new Vertex(currentPosition.getPosition());
-                    Vertex goal = new Vertex(t.getPose().getPosition());
-
-                    // Try and add the start and goal points to the graph
-                    boolean startAdded = graph.addVertex(start, util);
-                    boolean goalAdded = graph.addVertex(goal, util);
-
-                    if (!startAdded) {
-                        start = graph.getVertices().get(graph.getVertices().indexOf(start));
-                    } else {
-                        System.out.println("Start point added to the graph: "+
-                                start.getLocation().getX()+", "+start.getLocation().getY());
-                    }
-                    if (!goalAdded) {
-                        goal = graph.getVertices().get(graph.getVertices().indexOf(goal));
-                    } else {
-                        System.out.println("Goal point added to the graph: "
-                                + goal.getLocation().getX() + ", " + goal.getLocation().getY());
-                    }
-                    
-                    publishMarkers(graph);
-                    routeToGoal = findRoute(start, goal);
-                }
-
-                if (routeToGoal == null) {
-                    System.out.println("Could not find a path. Are you sure "
-                            + "the destination is reachable?");
-                    MarkerArray paths = pathMarkers.newMessage();
-                    ArrayList<Marker> pathList = new ArrayList<Marker>();
-                    paths.setMarkers(pathList);
-                    pathMarkers.publish(paths);
-                    routeToGoal = new ArrayList<Vertex>();
-                    return;
-                }
-
-                System.out.println("Found route of size: " + routeToGoal.size() + ". Flattening...");
-                List flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1); // -1 is flatten fully
-                System.out.println("Flattened to size: " + flatRouteToGoal.size());
-                double percentage = (double) flatRouteToGoal.size() / (double) routeToGoal.size();
-                System.out.printf("New path is %.2f times the size of the original.\n", percentage);
-                MarkerArray paths = pathMarkers.newMessage();
-                ArrayList<Marker> pathList = new ArrayList<Marker>();
-                pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
-                pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "orange"));
-
-                paths.setMarkers(pathList);
-                pathMarkers.publish(paths);
+                generateAndPublishRouteToGoal();
             }
         });
 
@@ -172,12 +120,85 @@ public class PRM extends AbstractNodeMain {
 
     }
 
+    /** Generates route to goal, regenerating the graph if necessary. */
+    public ArrayList<Vertex> generateAndPublishRouteToGoal() {
+        regenerationAttempts = 0;
+        routeToGoal = null; // Start with no path
+        // Try to find a path or regenerate graph until able to
+        while (routeToGoal == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
+            System.out.println("Finding route attempt: " + ++regenerationAttempts);
+
+            if (regenerationAttempts > 1) {
+                // Regenerate graph
+                graph.generatePRM(util, inflatedMap);
+            }
+
+            Vertex start = new Vertex(currentPosition.getPosition());
+            Vertex goal = new Vertex(goalPosition.getPosition());
+
+            // Try and add the start and goal points to the graph
+            boolean startAdded = graph.addVertex(start, util);
+            boolean goalAdded = graph.addVertex(goal, util);
+
+            if (!startAdded) {
+                start = graph.getVertices().get(graph.getVertices().indexOf(start));
+            } else {
+                System.out.println("Start point added to the graph: "
+                        + start.getLocation().getX() + ", " + start.getLocation().getY());
+            }
+            if (!goalAdded) {
+                goal = graph.getVertices().get(graph.getVertices().indexOf(goal));
+            } else {
+                System.out.println("Goal point added to the graph: "
+                        + goal.getLocation().getX() + ", " + goal.getLocation().getY());
+            }
+
+            System.out.println("Publishing markers for graph...");
+            publishMarkers(graph);
+            System.out.println("Finding route to goal...");
+            routeToGoal = findRoute(start, goal);
+        }
+
+        if (routeToGoal == null) {
+            System.out.println("Could not find a path. Are you sure "
+                    + "the destination is reachable?");
+            MarkerArray paths = pathMarkers.newMessage();
+            ArrayList<Marker> pathList = new ArrayList<Marker>();
+            paths.setMarkers(pathList);
+            pathMarkers.publish(paths);
+            routeToGoal = new ArrayList<Vertex>();
+            return null;
+        }
+
+        System.out.println("Found route of size: " + routeToGoal.size() + ". Flattening...");
+        flatRouteToGoal = util.flattenDrunkenPath(routeToGoal, -1); // -1 is flatten fully
+        System.out.println("Flattened to size: " + flatRouteToGoal.size());
+        double percentage = (double) flatRouteToGoal.size() / (double) routeToGoal.size();
+        System.out.printf("New path is %.2f times the size of the original.\n", percentage);
+        MarkerArray paths = pathMarkers.newMessage();
+        ArrayList<Marker> pathList = new ArrayList<Marker>();
+        pathList.add(util.makePathMarker(routeToGoal, "originalPath", "blue"));
+        pathList.add(util.makePathMarker(flatRouteToGoal, "flattenedPath", "orange"));
+
+        paths.setMarkers(pathList);
+        pathMarkers.publish(paths);
+        return flatRouteToGoal;
+    }
+
     public Pose getCurrentPosition() {
         return currentPosition;
     }
 
     public Pose getGoalPosition() {
         return goalPosition;
+    }
+
+    public void setCurrentPosition(Pose currentPosition) {
+        this.currentPosition = currentPosition;
+    }
+
+    public void setGoalPosition(Pose goalPosition) {
+        this.goalPosition = goalPosition;
     }
 
     /** How many times we regenerated the graph the last time we searched
@@ -194,7 +215,9 @@ public class PRM extends AbstractNodeMain {
         graph.generatePRM(util, inflatedMap);
 
         publishMarkers(graph);
-        inflatedMapPublisher.setLatchMode(true);
+        if (! experimentMode) {
+            inflatedMapPublisher.setLatchMode(true);
+        }
         inflatedMapPublisher.publish(inflatedMap);
 
         System.out.println("Average path length: " + util.averageConnectionLength(graph));

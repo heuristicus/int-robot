@@ -145,8 +145,11 @@ public class PID extends AbstractNodeMain {
         active = false;
     }
 
-
-    public void setSetpoint(double setpoint){
+    public double getOutput() {
+        return output;
+    }
+    
+    public void setSetpoint(double setpoint) {
         this.setpoint = setpoint;
     }
 
