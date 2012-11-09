@@ -25,8 +25,9 @@ import pf.AbstractLocaliser;
 
 public class Navigator extends AbstractNodeMain {
 
-    public static final double MAX_ROTATION_SPEED = 1.5;
-    public static final double MAX_MOVE_SPEED = 1.0;
+    public static final double MAX_ROTATION_SPEED = 0.3;
+    public static final double MIN_ROTATION_SPEED = 0.05;
+    public static final double MAX_MOVE_SPEED = 0.3;
     public static final double MIN_MOVE_SPEED = 0.1;
     public static final double POINT_REACHED_THRESHOLD = 0.5;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
@@ -156,7 +157,7 @@ public class Navigator extends AbstractNodeMain {
 
         if (turnOnSpot){
             System.out.println("Rotation to next waypoint: " + rotationToWaypoint);
-            if (rotationToWaypoint < 0.1){
+            if (Math.abs(rotationToWaypoint) < 0.1){
                 turnOnSpot = false;
             }
         } else {
@@ -244,6 +245,10 @@ public class Navigator extends AbstractNodeMain {
         }
 
         rotationToWaypoint = req;
+
+        if (req > MAX_ROTATION_SPEED) {
+            req = MAX_ROTATION_SPEED;
+        }
 
         return req;
     }

@@ -145,6 +145,10 @@ public class PID extends AbstractNodeMain {
         active = false;
     }
 
+    public boolean getState(){
+        return active;
+    }
+
     public double getOutput() {
         return output;
     }

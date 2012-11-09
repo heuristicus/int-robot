@@ -7,11 +7,16 @@ import ex3.search.Dijkstra;
 import geometry_msgs.Point;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Date;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import launcher.RunParams;
+import logging.Logger;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
 import org.ros.node.ConnectedNode;
@@ -25,22 +30,29 @@ import visualization_msgs.MarkerArray;
 
 public class BatchExperimenter {
 
+    private static final int EXPERIMENT_TIMEOUT_MS = RunParams.getInt("EXPERIMENT_TIMEOUT_MS");
+
     private static Publisher<PoseWithCovarianceStamped> initialPosePub;
     private static Publisher<PoseStamped> goalPub;
 
     private static PRM prm;
-//    private static int valueArrayIndex;
-//    private static String[] valuesArray;
     private static ConnectedNode node;
     private static int expNum;
     /** Maps minor expNums to lists of values that will vary for each minor exp */
     private static List<List<String>> expValues;
     private static int[] expMinorNums;
     private static String key;
+    private static Timer t;
+    private static TimerTask timeout;
+    private static Logger logger;
+    private static boolean cancelled = false;
 
-    public static void runAllExperiments(ConnectedNode connectedNode) {
-        System.out.println("runAllExperiments called");
+    public static void runAllExperiments(ConnectedNode connectedNode) 
+            throws FileNotFoundException, IOException {
+        System.out.println("RunAllExperiments called");
         node = connectedNode;
+        logger = new Logger("BatchExperiments", true);
+        System.out.println("Logger initialised");
 
         initialPosePub = node.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
 //        initialPosePub.setLatchMode(true);
@@ -51,7 +63,8 @@ public class BatchExperimenter {
         routeSub.addMessageListener(new MessageListener<MarkerArray>() {
             @Override
             public void onNewMessage(MarkerArray t) {
-                processPath();
+                System.out.println("Path markers message received. Processing...");
+                experimentDone(true);
             }
         });
 
@@ -129,14 +142,25 @@ public class BatchExperimenter {
     private static NodeMainExecutor exec = DefaultNodeMainExecutor.newDefault();
 
     public static void runExperimentForValues() {
-        System.out.println("creating new prm");
-        prm = new PRM(new Dijkstra());
-        System.out.println("executing prm");
+        System.out.println("Creating new prm");
+        prm = new PRM(new Dijkstra(), true);
+        System.out.println("Executing prm. Started at: "+new Date().toString());
+        cancelled = false;
+        t = new Timer();
+        int timeoutDuration = EXPERIMENT_TIMEOUT_MS;
+        timeout = new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("--------------- Experiment timed out. Cancelling...");
+                experimentDone(false); // shuts down node and moves on
+            }
+        };
+        t.schedule(timeout, timeoutDuration);
         exec.execute(prm, conf);
 
         try {
-            System.out.println("waiting for PRM to initialise");
-            while(!prm.graphGenerationComplete()){
+            System.out.println("Waiting for PRM to initialise");
+            while(!prm.graphGenerationComplete() && ! cancelled){
                 System.out.print(".");
                 Thread.sleep(200);
             }
@@ -144,15 +168,15 @@ public class BatchExperimenter {
         } catch (InterruptedException e) {
         }
 
-        System.out.println("constructing initial pose message");
+        System.out.println("Constructing initial pose message");
         PoseWithCovarianceStamped initialPose = initialPosePub.newMessage();
         initialPose = getStartPose(initialPose, node.getTopicMessageFactory(), expNum);
         initialPosePub.publish(initialPose);
-        System.out.println("sent initial pose message");
+        System.out.println("Sent initial pose message");
 
         try {
-            System.out.println("waiting for pose message receipt");
-            while (prm.getCurrentPosition() == null){
+            System.out.println("Waiting for pose message receipt");
+            while (prm.getCurrentPosition() == null && ! cancelled){
                 System.out.print(".");
                 Thread.sleep(200);
             }
@@ -160,19 +184,40 @@ public class BatchExperimenter {
         } catch (InterruptedException e) {
         }
 
-        System.out.println("constructing goal pose message");
+        System.out.println("Constructing goal pose message");
         PoseStamped goal = goalPub.newMessage();
         goal = getGoalPose(goal, node.getTopicMessageFactory(), expNum);
         goalPub.publish(goal);
-        System.out.println("sent goal message");
+        System.out.println("Sent goal message");
+    }
+
+    /** Called when an experiment is over, either due to completion or 
+     * timing out. The boolean parameter specifies which one, allowing this 
+     * method to act accordingly. */
+    public synchronized static void experimentDone(boolean completed) {
+        t.cancel();
+        cancelled = true;
+        if (completed) {
+            processPath();
+        } else {
+            moveToNextExperiment();
+        }
     }
 
     public static void processPath(){
-        ArrayList<Vertex> routeToGoal = prm.getRouteToGoal();
+        ArrayList<Vertex> routeToGoal = prm.getRoute();
         double length = PRMUtil.getPathLength(routeToGoal);
         System.out.println("Experiment: Path of length " + length + " found and recorded.");
         System.out.println("Moreover, regeneration attempts: "+prm.getRegenerationsForLastSearch());
+        logger.logLine("RUNPARAMS:"+RunParams.getAllPropertiesString());
+        logger.logLine("PathOfLength:"+length);
+        logger.logLine("RegenerationAttempts:"+prm.getRegenerationsForLastSearch());
+        moveToNextExperiment();
+    }
 
+    public static void moveToNextExperiment() {
+        exec.shutdownNodeMain(prm);
+        prm = null; // Allow garbage collection
         boolean moreMinorExperiments = incrementMinorNums(expMinorNums.length-1);
         if (! moreMinorExperiments) {
             expNum++;
@@ -180,6 +225,7 @@ public class BatchExperimenter {
             boolean experimentsToDo = initialiseExperiments(expNum);
             if (! experimentsToDo) {
                 System.out.println("No more experiments to do. Goodbye cruel world.");
+                logger.close();
                 System.exit(0);
             }
         }

@@ -1,5 +1,6 @@
 package launcher;
 
+import com.sun.corba.se.impl.orbutil.GetPropertyAction;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,7 +19,7 @@ public class RunParams {
         if (INSTANCE == null) {
             try {
                 loadFromFile();
-                System.out.println("Params File loaded lolz");
+                System.out.println("Params File loaded");
             } catch (IOException ex) {
                 System.err.println("Couldn't load Params file. Exiting...");
                 throw new IllegalStateException("RunParams has not been instantiated "
@@ -56,6 +57,10 @@ public class RunParams {
 
     public static Float getFloat(String key) {
         return Float.parseFloat(getInstance().getProperty(key));
+    }
+
+    public static String getAllPropertiesString() {
+        return getInstance().prop.toString();
     }
 
     /** Sets a property. Returns previous property if existed */

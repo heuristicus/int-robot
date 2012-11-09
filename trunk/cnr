@@ -4,10 +4,11 @@ gradle InstallApp
 if [ -n "$1" ]
 then
 	echo "Running $1..."
+	ARG=$1
 	sleep 2
 else
-	echo "No argument provided. Exiting."
-	exit
+	echo "No argument provided. Defaulting."
+	ARG="launcher.Launcher"
 fi
 
-bash $BASE_LOC $1
+bash $BASE_LOC $ARG

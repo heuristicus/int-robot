@@ -269,11 +269,11 @@ public class PRMUtil {
 
     
     /* Connect a vertex to other vertices in the graph. */
-    public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double distanceThreshold, int maxConnections){
+    public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double neighbourhoodSize, int maxConnections){
         if ("nearestN".equalsIgnoreCase(CONNECTION_METHOD)) {
             return connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
         } else if ("threshold".equalsIgnoreCase(CONNECTION_METHOD)) {
-            return connectVertex_firstNInThreshold(v, vertices, distanceThreshold, maxConnections);
+            return connectVertex_firstNInThreshold(v, vertices, neighbourhoodSize, maxConnections);
         } else {
             throw new IllegalStateException("Illegal connection method specified");
         }
@@ -287,7 +287,7 @@ public class PRMUtil {
      * based on their position in the array. The nodes with lower array indexes
      * are much more likely to be connected to.
      */
-    public ArrayList<Edge> connectVertex_firstNInThreshold(Vertex v, ArrayList<Vertex> graph, double distanceThreshold, int maxConnections) {
+    public ArrayList<Edge> connectVertex_firstNInThreshold(Vertex v, ArrayList<Vertex> graph, double neighbourhoodSize, int maxConnections) {
 	int connectedCount = 0;
         double distance = 0;
         ArrayList<Edge> connections = new ArrayList<Edge>();
@@ -298,7 +298,7 @@ public class PRMUtil {
                 continue;
             }
             distance = getEuclideanDistance(v, vert);
-            if (distance <= distanceThreshold && !isConnected(v, vert) && v != vert) {
+            if (distance <= neighbourhoodSize && !isConnected(v, vert) && v != vert) {
                 if (connectedInFreeSpace(inflatedMap,
                         v.getLocation().getX(),
                         v.getLocation().getY(),
