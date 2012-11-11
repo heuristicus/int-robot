@@ -207,10 +207,16 @@ public class BatchExperimenter {
     public static void processPath(){
         ArrayList<Vertex> routeToGoal = prm.getRoute();
         double length = PRMUtil.getPathLength(routeToGoal);
+        ArrayList<Vertex> flatRouteToGoal = prm.getFlatRoute();
+        double flatLength = PRMUtil.getPathLength(flatRouteToGoal);
+
         System.out.println("Experiment: Path of length " + length + " found and recorded.");
         System.out.println("Moreover, regeneration attempts: "+prm.getRegenerationsForLastSearch());
         logger.logLine("RUNPARAMS:"+RunParams.getAllPropertiesString());
         logger.logLine("PathOfLength:"+length);
+        logger.logLine("PointsInPath:"+routeToGoal.size());
+        logger.logLine("FlatPathOfLength:" + flatLength);
+        logger.logLine("PointsInFlattenedPath:" + flatRouteToGoal.size());
         logger.logLine("RegenerationAttempts:"+prm.getRegenerationsForLastSearch());
         moveToNextExperiment();
     }

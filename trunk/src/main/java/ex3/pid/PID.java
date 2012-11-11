@@ -1,6 +1,7 @@
 package ex3.pid;
 
 import geometry_msgs.PoseStamped;
+import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
@@ -20,7 +21,7 @@ public class PID extends AbstractNodeMain {
     double proportionalGain, integralGain, derivativeGain;
     double input; // The measured value of the variable that we are trying to control
     double setpoint; // The actual value that we want the variable to be.
-    double output;
+    double output = 0;
 
     double lastTime; // Time elapsed since the last call to the controller.
     double integralTerm, lastError;
@@ -28,16 +29,16 @@ public class PID extends AbstractNodeMain {
 
     double max, min;
 
-    boolean active = true;
+    boolean active = false;
     DIRECTION pidDirection;
 
-    Subscriber<PoseStamped> localisationPose;
+    Subscriber<PoseWithCovarianceStamped> localisationPose;
     Publisher<Quaternion> controlPub;
     public static MessageFactory factory;
 
     public PID(double proportionalGain, double integralGain, double derivativeGain, double min, double max, DIRECTION direction){
         pidDirection = direction;
-
+        System.out.println("pid constructed");
         if (pidDirection == DIRECTION.DIRECT){
             this.proportionalGain = proportionalGain;
             this.integralGain = integralGain;
@@ -54,15 +55,18 @@ public class PID extends AbstractNodeMain {
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
-        localisationPose = connectedNode.newSubscriber("estimated_pose", PoseStamped._TYPE);
 
-        localisationPose.addMessageListener(new MessageListener<PoseStamped>() {
+        System.out.println("onstart called");
+        localisationPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
+
+        localisationPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
             @Override
-            public void onNewMessage(PoseStamped t) {
+            public void onNewMessage(PoseWithCovarianceStamped t) {
                 // We should be called every time we receive a message from the
                 // localisation node.
-                Quaternion rotation = t.getPose().getOrientation();
-                control(rotation);
+                System.out.println("pid got message");
+                input = getHeading(t.getPose().getPose().getOrientation());
+                control();
             }
         });
 
@@ -71,28 +75,36 @@ public class PID extends AbstractNodeMain {
         factory = connectedNode.getTopicMessageFactory(); // To create quaternions
     }
 
-    public void control(Quaternion q){
+    public void control(){
         if (!active) return; // Don't modify any values if we're not running.
 
         double timeNow = System.currentTimeMillis();
         // Time delta between now and the last time we called the controller.
         double deltaT = timeNow - lastTime;
 
+        System.out.println("deltaT = "+ deltaT);
+
         // Proportional error - How different is the set point compared to the
         // value that we are getting out of the sensor.
         double error = setpoint - input;
+        System.out.println("prop error: " + error);
 
         // The total error up until now. Multiply by error to compensate for
         // bump caused by the modification of parameters during operation.
         integralTerm += setToLimits(integralGain * error * deltaT);
+        System.out.println("integral term: " + integralTerm);
 
         double deltaIn = lastInput - input;
+        System.out.println("change in input from last call: " + deltaIn);
 
         // How fast the error is changing.
         double derivativeError = (error - lastError) / deltaT;
+        System.out.println("deriv error: " + derivativeError);
 
         // see http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-derivative-kick/
         output = setToLimits(proportionalGain * error + integralTerm - derivativeGain * (deltaIn / deltaT));
+
+        System.out.println("output is: " + output);
 
         lastInput = input;
         lastError = error;
@@ -102,8 +114,7 @@ public class PID extends AbstractNodeMain {
 
     public void setOutputLimits(double min, double max){
         if (min > max){
-            System.out.println("Minimum cannot be greater than maximum.");
-            System.exit(1);
+            throw new IllegalStateException("min cannot be greater than max");
         }
 
         this.min = min;
@@ -154,6 +165,7 @@ public class PID extends AbstractNodeMain {
     }
     
     public void setSetpoint(double setpoint) {
+        System.out.println("Setting setpoint to " + setpoint);
         this.setpoint = setpoint;
     }
 

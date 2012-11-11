@@ -9,6 +9,9 @@ import geometry_msgs.PoseArray;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import geometry_msgs.Twist;
+import java.util.ArrayList;
+import java.util.List;
+import nav_msgs.OccupancyGrid;
 
 
 import nav_msgs.Odometry;
@@ -22,6 +25,9 @@ import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 
 import pf.AbstractLocaliser;
+import sensor_msgs.LaserScan;
+import util.LaserUtil;
+import visualization_msgs.Marker;
 
 public class Navigator extends AbstractNodeMain {
 
@@ -32,33 +38,46 @@ public class Navigator extends AbstractNodeMain {
     public static final double POINT_REACHED_THRESHOLD = 0.5;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
 
+    // Obstacle avoidance params
+    public static final float SAFE_DISTANCE = 0.75f; // In metres
+    public static final float OBSTACLE_ZONE = SAFE_DISTANCE * 2; // In metres
+    public static final int SECTORS_CHECKED = 21; // Check this many sectors
+    public static final int READINGS_PER_SECTOR_OBSTACLE = 20; // Resolution for obstacle marker creation
+    public static final float MARKER_POINT_WIDTH = 0.2f;
+
 
     MessageFactory factory;
     Pose wayPoint;
     Pose lastEstimate;
     Pose goalPoint;
     boolean active = false;
-    boolean turnOnSpot = false;
+    boolean turnOnSpot = true;
     double distanceToWaypoint;
     double rotationToWaypoint;
     PRM prm;
     PID pid;
     PoseArray route;
 
+    boolean obstacleWithinSafeDistance = false;
+//    float[] lastScanMedians;
+    LaserScan lastScan;
+
     Subscriber<Odometry> odom;
     Subscriber<PoseWithCovarianceStamped> estimatedPose;
+    Subscriber<LaserScan> laserSub;
     Subscriber<PoseArray> routeSub;
     Publisher<Twist> movement;
+    Publisher<Marker> obstacleMarkersPub;
 
     public Navigator(PRM prm) {
         this.prm = prm;
     }
 
-//    public Navigator(PRM prm, PID pid) {
-//        this.prm = prm;
-//        this.pid = pid;
-//        pid.setOutputLimits(0, MAX_ROTATION_SPEED);
-//    }
+    public Navigator(PRM prm, PID pid) {
+        this.prm = prm;
+        this.pid = pid;
+        pid.setOutputLimits(MIN_ROTATION_SPEED, MAX_ROTATION_SPEED);
+    }
 
     @Override
     public void onStart(ConnectedNode connectedNode) {
@@ -68,7 +87,9 @@ public class Navigator extends AbstractNodeMain {
         movement = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
         odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
         estimatedPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
+        laserSub = connectedNode.newSubscriber("base_scan", LaserScan._TYPE);
         routeSub = connectedNode.newSubscriber("route", PoseArray._TYPE);
+        obstacleMarkersPub = connectedNode.newPublisher("obstacleMarkers", Marker._TYPE);
 
         odom.addMessageListener(new MessageListener<Odometry>() {
             @Override
@@ -88,8 +109,28 @@ public class Navigator extends AbstractNodeMain {
                             System.out.println("Proceeding to next waypoint.");
                         }
                     }
-                    movement.publish(computeMovementValues());
+                    if (obstacleWithinSafeDistance) {
+                        // Stopped moving
+                        float[][] sectors = LaserUtil._getSectors(
+                                SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
+                        ArrayList<Point> markers = getMarkersForObstaclesInLaserScan(sectors);
+                        publishObstacleMarkers(markers);
+
+                        // add obstacle(s) to map
+
+                    } else {
+                        movement.publish(computeMovementValues());
+                    }
+//                    movement.publish(PIDcontrol());
                 }
+            }
+        });
+
+        laserSub.addMessageListener(new MessageListener<LaserScan>() {
+            @Override
+            public void onNewMessage(LaserScan scan) {
+                // If obstacle is too close, set field to stop motion
+                checkObstacleWithinSafeDistance(scan);
             }
         });
 
@@ -107,10 +148,81 @@ public class Navigator extends AbstractNodeMain {
                 // Each time we get an update for the pose estimate, we update our position
                 lastEstimate = t.getPose().getPose();
                 prm.setCurrentPosition(lastEstimate);
+                if (pid != null && route != null){
+                    pid.setSetpoint(bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition()));
+                }
             }
         });
 
     }
+
+    public ArrayList<Point> getMarkersForObstaclesInLaserScan(float[][] sectors) {
+        ArrayList<Point> markers = new ArrayList<Point>();
+        float[] medians = LaserUtil.medianOfEachSector(sectors);
+        for (int i = 0; i < medians.length; i++) {
+            if (medians[i] < OBSTACLE_ZONE) {
+                double robotHeading = AbstractLocaliser.getHeading(this.lastEstimate.getOrientation());
+                double headingOfSector = LaserUtil.headingOfSector(
+                        SECTORS_CHECKED, i, READINGS_PER_SECTOR_OBSTACLE, robotHeading);
+                Point marker = calculateMarkerPosition(headingOfSector, medians[i]);
+                markers.add(marker);
+            }
+        }
+        return markers;
+    }
+
+    /** 
+     * @param heading The heading of the point */
+    public Point calculateMarkerPosition(double heading, float distanceReading) {
+        double radHeading = Math.toRadians(heading+45); // Don't ask
+        double xDisplacement = Math.sin(radHeading) * distanceReading;
+        double yDisplacement = Math.cos(radHeading) * distanceReading;
+        Point currentPoint = this.lastEstimate.getPosition();
+        Point newPoint = factory.newFromType(Point._TYPE);
+        newPoint.setX(currentPoint.getX() + xDisplacement);
+        newPoint.setY(currentPoint.getY() + yDisplacement);
+
+        System.out.println("Distance to point at heading " + heading + " is " + distanceReading);
+        System.out.println("Robot's heading: "+AbstractLocaliser.getHeading(lastEstimate.getOrientation()));
+        System.out.println("xDisp: "+xDisplacement+" yDisp: "+yDisplacement);
+        System.out.println("NewPoint x: "+newPoint.getX()+" y: "+newPoint.getY());
+        return newPoint;
+    }
+
+    public boolean checkObstacleWithinSafeDistance(LaserScan scan) {
+        float[][] sectors = LaserUtil.getSectors(SECTORS_CHECKED, scan);
+        float[] medians = LaserUtil.medianOfEachSector(sectors);
+        for (float median : medians) {
+            // If obstacle
+            if (median < SAFE_DISTANCE) {
+                System.out.println("Oh noes. Obstacle detected. Stopping");
+                obstacleWithinSafeDistance = true;
+                lastScan = scan;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void publishObstacleMarkers(List<Point> markers) {
+/*        double mapHeight = map.getInfo().getHeight();
+        double mapWidth = map.getInfo().getWidth();
+        double mapRes = map.getInfo().getResolution();*/
+//        MarkerArray arr = this.obstacleMarkersPub.newMessage();
+        Marker m = PRMUtil.setUpMarker("/map", "obstacle", 15, Marker.ADD, Marker.POINTS, null, null, null, factory);
+
+        m.getScale().setX(MARKER_POINT_WIDTH);
+        m.getScale().setY(MARKER_POINT_WIDTH);
+        m.setPoints(markers);
+        m.getColor().setA(1.0f);
+        m.getColor().setB(1.0f);
+
+/*        ArrayList<Marker> mk = new ArrayList<Marker>();
+        mk.add(m);
+        arr.setMarkers(mk);*/
+        obstacleMarkersPub.publish(m);
+    }
+
 
     /*
      * Initialises the navigator to follow the route from the current location to
@@ -120,6 +232,9 @@ public class Navigator extends AbstractNodeMain {
         nextWayPoint();
         goalPoint = route.getPoses().get(route.getPoses().size() - 1);
         active = true;
+        if (pid != null){
+            pid.activate();
+        }
     }
 
     /*
@@ -185,10 +300,9 @@ public class Navigator extends AbstractNodeMain {
 
         double rotReq = pid.getOutput();
 
-        System.out.println("PID rotation request = " + rotReq);
+        pub.getAngular().setZ(rotReq);
+        pub.getLinear().setX(computeLinearMovement());
 
-    	pub.getAngular().setZ(rotReq);
-    	pub.getLinear().setX(computeLinearMovement());
     	return pub;
     }
     

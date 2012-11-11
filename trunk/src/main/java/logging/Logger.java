@@ -7,10 +7,11 @@ import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import launcher.RunParams;
 
 public class Logger {
 
-    private static final String LOG_DIRECTORY = "/data/private/robot/workspace/robotics/logs";
+    private static final String LOG_DIRECTORY = RunParams.get("LOG_DIRECTORY");
     private final String logFile;
     private File file;
     private PrintWriter writer;

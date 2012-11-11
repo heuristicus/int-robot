@@ -605,7 +605,7 @@ public class PRMUtil {
     /*
      * Sets the header of a specific marker to the given values.
      */
-    void setMarkerHeader(Marker m, String frameID, String namespace, int ID, int action, int type){
+    public static void setMarkerHeader(Marker m, String frameID, String namespace, int ID, int action, int type){
         m.getHeader().setFrameId(frameID);
         m.setNs(namespace);
         m.setAction(action);
@@ -613,11 +613,16 @@ public class PRMUtil {
         m.setType(type);
     }
 
+    public Marker setUpMarker(String frameID, String namespace, int ID, int action,
+                  int type, ColorRGBA colour, Pose pose, Vector3 vector){
+        return setUpMarker(frameID, namespace, ID, action, type, colour, pose, vector, factory);
+    }
     /*
      * Creates a marker message using the given values
      */
-    Marker setUpMarker(String frameID, String namespace, int ID, int action, int type, ColorRGBA colour, Pose pose, Vector3 vector){
-        Marker m = factory.newFromType(Marker._TYPE);
+    public static Marker setUpMarker(String frameID, String namespace, int ID, int action,
+            int type, ColorRGBA colour, Pose pose, Vector3 vector, MessageFactory messageFactory){
+        Marker m = messageFactory.newFromType(Marker._TYPE);
         setMarkerHeader(m, frameID, namespace, ID, action, type);
 
         if (pose != null) {

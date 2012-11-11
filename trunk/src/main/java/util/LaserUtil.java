@@ -15,10 +15,11 @@ public class LaserUtil extends AbstractNodeMain {
 
     @Override
     public void onStart(ConnectedNode node) {
-    Subscriber<LaserScan> laser;
-    laser = node.newSubscriber("base_scan", LaserScan._TYPE);
+        Subscriber<LaserScan> laser;
+        laser = node.newSubscriber("base_scan", LaserScan._TYPE);
 
         laser.addMessageListener(new MessageListener<LaserScan>() {
+
             @Override
             public void onNewMessage(LaserScan scan) {
                 float[] ranges = scan.getRanges();
@@ -33,7 +34,7 @@ public class LaserUtil extends AbstractNodeMain {
 
                 float[][] sectors = getSectors(5, scan);
                 for (int sector = 0; sector < sectors.length; sector++) {
-                    System.out.println("Sector "+sector+" ---------");
+                    System.out.println("Sector " + sector + " ---------");
                     for (int i = 0; i < sectors[sector].length; i++) {
                         System.out.println(i + ": " + sectors[sector][i]);
                     }
@@ -42,8 +43,8 @@ public class LaserUtil extends AbstractNodeMain {
                 System.out.println("\n\n");
 
                 float[] avgs = averageOfEachSector(sectors);
-                for (int i=0; i < avgs.length; i++) {
-                    System.out.println("Avg "+i+": "+avgs[i]);
+                for (int i = 0; i < avgs.length; i++) {
+                    System.out.println("Avg " + i + ": " + avgs[i]);
                 }
 
                 System.out.println("\n\n");
@@ -57,17 +58,17 @@ public class LaserUtil extends AbstractNodeMain {
 
     /**
      * Best not to use this method. Use getSectors() instead. See javadoc there.
-     */
-    private static float[][] _getSectors(int numOfSectors, int degreesPerSector, LaserScan laser) {
+     * Be careful. */
+    public static float[][] _getSectors(int numOfSectors, int readingsPerSector, LaserScan laser) {
         if (numOfSectors % 2 == 0) {
             throw new IllegalArgumentException("Only odd numbers accepted.");
         }
 
         float[] ranges = laser.getRanges();
 
-        float[][] sectors = new float[numOfSectors][degreesPerSector];
+        float[][] sectors = new float[numOfSectors][readingsPerSector];
 
-        int degreesRequired = numOfSectors * degreesPerSector;
+        int degreesRequired = numOfSectors * readingsPerSector;
         if (ranges.length < degreesRequired + 1) { // +1 is because of the way we get the central readings.
             throw new IllegalStateException("Oh noez, too many sectors requested");
         }
@@ -78,7 +79,7 @@ public class LaserUtil extends AbstractNodeMain {
         float readingVal;
         for (int sector = 0; sector < numOfSectors; sector++) {
             for (int reading = 0; reading < sectors[sector].length; reading++) {
-                readingIndex = startAngle + (degreesPerSector * sector) + reading;
+                readingIndex = startAngle + (readingsPerSector * sector) + reading;
                 if (ranges[readingIndex] == 0.0f){
                     readingVal = DEFAULT_ZERO_REPLACEMENT;
                 } else {
@@ -124,7 +125,7 @@ public class LaserUtil extends AbstractNodeMain {
         int len = sector.length;
         int mid = len / 2;
         if (len % 2 == 0) {
-        	// If even, get middle two values and return their average.
+            // If even, get middle two values and return their average.
             return (sector[mid] + sector[mid - 1]) / 2;
         } else {
             // just return the median value
@@ -181,6 +182,26 @@ public class LaserUtil extends AbstractNodeMain {
         }
 
         return minPos;
+    }
+
+    /** In degrees NOT radians. Be warned */
+    public static double getAnglePerSector(int readingsPerSector) {
+        return readingsPerSector * 0.352; // The laser's angle-per-reading
+    }
+
+    /** Given that the robot took some laser readings, what is the angle (or
+     * heading) of one sector of those readings (the middle of the sector)
+     * IN DEGREES! Angle is displacement rather than absolute.
+     * Note that the sectorNum is considered to be 0-based. That is, if there are
+     * 3 sectors overall, the middle sector is '1'. */
+    public static double headingOfSector(int numOfSectorsOverall,
+            int sectorNum, int readingsPerSector, double robotHeading) {
+        if (numOfSectorsOverall % 2 == 0) {
+            throw new IllegalArgumentException("Sorry, only odd numbers allowed");
+        }
+        int middleSector = numOfSectorsOverall / 2;
+        // Negative because laser readings are provided counter-clockwise
+        return -(sectorNum - middleSector) * getAnglePerSector(readingsPerSector);
     }
 
     @Override

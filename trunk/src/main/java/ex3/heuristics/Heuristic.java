@@ -1,10 +1,9 @@
 package ex3.heuristics;
 
-import ex3.Edge;
+import ex3.Vertex;
 
 public interface Heuristic {
 
-    /* Evaluate the utility of the given edge. */
-    public abstract double evaluate(Edge e);
+    public abstract double evaluate(Vertex v1, Vertex v2);
 
 }

@@ -32,10 +32,16 @@ public class Launcher extends AbstractNodeMain {
 //        PFLocalisationNode.realWorldMode = false;
 //        PFLocalisationNode.augmented = true;
 //        exec.execute(new PFLocalisationNode(), conf);
+
         PRM prm = new PRM(new Dijkstra(), false);
         exec.execute(prm, conf);
-        //exec.execute(new Navigator(new PRM(new Dijkstra(), false), new PID(0.5, 0.5, 0.5, 1.0, 1.0, PID.DIRECTION.DIRECT)), conf);
         exec.execute(new Navigator(prm), conf);
+
+//        PID pid = new PID(0.5, 0.5, 0.5, 1.0, 1.0, PID.DIRECTION.DIRECT);
+//        exec.execute(pid, conf);
+//        exec.execute(new Navigator(prm, pid), conf);
+
+
 //        try {
 //            BatchExperimenter.runAllExperiments(connectedNode);
 //        } catch (Exception e) {

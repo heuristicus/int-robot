@@ -36,6 +36,7 @@ public class PRM extends AbstractNodeMain {
     OccupancyGrid map;
     OccupancyGrid inflatedMap;
     private boolean experimentMode = false;
+    long seed = System.currentTimeMillis();
 
     ArrayList<Vertex> route;
     ArrayList<Vertex> flatRoute;
@@ -53,6 +54,12 @@ public class PRM extends AbstractNodeMain {
     public PRM(SearchAlgorithm search, boolean experimentMode){
         this.search = search;
         this.experimentMode = experimentMode;
+    }
+
+    public PRM(SearchAlgorithm search, boolean experimentMode, long seed){
+        this.search = search;
+        this.experimentMode = experimentMode;
+        this.seed = seed;
     }
 
     @Override
@@ -205,7 +212,7 @@ public class PRM extends AbstractNodeMain {
         /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
         inflatedMap = PRMUtil.inflateMap(map, inflatedMapPublisher);
-        util = new PRMUtil(new Random(), factory, inflatedMap);
+        util = new PRMUtil(new Random(seed), factory, inflatedMap);
         graph = new PRMGraph();
         graph.generatePRM(util, inflatedMap);
 
