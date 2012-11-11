@@ -1,6 +1,5 @@
 package launcher;
 
-import com.sun.corba.se.impl.orbutil.GetPropertyAction;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
