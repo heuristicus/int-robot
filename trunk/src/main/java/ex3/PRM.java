@@ -1,6 +1,7 @@
 package ex3;
 
 import ex3.search.SearchAlgorithm;
+import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
 import geometry_msgs.PoseStamped;
@@ -183,6 +184,8 @@ public class PRM extends AbstractNodeMain {
         flatRoute = util.flattenDrunkenPath(route, -1); // -1 is flatten fully
         System.out.println("Flattened to size: " + flatRoute.size());
         double percentage = (double) flatRoute.size() / (double) route.size();
+        System.out.println("Unflattened path length is: " + util.getPathLength(route));
+        System.out.println("Flattened path length is: " + util.getPathLength(flatRoute));
         System.out.printf("New path is %.2f times the size of the original.\n", percentage);
         MarkerArray paths = pathMarkers.newMessage();
         ArrayList<Marker> pathList = new ArrayList<Marker>();
@@ -201,7 +204,7 @@ public class PRM extends AbstractNodeMain {
 
         /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
-        inflatedMap = util.inflateMap(map, inflatedMapPublisher);
+        inflatedMap = PRMUtil.inflateMap(map, inflatedMapPublisher);
         util = new PRMUtil(new Random(), factory, inflatedMap);
         graph = new PRMGraph();
         graph.generatePRM(util, inflatedMap);
@@ -211,6 +214,8 @@ public class PRM extends AbstractNodeMain {
             inflatedMapPublisher.setLatchMode(true);
         }
         inflatedMapPublisher.publish(inflatedMap);
+
+        publishGrid();
 
         System.out.println("Average path length: " + util.averageConnectionLength(graph));
         graphGenerationComplete = true;
@@ -234,6 +239,46 @@ public class PRM extends AbstractNodeMain {
         MarkerArray array = PRMMarkers.newMessage();
         array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
         PRMMarkers.publish(array);
+    }
+
+    public void publishGrid(){
+        double mapHeight = map.getInfo().getHeight();
+        double mapWidth = map.getInfo().getWidth();
+        double mapRes = map.getInfo().getResolution();
+        MarkerArray arr = PRMMarkers.newMessage();
+        Marker m = util.setUpMarker("/map", "grid", 10, Marker.ADD, Marker.LINE_LIST, null, null, null);
+        m.getPose().getOrientation().setZ(0.1f);
+        m.getColor().setA(1.0f);
+        m.getColor().setB(1.0f);
+        m.getScale().setX(0.1f);
+        int cellWidthMap = (int)(RunParams.getDouble("CELL_WIDTH")/mapRes);
+        for (int i = 0; i < mapWidth; i += cellWidthMap) {
+            Point p1 = util.factory.newFromType(Point._TYPE);
+            Point p2 = util.factory.newFromType(Point._TYPE);
+            p1.setX(-i*mapRes);
+            p1.setY(0);
+            p2.setX(-i*mapRes);
+            p2.setY(-mapHeight*mapRes);
+
+            m.getPoints().add(p1);
+            m.getPoints().add(p2);
+        }
+        for (int j = 0; j < mapHeight; j += cellWidthMap) {
+            Point p1 = util.factory.newFromType(Point._TYPE);
+            Point p2 = util.factory.newFromType(Point._TYPE);
+            p1.setX(0);
+            p1.setY(-j*mapRes);
+            p2.setX(-mapWidth*mapRes);
+            p2.setY(-j*mapRes);
+            m.getPoints().add(p1);
+            m.getPoints().add(p2);
+        }
+
+        ArrayList<Marker> mk = new ArrayList<Marker>();
+        mk.add(m);
+        arr.setMarkers(mk);
+        PRMMarkers.publish(arr);
+
     }
 
     /*

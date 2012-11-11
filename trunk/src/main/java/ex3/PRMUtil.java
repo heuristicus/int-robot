@@ -18,7 +18,6 @@ import org.jboss.netty.buffer.ChannelBuffers;
 import org.ros.message.MessageFactory;
 import org.ros.node.topic.Publisher;
 import std_msgs.ColorRGBA;
-import sun.org.mozilla.javascript.xml.XMLLib.Factory;
 import visualization_msgs.Marker;
 
 public class PRMUtil {
@@ -27,6 +26,7 @@ public class PRMUtil {
     public static final float MARKER_EDGE_WIDTH = RunParams.getFloat("MARKER_EDGE_WIDTH");
     public static final float MARKER_POINT_WIDTH = RunParams.getFloat("MARKER_POINT_WIDTH");
     public static final String CONNECTION_METHOD = RunParams.get("CONNECTION_METHOD");
+    public static final double NEIGHBOURHOOD_RADIUS = RunParams.getDouble("NEIGHBOURHOOD_RADIUS");
 
     Random randGen;
     MessageFactory factory;
@@ -103,7 +103,7 @@ public class PRMUtil {
 
         while (!foundOpen){
             randX = (randGen.nextFloat() * cellWidth) + startX;
-            randY = (randGen.nextFloat() * mapHeight);
+            randY = (randGen.nextFloat() * cellWidth) + startY;
 
             foundOpen = checkPositionValidity((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
 
@@ -269,14 +269,89 @@ public class PRMUtil {
 
     
     /* Connect a vertex to other vertices in the graph. */
-    public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double neighbourhoodSize, int maxConnections){
+    public ArrayList<Edge> connectVertexToGraph(Vertex v, ArrayList<Vertex> vertices, double neighbourhoodDistanceThreshold, int maxConnections){
         if ("nearestN".equalsIgnoreCase(CONNECTION_METHOD)) {
             return connectVertex_nearestN(v, vertices, maxConnections, maxConnections * 2);
         } else if ("threshold".equalsIgnoreCase(CONNECTION_METHOD)) {
-            return connectVertex_firstNInThreshold(v, vertices, neighbourhoodSize, maxConnections);
+            return connectVertex_firstNInThreshold(v, vertices, neighbourhoodDistanceThreshold, maxConnections);
+        } else if ("neighbourhood".equalsIgnoreCase(CONNECTION_METHOD)) {
+            return connectVertex_neighbourhoods(v, vertices, maxConnections, maxConnections * 2, NEIGHBOURHOOD_RADIUS);
         } else {
             throw new IllegalStateException("Illegal connection method specified");
         }
+    }
+
+    /* Connects vertices in a neighbourhood pattern. The idea is to connect
+     * nodes in clusters (or neighbourhoods) where there are no loops in
+     * connections within the neighbourhood. In other words, if, for node A,
+     * another node B, is in the neighbourhood, we only connect if there is no
+     * direct or indirect path from A to B where all nodes within the path
+     * are in the neighbourhood.
+     * For nodes outside of the neighbourhood, we connect only if there is no
+     * other direct or indirect connection. */
+    public ArrayList<Edge> connectVertex_neighbourhoods(Vertex v, ArrayList<Vertex> graph, 
+            int maxConnections, int maxAttempts, double neighbourhoodRadius) {
+        PriorityQueue<VertexTuple> closestNodes = new PriorityQueue<VertexTuple>(graph.size());
+
+        for (Vertex vert : graph) {
+            if (vert == v || vert.connectedVertices.size() >= maxConnections){
+                continue;
+            }
+            closestNodes.add(new VertexTuple(vert, getEuclideanDistance(v, vert)));
+        }
+
+        ArrayList<Edge> connections = new ArrayList<Edge>();
+
+        int connectionAttempts = 0;
+        int connectionCount = v.connectedVertices.size();
+        while (connectionAttempts < maxAttempts && connectionCount < maxConnections) {
+            VertexTuple vt = closestNodes.poll();
+            // Run out of nodes to check so exit.
+            if (vt == null){
+                break;
+            }
+            Vertex vert = vt.v1;
+
+            if (vert.getConnectedVertices().contains(v)){
+                // If we've already been connected to this node, carry on.
+                continue;
+            }
+
+            if (getEuclideanDistance(v, vert) <= neighbourhoodRadius) {
+                // Only connect if not already connected indirectly by a path
+                // entirely contained within the neighbourhood
+                if (! isConnectedWithinNeighbourhood(v, vert, NEIGHBOURHOOD_RADIUS)) {
+                    // Connect if no obstacles
+                    if (connectedInFreeSpace(inflatedMap,
+                            v.getLocation().getX(),
+                            v.getLocation().getY(),
+                            vert.getLocation().getX(),
+                            vert.getLocation().getY(), vt.distance)) {
+                        v.addConnectedVertex(vert);
+                        vert.addConnectedVertex(v);
+                        connections.add(new Edge(v, vert, vt.distance));
+                        connectionCount++;
+                    }
+                }
+            } else {
+                if (!isConnected(v, vert)) {
+                    if (connectedInFreeSpace(inflatedMap,
+                            v.getLocation().getX(),
+                            v.getLocation().getY(),
+                            vert.getLocation().getX(),
+                            vert.getLocation().getY(), vt.distance)) {
+                        v.addConnectedVertex(vert);
+                        vert.addConnectedVertex(v);
+                        connections.add(new Edge(v, vert, vt.distance));
+                        connectionCount++;
+                    }
+                }
+            }
+            
+            connectionAttempts++;
+        }
+
+        return connections;
     }
 
     /*
@@ -463,6 +538,36 @@ public class PRMUtil {
 		if (connV.equals(v2)){
 		    return true;
 		} else if (!done.contains(connV) && !toDo.contains(connV)){
+		    toDo.add(connV);
+		}
+	    }
+	}
+        return false;
+    }
+
+    /* Checks if v1 is connected to v2 only via nodes which are within the
+     * neighbourhood of v1, returns false otherwise. Neighbourhood is defined
+     * by the provided radius value */
+    public boolean isConnectedWithinNeighbourhood(Vertex v1, Vertex v2, double radius){
+        // If the node has no connections, then just return.
+        if (v1.getConnectedVertices().isEmpty()
+                || getEuclideanDistance(v1, v2) > radius){
+            return false;
+        }
+
+	Queue<Vertex> toDo = new LinkedList<Vertex>();
+	HashSet<Vertex> done = new HashSet<Vertex>();
+
+	toDo.add(v1);
+
+	while(! toDo.isEmpty()){
+	    Vertex check = toDo.remove();
+	    done.add(check);
+	    for (Vertex connV : check.getConnectedVertices()){
+		if (connV.equals(v2)){
+		    return true;
+		} else if (!done.contains(connV) && !toDo.contains(connV)
+                        && getEuclideanDistance(v1, connV) <= radius){
 		    toDo.add(connV);
 		}
 	    }
