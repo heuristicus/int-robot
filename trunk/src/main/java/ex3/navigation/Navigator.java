@@ -46,6 +46,7 @@ public class Navigator extends AbstractNodeMain {
     public static final float MARKER_POINT_WIDTH = 0.2f;
 
 
+
     MessageFactory factory;
     Pose wayPoint;
     Pose lastEstimate;
@@ -163,20 +164,21 @@ public class Navigator extends AbstractNodeMain {
             if (medians[i] < OBSTACLE_ZONE) {
                 double robotHeading = AbstractLocaliser.getHeading(this.lastEstimate.getOrientation());
                 double headingOfSector = LaserUtil.headingOfSector(
-                        SECTORS_CHECKED, i, READINGS_PER_SECTOR_OBSTACLE, robotHeading);
-                Point marker = calculateMarkerPosition(headingOfSector, medians[i]);
+                        SECTORS_CHECKED, i, READINGS_PER_SECTOR_OBSTACLE);
+                Point marker = calculateMarkerPosition(robotHeading + headingOfSector, medians[i]);
                 markers.add(marker);
             }
         }
+        System.out.println();
         return markers;
     }
 
     /** 
-     * @param heading The heading of the point */
+     * @param heading The heading of the point in RADIANS */
     public Point calculateMarkerPosition(double heading, float distanceReading) {
-        double radHeading = Math.toRadians(heading+45); // Don't ask
-        double xDisplacement = Math.sin(radHeading) * distanceReading;
-        double yDisplacement = Math.cos(radHeading) * distanceReading;
+        double xDisplacement = Math.sin(heading) * distanceReading;
+        double yDisplacement = Math.cos(heading) * distanceReading;
+
         Point currentPoint = this.lastEstimate.getPosition();
         Point newPoint = factory.newFromType(Point._TYPE);
         newPoint.setX(currentPoint.getX() + xDisplacement);

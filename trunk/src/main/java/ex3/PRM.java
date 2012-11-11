@@ -308,12 +308,24 @@ public class PRM extends AbstractNodeMain {
         return flatRoute;
     }
 
-        public Pose getCurrentPosition() {
+    public Pose getCurrentPosition() {
         return currentPosition;
     }
 
     public Pose getGoalPosition() {
         return goalPosition;
+    }
+
+    public OccupancyGrid getOriginalMap() {
+        return map;
+    }
+
+    public OccupancyGrid getInflatedMap() {
+        return inflatedMap;
+    }
+
+    public void setInflatedMap(OccupancyGrid infMap) {
+        inflatedMap = infMap;
     }
 
     public void setCurrentPosition(Pose currentPosition) {

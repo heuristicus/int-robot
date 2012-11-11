@@ -184,18 +184,18 @@ public class LaserUtil extends AbstractNodeMain {
         return minPos;
     }
 
-    /** In degrees NOT radians. Be warned */
+    /** In RADIANS. Be warned */
     public static double getAnglePerSector(int readingsPerSector) {
-        return readingsPerSector * 0.352; // The laser's angle-per-reading
+        return readingsPerSector * Math.toRadians(0.352); // The laser's angle-per-reading
     }
 
     /** Given that the robot took some laser readings, what is the angle (or
      * heading) of one sector of those readings (the middle of the sector)
-     * IN DEGREES! Angle is displacement rather than absolute.
+     * IN RADIANS! Angle is displacement rather than absolute.
      * Note that the sectorNum is considered to be 0-based. That is, if there are
      * 3 sectors overall, the middle sector is '1'. */
     public static double headingOfSector(int numOfSectorsOverall,
-            int sectorNum, int readingsPerSector, double robotHeading) {
+            int sectorNum, int readingsPerSector) {
         if (numOfSectorsOverall % 2 == 0) {
             throw new IllegalArgumentException("Sorry, only odd numbers allowed");
         }
