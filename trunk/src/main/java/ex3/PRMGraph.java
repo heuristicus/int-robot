@@ -41,7 +41,7 @@ public class PRMGraph {
         System.out.println("All vertices connected in: "+(System.currentTimeMillis()-start)+" ms");
     }
 
-    public boolean addVertex(Vertex v, PRMUtil util){
+    public boolean addVertex(Vertex v, PRMUtil util, OccupancyGrid map){
         if (vertices.contains(v)){
             // If we've added the vertex before.
             return false;
@@ -59,6 +59,14 @@ public class PRMGraph {
 
     public ArrayList<Vertex> getVertices() {
         return vertices;
+    }
+
+    public void setEdges(ArrayList<Edge> edges) {
+        this.edges = edges;
+    }
+
+    public void setVertices(ArrayList<Vertex> vertices) {
+        this.vertices = vertices;
     }
 
     public ArrayList<Point> getVertexLocations(){

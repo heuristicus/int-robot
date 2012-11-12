@@ -30,10 +30,10 @@ public class PRM extends AbstractNodeMain {
     SearchAlgorithm search;
     boolean mapReceived = false;
     boolean graphGenerationComplete = false;
-    boolean routeFound = false;
+    boolean routeSearchDone = false;
     private int regenerationAttempts = 0;
     public static ConnectedNode node;
-    OccupancyGrid map;
+    OccupancyGrid originalMap;
     OccupancyGrid inflatedMap;
     private boolean experimentMode = false;
     long seed = System.currentTimeMillis();
@@ -86,9 +86,9 @@ public class PRM extends AbstractNodeMain {
         final MessageFactory factory = node.getTopicMessageFactory();
         grid.addMessageListener(new MessageListener<OccupancyGrid>() {
             @Override
-            public void onNewMessage(OccupancyGrid message) {
+            public void onNewMessage(OccupancyGrid map) {
                 System.out.println("PRM node received map. Initialising road map.");
-                map = message;
+                originalMap = map;
                 mapReceived = true;
                 initialisePRM(factory);
             }
@@ -147,8 +147,8 @@ public class PRM extends AbstractNodeMain {
             Vertex goal = new Vertex(goalPosition.getPosition());
 
             // Try and add the start and goal points to the graph
-            boolean startAdded = graph.addVertex(start, util);
-            boolean goalAdded = graph.addVertex(goal, util);
+            boolean startAdded = graph.addVertex(start, util, inflatedMap);
+            boolean goalAdded = graph.addVertex(goal, util, inflatedMap);
 
 
             // Check to see if we've already added the start or goal points to the
@@ -173,9 +173,7 @@ public class PRM extends AbstractNodeMain {
         }
 
 
-        /*
-         * What the hell are we doing here?
-         */
+        // What the hell are we doing here?
         if (route == null) {
             System.out.println("Could not find a path. Are you sure "
                     + "the destination is reachable?");
@@ -188,11 +186,11 @@ public class PRM extends AbstractNodeMain {
 
         // Find a flattened path and print some information about it
         System.out.println("Found route of size: " + route.size() + ". Flattening...");
-        flatRoute = util.flattenDrunkenPath(route, -1); // -1 is flatten fully
+        flatRoute = util.flattenDrunkenPath(route, -1, inflatedMap); // -1 is flatten fully
         System.out.println("Flattened to size: " + flatRoute.size());
         double percentage = (double) flatRoute.size() / (double) route.size();
-        System.out.println("Unflattened path length is: " + util.getPathLength(route));
-        System.out.println("Flattened path length is: " + util.getPathLength(flatRoute));
+        System.out.println("Unflattened path length is: " + PRMUtil.getPathLength(route));
+        System.out.println("Flattened path length is: " + PRMUtil.getPathLength(flatRoute));
         System.out.printf("New path is %.2f times the size of the original.\n", percentage);
         MarkerArray paths = pathMarkers.newMessage();
         ArrayList<Marker> pathList = new ArrayList<Marker>();
@@ -201,17 +199,15 @@ public class PRM extends AbstractNodeMain {
 
         paths.setMarkers(pathList);
         pathMarkers.publish(paths);
-        routeFound = true;
+        routeSearchDone = true;
         
         // Publish the flattened route so that it can be used by others.
         publishRoute(flatRoute);
-//        publishRoute(route);
-
     }
 
-        /* Initialises the PRM with a utility object and a graph. */
+    /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
-        inflatedMap = PRMUtil.inflateMap(map, inflatedMapPublisher);
+        inflatedMap = PRMUtil.inflateMap(originalMap, inflatedMapPublisher);
         util = new PRMUtil(new Random(seed), factory, inflatedMap);
         graph = new PRMGraph();
         graph.generatePRM(util, inflatedMap);
@@ -249,9 +245,9 @@ public class PRM extends AbstractNodeMain {
     }
 
     public void publishGrid(){
-        double mapHeight = map.getInfo().getHeight();
-        double mapWidth = map.getInfo().getWidth();
-        double mapRes = map.getInfo().getResolution();
+        double mapHeight = inflatedMap.getInfo().getHeight();
+        double mapWidth = inflatedMap.getInfo().getWidth();
+        double mapRes = inflatedMap.getInfo().getResolution();
         MarkerArray arr = PRMMarkers.newMessage();
         Marker m = util.setUpMarker("/map", "grid", 10, Marker.ADD, Marker.LINE_LIST, null, null, null);
         m.getPose().getOrientation().setZ(0.1f);
@@ -296,8 +292,8 @@ public class PRM extends AbstractNodeMain {
         routePub.publish(pa);
     }
 
-    public boolean routeFound() {
-        return routeFound;
+    public boolean routeSearchDone() {
+        return routeSearchDone;
     }
 
     public ArrayList<Vertex> getRoute() {
@@ -317,7 +313,7 @@ public class PRM extends AbstractNodeMain {
     }
 
     public OccupancyGrid getOriginalMap() {
-        return map;
+        return originalMap;
     }
 
     public OccupancyGrid getInflatedMap() {
@@ -325,7 +321,10 @@ public class PRM extends AbstractNodeMain {
     }
 
     public void setInflatedMap(OccupancyGrid infMap) {
-        inflatedMap = infMap;
+        this.inflatedMap = infMap;
+        PRMUtil.checkAndPruneGraph(this.graph, this.inflatedMap);
+        inflatedMapPublisher.publish(this.inflatedMap);
+        publishMarkers(this.graph);
     }
 
     public void setCurrentPosition(Pose currentPosition) {

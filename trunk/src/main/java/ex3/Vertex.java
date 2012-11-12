@@ -7,8 +7,8 @@ import org.ros.message.MessageFactory;
 
 public class Vertex {
 
-    ArrayList<Vertex> connectedVertices;
-    Point location;
+    private ArrayList<Vertex> connectedVertices;
+    private Point location;
 
     public Vertex (float x, float y, MessageFactory factory){
         location = factory.newFromType(Point._TYPE);
@@ -40,6 +40,12 @@ public class Vertex {
 
     public void addConnectedVertex(Vertex v){
         connectedVertices.add(v);
+    }
+
+    /** Removes the given vertex from this vertex's neighbour list and vice versa */
+    public void destroyConnection(Vertex v) {
+        connectedVertices.remove(v);
+        v.getConnectedVertices().remove(this);
     }
 
     public Pose makePose(MessageFactory factory){

@@ -6,6 +6,7 @@ import geometry_msgs.PoseArray;
 import geometry_msgs.Vector3;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -231,7 +232,7 @@ public class PRMUtil {
      * Checks whether the position specified by the given x and y coordinates is
      * a valid position on the given map.
      */
-    public boolean checkPositionValidity(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
+    public static boolean checkPositionValidity(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
         // get the index in the array for this random point
         int index = getMapIndex(x, y, mapWidth, mapHeight);
         if (index > 0 && index < buffLength) {
@@ -294,7 +295,7 @@ public class PRMUtil {
         PriorityQueue<VertexTuple> closestNodes = new PriorityQueue<VertexTuple>(graph.size());
 
         for (Vertex vert : graph) {
-            if (vert == v || vert.connectedVertices.size() >= maxConnections){
+            if (vert == v || vert.getConnectedVertices().size() >= maxConnections){
                 continue;
             }
             closestNodes.add(new VertexTuple(vert, getEuclideanDistance(v, vert)));
@@ -303,7 +304,7 @@ public class PRMUtil {
         ArrayList<Edge> connections = new ArrayList<Edge>();
 
         int connectionAttempts = 0;
-        int connectionCount = v.connectedVertices.size();
+        int connectionCount = v.getConnectedVertices().size();
         while (connectionAttempts < maxAttempts && connectionCount < maxConnections) {
             VertexTuple vt = closestNodes.poll();
             // Run out of nodes to check so exit.
@@ -367,7 +368,7 @@ public class PRMUtil {
         double distance = 0;
         ArrayList<Edge> connections = new ArrayList<Edge>();
         for (Vertex vert : graph) {
-            if (vert.connectedVertices.size() >= maxConnections
+            if (vert.getConnectedVertices().size() >= maxConnections
                     || vert.getConnectedVertices().contains(v)){
                 // If we've already been connected to this node, carry on.
                 continue;
@@ -427,7 +428,7 @@ public class PRMUtil {
         PriorityQueue<VertexTuple> closestNodes = new PriorityQueue<VertexTuple>(graph.size());
 
         for (Vertex vert : graph) {
-            if (vert == v || vert.connectedVertices.size() >= maxConnections){
+            if (vert == v || vert.getConnectedVertices().size() >= maxConnections){
                 continue;
             }
             closestNodes.add(new VertexTuple(vert, getEuclideanDistance(v, vert)));
@@ -436,7 +437,7 @@ public class PRMUtil {
         ArrayList<Edge> connections = new ArrayList<Edge>();
 
         int connectionAttempts = 0;
-        int connectionCount = v.connectedVertices.size();
+        int connectionCount = v.getConnectedVertices().size();
         while (connectionAttempts < maxAttempts && connectionCount < maxConnections) {
             VertexTuple vt = closestNodes.poll();
             // Run out of nodes to check so exit.
@@ -474,7 +475,7 @@ public class PRMUtil {
      * and b is connected to c, we check if there is a path from a to c and
      * if so, remove b from the path. We do this for the whole path until we
      * have as straight a path as possible */
-    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path) {
+    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path, OccupancyGrid mapToUse) {
         ArrayList<Vertex> flatPath = (ArrayList) path.clone();
         boolean pathModified = true;
         while (pathModified) {
@@ -483,7 +484,7 @@ public class PRMUtil {
                 // Check if current node can connect to the node after next
                 Vertex a = flatPath.get(i);
                 Vertex c = flatPath.get(i + 2);
-                if (connectedInFreeSpace(inflatedMap, a, c)) {
+                if (connectedInFreeSpace(mapToUse, a, c)) {
                     flatPath.remove(i + 1); // Remove b
                     pathModified = true;
                 }
@@ -499,9 +500,9 @@ public class PRMUtil {
      * over the path the specified number of times. If -1 is passed, the iteration
      * will continue until the path cannot be flattened any more.
      */
-    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path, int iterations) {
+    public ArrayList<Vertex> flattenDrunkenPath(ArrayList<Vertex> path, int iterations, OccupancyGrid mapToUse) {
         if (iterations == -1){
-            return flattenDrunkenPath(path);
+            return flattenDrunkenPath(path, mapToUse);
         }
         ArrayList<Vertex> flatPath = (ArrayList) path.clone();
         for (int j = 0; j < iterations; j++) {
@@ -509,7 +510,7 @@ public class PRMUtil {
                 // Check if current node can connect to the node after next
                 Vertex a = flatPath.get(i);
                 Vertex c = flatPath.get(i + 2);
-                if (connectedInFreeSpace(inflatedMap, a, c)) {
+                if (connectedInFreeSpace(mapToUse, a, c)) {
                     flatPath.remove(i + 1); // Remove b
                 }
             }
@@ -897,6 +898,63 @@ public class PRMUtil {
         }
 
         return connectedFreely;
+    }
+
+    /** This method checks all nodes and vertices and removes any that go
+     * through non-free space. Note that this is DESTRUCTIVE to the given graph. */
+    public static void checkAndPruneGraph(PRMGraph graph, OccupancyGrid map) {
+        ChannelBuffer data = map.getData();
+        int width = map.getInfo().getWidth();
+        int height = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution();
+
+        ArrayList<Edge> edges = graph.getEdges();
+        ArrayList<Vertex> vertices = graph.getVertices();
+
+        Iterator<Vertex> vertexIt = vertices.iterator();
+
+        // Remove invalid vertices and the edges that contain them
+        while (vertexIt.hasNext()) {
+            Vertex vertex = vertexIt.next();
+            int scaledX = (int) Math.round(vertex.getLocation().getX() / mapRes);
+            int scaledY = (int) Math.round(vertex.getLocation().getY() / mapRes);
+
+            if (! PRMUtil.checkPositionValidity(scaledX, scaledY,
+                    width, height, data, data.capacity())) {
+                // Remove this vertex from all neighbours
+                Iterator<Vertex> neighbours = vertex.getConnectedVertices().iterator();
+                while (neighbours.hasNext()) {
+                    neighbours.next().getConnectedVertices().remove(vertex);
+                }
+
+                // Remove all edges containing naughty vertex
+                Iterator<Edge> edgeIt = edges.iterator();
+                while (edgeIt.hasNext()) {
+                    Edge edge = edgeIt.next();
+                    if (edge.getVertexA().equals(vertex)
+                            || edge.getVertexB().equals(vertex)) {
+                        edgeIt.remove();
+                    }
+                }
+
+                // Finally, remove the offending vertex
+                vertexIt.remove();
+            }
+        }
+
+        // Remove edges which intersect with non-free space
+        Iterator<Edge> edgeIt = edges.iterator();
+        while (edgeIt.hasNext()) {
+            Edge edge = edgeIt.next();
+            if (! PRMUtil.connectedInFreeSpace(map, edge.getVertexA(), edge.getVertexB())) {
+                // Remove vertices from each other's neighbour list
+                edge.getVertexA().destroyConnection(edge.getVertexB());
+
+                edgeIt.remove();
+            }
+        }
+        graph.setEdges(edges);
+        graph.setVertices(vertices);
     }
 
 }
