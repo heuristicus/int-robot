@@ -58,6 +58,10 @@ public class RunParams {
         return Float.parseFloat(getInstance().getProperty(key));
     }
 
+    public static boolean getBool(String key){
+        return Boolean.parseBoolean(key);
+    }
+
     public static String getAllPropertiesString() {
         return getInstance().prop.toString();
     }

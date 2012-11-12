@@ -49,6 +49,7 @@ public class Navigator extends AbstractNodeMain {
     public static final float MARKER_POINT_WIDTH = 0.2f;
     public static final int OBSTACLE_INFLATION_RADIUS = RunParams.getInt("OBSTACLE_INFLATION_RADIUS");
     public static final float LASER_IGNORE_THRESHOLD = RunParams.getFloat("LASER_IGNORE_THRESHOLD");
+    public static final boolean OBSTACLE_DETECTION_ACTIVE = RunParams.getBool("OBSTACLE_DETECTION_ACTIVE");
 
     OccupancyGrid inflatedMap;
     OccupancyGrid obstacleInflatedMap = null;
@@ -91,6 +92,8 @@ public class Navigator extends AbstractNodeMain {
         factory = connectedNode.getTopicMessageFactory();
         AbstractLocaliser.setFactory(factory);
 
+        System.out.println("Obstacle detection active: " + OBSTACLE_DETECTION_ACTIVE);
+
         movement = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
         odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
         estimatedPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
@@ -116,7 +119,7 @@ public class Navigator extends AbstractNodeMain {
                             System.out.println("Proceeding to next waypoint.");
                         }
                     }
-                    if (obstacleWithinSafeDistance) {
+                    if (obstacleWithinSafeDistance && OBSTACLE_DETECTION_ACTIVE) {
                         // Stopped moving
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
@@ -141,16 +144,18 @@ public class Navigator extends AbstractNodeMain {
             }
         });
 
-        laserSub.addMessageListener(new MessageListener<LaserScan>() {
-            @Override
-            public void onNewMessage(LaserScan scan) {
-                // If obstacle is too close and we are moving forward, stop
-                if (! turnOnSpot && checkObstacleWithinSafeDistance(scan)) {
-                    System.out.println("Setting obstacleWithinSafeDistance = true");
-                    obstacleWithinSafeDistance = true;
+        if (OBSTACLE_DETECTION_ACTIVE) { // only subscribe to laser if we are doing avoidance
+            laserSub.addMessageListener(new MessageListener<LaserScan>() {
+                @Override
+                public void onNewMessage(LaserScan scan) {
+                    // If obstacle is too close and we are moving forward, stop
+                    if (!turnOnSpot && checkObstacleWithinSafeDistance(scan)) {
+                        System.out.println("Setting obstacleWithinSafeDistance = true");
+                        obstacleWithinSafeDistance = true;
+                    }
                 }
-            }
-        });
+            });
+        }
 
         routeSub.addMessageListener(new MessageListener<PoseArray>() {
             @Override
