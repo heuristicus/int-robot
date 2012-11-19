@@ -59,7 +59,7 @@ public class RunParams {
     }
 
     public static boolean getBool(String key){
-        return Boolean.parseBoolean(key);
+        return Boolean.parseBoolean(getInstance().getProperty(key));
     }
 
     public static String getAllPropertiesString() {
