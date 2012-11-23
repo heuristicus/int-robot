@@ -30,4 +30,5 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #target_link_libraries(example ${PROJECT_NAME})
 rosbuild_add_executable(ImageConverter src/ImageConverter.cpp)
 rosbuild_add_executable(Rectangulator src/Rectangulator.cpp)
+rosbuild_add_executable(RectangulatorLive src/RectangulatorLive.cpp)
 
