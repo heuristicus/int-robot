@@ -65,6 +65,7 @@ public class Navigator extends AbstractNodeMain {
     PRM prm;
     PID pid;
     PoseArray route;
+    ArrayList<Point> obstacleMarkers;
 
     boolean obstacleWithinSafeDistance = false;
 //    float[] lastScanMedians;
@@ -91,6 +92,7 @@ public class Navigator extends AbstractNodeMain {
     public void onStart(ConnectedNode connectedNode) {
         factory = connectedNode.getTopicMessageFactory();
         AbstractLocaliser.setFactory(factory);
+        obstacleMarkers = new ArrayList<Point>();
 
         System.out.println("Obstacle detection active: " + OBSTACLE_DETECTION_ACTIVE);
 
@@ -124,6 +126,7 @@ public class Navigator extends AbstractNodeMain {
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
                         ArrayList<Point> obstacles = getMarkersForObstaclesInLaserScan(sectors);
+                        obstacleMarkers.addAll(obstacles);
                         publishObstacleMarkers(obstacles);
 
                         // Add obstacle(s) to map
@@ -206,14 +209,14 @@ public class Navigator extends AbstractNodeMain {
      * @param heading The heading of the point in RADIANS */
     public Point calculateMarkerPosition(double heading, float distanceReading,
             double robotHeading) {
-        double xDisplacement = Math.sin(heading) * distanceReading;
-        double yDisplacement = Math.cos(heading) * distanceReading;
+        double xDisplacement = Math.cos(robotHeading) * distanceReading;
+        double yDisplacement = Math.sin(robotHeading) * distanceReading;
 
-        if ((robotHeading > Math.PI/2  && robotHeading < Math.PI) ||
-                (robotHeading > -Math.PI/2 && robotHeading < 0)) {
-            xDisplacement = -xDisplacement;
-            yDisplacement = -yDisplacement;
-        }
+//        if ((robotHeading > Math.PI/2  && robotHeading < Math.PI) ||
+//                (robotHeading > -Math.PI/2 && robotHeading < 0)) {
+//            xDisplacement = -xDisplacement;
+//            yDisplacement = -yDisplacement;
+//        }
 
         Point currentPoint = this.lastEstimate.getPosition();
         Point newPoint = factory.newFromType(Point._TYPE);
