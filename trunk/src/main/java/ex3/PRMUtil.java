@@ -787,7 +787,7 @@ public class PRMUtil {
 
         for (int i = 0; i < original.capacity(); i++) {
             // If data in the map indicates an obstacle, widen the obstacle by some amount
-            if (original.getByte(i) == 100) {
+            if (original.getByte(i) == 100 || original.getByte(i) == -1) {
                 for (int yOffset = -INFLATION_RADIUS; yOffset <= INFLATION_RADIUS; yOffset++) {
                     int xOffset = grid.getInfo().getWidth() * yOffset;
                     //xRadius = RADIUS -
