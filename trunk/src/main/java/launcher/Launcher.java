@@ -1,6 +1,8 @@
 package launcher;
 
-import ex4.FaceDetect;
+import ex3.PRM;
+import ex3.navigation.Navigator;
+import ex3.search.Dijkstra;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -34,9 +36,9 @@ public class Launcher extends AbstractNodeMain {
 //        exec.execute(new PFLocalisationNode(), conf);
 
         // PRM
-//        PRM prm = new PRM(new Dijkstra(), false);
-//        exec.execute(prm, conf);
-//        exec.execute(new Navigator(prm), conf);
+        PRM prm = new PRM(new Dijkstra(), false);
+        exec.execute(prm, conf);
+        exec.execute(new Navigator(prm), conf);
 
         // Not currently working
 //        PID pid = new PID(0.5, 0.5, 0.5, 1.0, 1.0, PID.DIRECTION.DIRECT);
@@ -53,8 +55,8 @@ public class Launcher extends AbstractNodeMain {
 
 //        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
 
-        FaceDetect face = new FaceDetect();
-        exec.execute(face, conf);
+//        FaceDetect face = new FaceDetect();
+//        exec.execute(face, conf);
     }
 
     @Override
