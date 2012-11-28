@@ -6,6 +6,7 @@ import ex3.pid.PID;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
+import geometry_msgs.PoseWithCovariance;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import geometry_msgs.Twist;
@@ -40,10 +41,10 @@ public class Navigator extends AbstractNodeMain {
     public static final double MIN_MOVE_SPEED = 0.1;
     public static final double POINT_REACHED_THRESHOLD = 0.5;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
+    public static final double DISTANCE_FROM_LAST_ESTIMATED_POSE = 3.0;
     // Will attempt to align the robot within this range of the actual angle
     // to the next waypoint.
     public static final double NEXT_WAYPOINT_HEADING_ERROR = 0.15;
-
     // Obstacle avoidance params
     public static final float SAFE_DISTANCE = 0.75f; // In metres
     public static final float OBSTACLE_ZONE = SAFE_DISTANCE + 0.25f; // In metres
@@ -57,14 +58,16 @@ public class Navigator extends AbstractNodeMain {
     public static final boolean OBSTACLE_DETECTION_ACTIVE = RunParams.getBool("OBSTACLE_DETECTION_ACTIVE");
     public static final float OBSTACLE_EXPIRY_DISTANCE = RunParams.getFloat("OBSTACLE_EXPIRY_DISTANCE");
 
-    public enum ObstacleAction { ADD, REMOVE };
+    public enum ObstacleAction {
 
+        ADD, REMOVE
+    };
     OccupancyGrid inflatedMap;
     OccupancyGrid obstacleInflatedMap = null;
-
     MessageFactory factory;
     Pose wayPoint;
     Pose lastEstimate;
+    PoseWithCovariance lastEstimatedPoseWithConvariance;
     Pose goalPoint;
     boolean active = false;
     boolean turnOnSpot = true;
@@ -74,17 +77,17 @@ public class Navigator extends AbstractNodeMain {
     PID pid;
     PoseArray route;
     ArrayList<Point> obstacleMarkers;
-
     boolean obstacleWithinSafeDistance = false;
 //    float[] lastScanMedians;
     LaserScan lastScan;
-
     Subscriber<Odometry> odom;
     Subscriber<PoseWithCovarianceStamped> estimatedPose;
     Subscriber<LaserScan> laserSub;
     Subscriber<PoseArray> routeSub;
+    Subscriber<PoseWithCovarianceStamped> initialPosition;
     Publisher<Twist> movement;
     Publisher<Marker> obstacleMarkersPub;
+    Publisher<PoseWithCovariance> estimatedPosePub;
 
     public Navigator(PRM prm) {
         this.prm = prm;
@@ -110,8 +113,11 @@ public class Navigator extends AbstractNodeMain {
         laserSub = connectedNode.newSubscriber("base_scan", LaserScan._TYPE);
         routeSub = connectedNode.newSubscriber("route", PoseArray._TYPE);
         obstacleMarkersPub = connectedNode.newPublisher("obstacleMarkers", Marker._TYPE);
+        estimatedPosePub = connectedNode.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
+        initialPosition = connectedNode.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
 
         odom.addMessageListener(new MessageListener<Odometry>() {
+
             @Override
             public void onNewMessage(Odometry t) {
                 // Each time we receive an odometry message, publish a movement to cmd_vel.
@@ -145,7 +151,7 @@ public class Navigator extends AbstractNodeMain {
                         OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         // Add obstacles to the map
                         obstaclesOntoMap(mapToInflate, obstacles, ObstacleAction.ADD);
-                        
+
                         prm.setInflatedMap(obstacleInflatedMap);
 
                         // Regen route (also publishes)
@@ -166,6 +172,7 @@ public class Navigator extends AbstractNodeMain {
 
         if (OBSTACLE_DETECTION_ACTIVE) { // only subscribe to laser if we are doing avoidance
             laserSub.addMessageListener(new MessageListener<LaserScan>() {
+
                 @Override
                 public void onNewMessage(LaserScan scan) {
                     // If obstacle is too close and we are moving forward, stop
@@ -178,29 +185,62 @@ public class Navigator extends AbstractNodeMain {
         }
 
         routeSub.addMessageListener(new MessageListener<PoseArray>() {
+
             @Override
             public void onNewMessage(PoseArray t) {
                 route = t;
                 initRoute();
                 // if this is the first run
-                if (obstacleInflatedMap == null && inflatedMap == null){
+                if (obstacleInflatedMap == null && inflatedMap == null) {
                     inflatedMap = prm.getInflatedMap();
                 }
             }
         });
 
         estimatedPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
+
             @Override
             public void onNewMessage(PoseWithCovarianceStamped t) {
                 // Each time we get an update for the pose estimate, we update our position
-                lastEstimate = t.getPose().getPose();
+                Pose newEstimatedPose = t.getPose().getPose();
+
+                if (lastEstimatedPoseWithConvariance != null) {
+                    double distanceFromLastPose = PRMUtil.getEuclideanDistance(newEstimatedPose.getPosition(), lastEstimatedPoseWithConvariance.getPose().getPosition());
+                    System.out.println("----------DISTANCE IS ----------- " + distanceFromLastPose);
+                    System.out.println("1) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
+                    if (distanceFromLastPose > DISTANCE_FROM_LAST_ESTIMATED_POSE) {
+                        System.out.println("2) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
+                        PoseWithCovariance initialPoseWithCS = estimatedPosePub.newMessage();
+                        initialPoseWithCS.setPose(lastEstimatedPoseWithConvariance.getPose());
+                        estimatedPosePub.publish(initialPoseWithCS);
+                        System.out.println("Detected AMCL Jump!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    } else {
+                        lastEstimatedPoseWithConvariance = t.getPose();
+                    }
+                } else {
+                    lastEstimatedPoseWithConvariance = t.getPose();
+                }
+
+                lastEstimate = newEstimatedPose;
+
                 prm.setCurrentPosition(lastEstimate);
-                
+
 //                if (pid != null && route != null){
 //                    pid.setSetpoint(bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition()));
 //                }
+
             }
         });
+
+        initialPosition.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
+
+            @Override
+            public void onNewMessage(PoseWithCovarianceStamped t) {
+                lastEstimatedPoseWithConvariance = null;
+                //              System.out.println("Resetting estimated pose");
+            }
+        });
+
 
     }
 
@@ -315,7 +355,7 @@ public class Navigator extends AbstractNodeMain {
 
         return obstacleInflatedMap;
     }
-    
+
     public OccupancyGrid obstaclesOntoMap(OccupancyGrid inflatedMap,
             ArrayList<Point> obstacles, ObstacleAction action) {
         // Copy data in the grid to a new channel buffer
@@ -353,27 +393,27 @@ public class Navigator extends AbstractNodeMain {
                         break;
                     }
 
-                    if (action == ObstacleAction.ADD){
+                    if (action == ObstacleAction.ADD) {
                         // Don't change unknown and occupied cells
                         if (original.getByte(j) == -1) {
                             continue; // Don't change the value of unknown cells
-                        } else if (original.getByte(j) == 100){
+                        } else if (original.getByte(j) == 100) {
                             // Change the value of occupied cells so we can tell when we come to remove later
                             obstacleInflatedMap.getData().setByte(j, 200);
                         } else { // make free cells occupied
                             obstacleInflatedMap.getData().setByte(j, 100);
                         }
                     } else { // we are removing from the map
-                        if (original.getByte(j) == 100){
+                        if (original.getByte(j) == 100) {
                             // set obstacles that we added back to free space
                             obstacleInflatedMap.getData().setByte(j, 0);
-                         } else if (original.getByte(j) == 200){
+                        } else if (original.getByte(j) == 200) {
                             // put obstacles back into the places they were before
                             obstacleInflatedMap.getData().setByte(j, 100);
-                         } else {
+                        } else {
                             // ignore everything else
                             continue;
-                         }
+                        }
                     }
                 }
             }
@@ -382,21 +422,19 @@ public class Navigator extends AbstractNodeMain {
         return obstacleInflatedMap;
     }
 
-
-
     /*
      * Checks the given list of obstacle markers (points) on the map for points
      * which are more than specified euclidean distance from the current location
      * of the robot.
      * ****DESTRUCTIVE******
      */
-    public void _pruneObstacleMarkers(ArrayList<Point> markers, Point currentLocation){
+    public void _pruneObstacleMarkers(ArrayList<Point> markers, Point currentLocation) {
         ArrayList<Point> invalidMarkers = new ArrayList<Point>();
         System.out.println("checking obstacle markers");
-        
+
         for (Point point : markers) {
             double pointDist = PRMUtil.getEuclideanDistance(point, currentLocation);
-            if (pointDist > OBSTACLE_EXPIRY_DISTANCE){
+            if (pointDist > OBSTACLE_EXPIRY_DISTANCE) {
                 System.out.printf("Obstacle at point [%f, %f] is over %f metres away. Removing\n", point.getX(), point.getY(), OBSTACLE_EXPIRY_DISTANCE);
                 invalidMarkers.add(point); // add the invalidated point
             }
@@ -431,10 +469,11 @@ public class Navigator extends AbstractNodeMain {
      * the end point. New routes may be received when the prm receives a new map,
      * and in these cases it is important not to lose the original inflated map.
      */
-    public void initRoute(){
+    public void initRoute() {
         nextWayPoint();
         goalPoint = route.getPoses().get(route.getPoses().size() - 1);
         active = true;
+
 //        if (pid != null){
 //            pid.activate();
 //        }
@@ -447,8 +486,8 @@ public class Navigator extends AbstractNodeMain {
      * the node at the head of the list. Returns false if the list is empty,
      * implying that we have reached the goal.
      */
-    public boolean nextWayPoint(){
-        if (route.getPoses().isEmpty()){
+    public boolean nextWayPoint() {
+        if (route.getPoses().isEmpty()) {
             return false;
         } else {
             wayPoint = route.getPoses().remove(0);
@@ -474,15 +513,16 @@ public class Navigator extends AbstractNodeMain {
 
         //System.out.println("Rotating on waypoint: " + turnOnSpot);
 
-        if (turnOnSpot){
+        if (turnOnSpot) {
             //System.out.println("Rotation to next waypoint: " + rotationToWaypoint);
-            if (Math.abs(rotationToWaypoint) < NEXT_WAYPOINT_HEADING_ERROR){
+            if (Math.abs(rotationToWaypoint) < NEXT_WAYPOINT_HEADING_ERROR) {
+
                 turnOnSpot = false;
             }
         } else {
             pub.getLinear().setX(moveReq);
         }
-        
+
         return pub;
     }
 
@@ -490,31 +530,30 @@ public class Navigator extends AbstractNodeMain {
      * Calculates the bearing from zero from one point to another. Zero is 
      * facing directly east.
      */
-    public double bearingFromZero(Point p1, Point p2)
-    {
-    	return Math.atan2(p2.getY() - p1.getY(), p2.getX() - p1.getX());
+    public double bearingFromZero(Point p1, Point p2) {
+        return Math.atan2(p2.getY() - p1.getY(), p2.getX() - p1.getX());
     }
-    
+
     /*
      * Uses a PID controller to set the rotation value sent to cmd_vel. 
      * The standard method for linear movement calculation is used.
      */
-    public Twist PIDcontrol(){
-    	Twist pub = movement.newMessage();
+    public Twist PIDcontrol() {
+        Twist pub = movement.newMessage();
 
         double rotReq = pid.getOutput();
 
         pub.getAngular().setZ(rotReq);
         pub.getLinear().setX(computeLinearMovement());
 
-    	return pub;
+        return pub;
     }
-    
+
     /*
      * Computes the value of linear movement that should be sent to the robot in a naive way.
      */
-    public double computeLinearMovement(){
-        if (distanceToWaypoint < POINT_REACHED_THRESHOLD){
+    public double computeLinearMovement() {
+        if (distanceToWaypoint < POINT_REACHED_THRESHOLD) {
             // If we have reached the point, stop.
             return 0;
         } else if (distanceToWaypoint <= POINT_PROXIMITY_THRESHOLD) {
@@ -526,20 +565,20 @@ public class Navigator extends AbstractNodeMain {
             return MAX_MOVE_SPEED;
         }
     }
-    
+
     /*
      * Returns a speed value that is within the default bounds.
      */
-    public double boundedSpeed(double speedReq){
-    	if (speedReq < MIN_MOVE_SPEED){
-    		return MIN_MOVE_SPEED;
-    	} else if (speedReq > MAX_MOVE_SPEED){
-    		return MAX_MOVE_SPEED;
-    	} else {
-    		return speedReq;
-    	}
+    public double boundedSpeed(double speedReq) {
+        if (speedReq < MIN_MOVE_SPEED) {
+            return MIN_MOVE_SPEED;
+        } else if (speedReq > MAX_MOVE_SPEED) {
+            return MAX_MOVE_SPEED;
+        } else {
+            return speedReq;
+        }
     }
-    
+
     /*
      * Computes the angular movement required to keep the robot on course for the point
      * that it is heading towards.
@@ -556,7 +595,7 @@ public class Navigator extends AbstractNodeMain {
         // rotate a bit.
         if (Math.toDegrees(diff) > 180) {
             req = diff - Math.toRadians(360);
-        } else if (Math.toDegrees(diff) < -180){
+        } else if (Math.toDegrees(diff) < -180) {
             req = diff + Math.toRadians(360);
         } else {
             req = diff;
@@ -570,10 +609,9 @@ public class Navigator extends AbstractNodeMain {
 
         return req;
     }
-    
+
     @Override
     public GraphName getDefaultNodeName() {
         return GraphName.of("Navigator");
     }
-
 }
