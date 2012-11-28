@@ -40,16 +40,24 @@ public class Navigator extends AbstractNodeMain {
     public static final double MIN_MOVE_SPEED = 0.1;
     public static final double POINT_REACHED_THRESHOLD = 0.5;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
+    // Will attempt to align the robot within this range of the actual angle
+    // to the next waypoint.
+    public static final double NEXT_WAYPOINT_HEADING_ERROR = 0.15;
 
     // Obstacle avoidance params
     public static final float SAFE_DISTANCE = 0.75f; // In metres
     public static final float OBSTACLE_ZONE = SAFE_DISTANCE + 0.25f; // In metres
-    public static final int SECTORS_CHECKED = 9; // Check this many sectors
+    public static final int SECTORS_CHECKED = 11; // Check this many sectors
     public static final int READINGS_PER_SECTOR_OBSTACLE = 20; // Resolution for obstacle marker creation
     public static final float MARKER_POINT_WIDTH = 0.2f;
+    // How many receipts of an estimatedPose we should wait before attempting to prune the obstacle array.
+    public static final int OBSTACLE_ARRAY_CHECK_TIME = 20;
     public static final int OBSTACLE_INFLATION_RADIUS = RunParams.getInt("OBSTACLE_INFLATION_RADIUS");
     public static final float LASER_IGNORE_THRESHOLD = RunParams.getFloat("LASER_IGNORE_THRESHOLD");
     public static final boolean OBSTACLE_DETECTION_ACTIVE = RunParams.getBool("OBSTACLE_DETECTION_ACTIVE");
+    public static final float OBSTACLE_EXPIRY_DISTANCE = RunParams.getFloat("OBSTACLE_EXPIRY_DISTANCE");
+
+    public enum ObstacleAction { ADD, REMOVE };
 
     OccupancyGrid inflatedMap;
     OccupancyGrid obstacleInflatedMap = null;
@@ -116,6 +124,10 @@ public class Navigator extends AbstractNodeMain {
                             System.out.println("Goal reached.");
                             active = false;
                             route = null;
+                            // When we reach the goal, we get rid of all obstacles on the map.
+                            // and reset the obstacle map.
+                            prm.setInflatedMap(inflatedMap);
+                            obstacleInflatedMap = null;
                         } else { // Not yet reached the end of the path
                             turnOnSpot = true;
                             System.out.println("Proceeding to next waypoint.");
@@ -126,12 +138,14 @@ public class Navigator extends AbstractNodeMain {
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
                         ArrayList<Point> obstacles = getMarkersForObstaclesInLaserScan(sectors);
-                        obstacleMarkers.addAll(obstacles);
+                        obstacleMarkers.addAll(obstacles); // Track the obstacles in a list
                         publishObstacleMarkers(obstacles);
 
                         // Add obstacle(s) to map
                         OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
-                        inflateObstaclesOntoMap(mapToInflate, obstacles);
+                        // Add obstacles to the map
+                        obstaclesOntoMap(mapToInflate, obstacles, ObstacleAction.ADD);
+                        
                         prm.setInflatedMap(obstacleInflatedMap);
 
                         // Regen route (also publishes)
@@ -140,6 +154,9 @@ public class Navigator extends AbstractNodeMain {
                         obstacleWithinSafeDistance = false;
                         turnOnSpot = true; // New path so new movement
                     } else {
+                        if (obstacleMarkers.size() > 0) {
+                            _pruneObstacleMarkers(obstacleMarkers, lastEstimate.getPosition());
+                        }
                         movement.publish(computeMovementValues());
                     }
 //                    movement.publish(PIDcontrol());
@@ -165,6 +182,10 @@ public class Navigator extends AbstractNodeMain {
             public void onNewMessage(PoseArray t) {
                 route = t;
                 initRoute();
+                // if this is the first run
+                if (obstacleInflatedMap == null && inflatedMap == null){
+                    inflatedMap = prm.getInflatedMap();
+                }
             }
         });
 
@@ -174,9 +195,10 @@ public class Navigator extends AbstractNodeMain {
                 // Each time we get an update for the pose estimate, we update our position
                 lastEstimate = t.getPose().getPose();
                 prm.setCurrentPosition(lastEstimate);
-                if (pid != null && route != null){
-                    pid.setSetpoint(bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition()));
-                }
+                
+//                if (pid != null && route != null){
+//                    pid.setSetpoint(bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition()));
+//                }
             }
         });
 
@@ -223,10 +245,10 @@ public class Navigator extends AbstractNodeMain {
         newPoint.setX(currentPoint.getX() + xDisplacement);
         newPoint.setY(currentPoint.getY() + yDisplacement);
 
-        System.out.println("Distance to point at heading " + heading + " is " + distanceReading);
-        System.out.println("Robot's heading: "+AbstractLocaliser.getHeading(lastEstimate.getOrientation()));
-        System.out.println("xDisp: "+xDisplacement+" yDisp: "+yDisplacement);
-        System.out.println("NewPoint x: "+newPoint.getX()+" y: "+newPoint.getY());
+//        System.out.println("Distance to point at heading " + heading + " is " + distanceReading);
+//        System.out.println("Robot's heading: "+AbstractLocaliser.getHeading(lastEstimate.getOrientation()));
+//        System.out.println("xDisp: "+xDisplacement+" yDisp: "+yDisplacement);
+//        System.out.println("NewPoint x: "+newPoint.getX()+" y: "+newPoint.getY());
         return newPoint;
     }
 
@@ -236,7 +258,7 @@ public class Navigator extends AbstractNodeMain {
         for (float median : medians) {
             // If obstacle
             if (medianIsAnObstacle(median)) {
-                System.out.println("Oh noes. Obstacle detected. Stopping");
+                //System.out.println("Oh noes. Obstacle detected. Stopping");
                 lastScan = scan;
                 return true;
             }
@@ -291,7 +313,106 @@ public class Navigator extends AbstractNodeMain {
             }
         }
 
-        return inflatedMap;
+        return obstacleInflatedMap;
+    }
+    
+    public OccupancyGrid obstaclesOntoMap(OccupancyGrid inflatedMap,
+            ArrayList<Point> obstacles, ObstacleAction action) {
+        // Copy data in the grid to a new channel buffer
+        ChannelBuffer original = ChannelBuffers.copiedBuffer(inflatedMap.getData());
+
+        // Get an occupancy grid for us to put modified data into.
+        obstacleInflatedMap = factory.newFromType(OccupancyGrid._TYPE);
+
+        // Copy the original buffer into the newly created grid.
+        obstacleInflatedMap.setInfo(inflatedMap.getInfo());
+        obstacleInflatedMap.setData(ChannelBuffers.copiedBuffer(inflatedMap.getData()));
+
+        final int mapHeight = inflatedMap.getInfo().getHeight();
+        final int mapWidth = inflatedMap.getInfo().getWidth();
+        final float mapRes = inflatedMap.getInfo().getResolution();
+
+        for (Point obstacle : obstacles) {
+            int scaledX = (int) Math.round(obstacle.getX() / mapRes);
+            int scaledY = (int) Math.round(obstacle.getY() / mapRes);
+
+            // Data in the map indicates an obstacle, widen the obstacle by some amount
+            for (int yOffset = -OBSTACLE_INFLATION_RADIUS; yOffset <= OBSTACLE_INFLATION_RADIUS; yOffset++) {
+                int xOffset = mapWidth * yOffset;
+
+                int index = PRMUtil.getMapIndex(scaledX, scaledY, mapWidth, mapHeight);
+
+                for (int j = index + xOffset - OBSTACLE_INFLATION_RADIUS; j <= index + xOffset + OBSTACLE_INFLATION_RADIUS; j++) {
+                    // If there is an obstacle very close to the zeroth index, avoid
+                    // exceptions
+                    if (j < 0) {
+                        j = 0;
+                    }
+                    // Also avoid going over capacity
+                    if (j >= original.capacity()) {
+                        break;
+                    }
+
+                    if (action == ObstacleAction.ADD){
+                        // Don't change unknown and occupied cells
+                        if (original.getByte(j) == -1) {
+                            continue; // Don't change the value of unknown cells
+                        } else if (original.getByte(j) == 100){
+                            // Change the value of occupied cells so we can tell when we come to remove later
+                            obstacleInflatedMap.getData().setByte(j, 200);
+                        } else { // make free cells occupied
+                            obstacleInflatedMap.getData().setByte(j, 100);
+                        }
+                    } else { // we are removing from the map
+                        if (original.getByte(j) == 100){
+                            // set obstacles that we added back to free space
+                            obstacleInflatedMap.getData().setByte(j, 0);
+                         } else if (original.getByte(j) == 200){
+                            // put obstacles back into the places they were before
+                            obstacleInflatedMap.getData().setByte(j, 100);
+                         } else {
+                            // ignore everything else
+                            continue;
+                         }
+                    }
+                }
+            }
+        }
+
+        return obstacleInflatedMap;
+    }
+
+
+
+    /*
+     * Checks the given list of obstacle markers (points) on the map for points
+     * which are more than specified euclidean distance from the current location
+     * of the robot.
+     * ****DESTRUCTIVE******
+     */
+    public void _pruneObstacleMarkers(ArrayList<Point> markers, Point currentLocation){
+        ArrayList<Point> invalidMarkers = new ArrayList<Point>();
+        System.out.println("checking obstacle markers");
+        
+        for (Point point : markers) {
+            double pointDist = PRMUtil.getEuclideanDistance(point, currentLocation);
+            if (pointDist > OBSTACLE_EXPIRY_DISTANCE){
+                System.out.printf("Obstacle at point [%f, %f] is over %f metres away. Removing\n", point.getX(), point.getY(), OBSTACLE_EXPIRY_DISTANCE);
+                invalidMarkers.add(point); // add the invalidated point
+            }
+        }
+
+
+        // Remove the obstacles on the map which represent the points we removed.
+        if (invalidMarkers.size() > 0) {
+            markers.removeAll(invalidMarkers);
+            OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
+            prm.setInflatedMap(obstaclesOntoMap(mapToInflate, invalidMarkers, ObstacleAction.REMOVE));
+            // we want to reconnect the graph once we remove the obstacles, otherwise
+            // we may end up cutting off areas of the graph, resulting in worse
+            // paths
+            prm.reconnectGraph(obstacleInflatedMap);
+        }
     }
 
     public void publishObstacleMarkers(List<Point> markers) {
@@ -307,18 +428,18 @@ public class Navigator extends AbstractNodeMain {
 
     /*
      * Initialises the navigator to follow the route from the current location to
-     * the end point.
+     * the end point. New routes may be received when the prm receives a new map,
+     * and in these cases it is important not to lose the original inflated map.
      */
     public void initRoute(){
         nextWayPoint();
         goalPoint = route.getPoses().get(route.getPoses().size() - 1);
         active = true;
-        if (pid != null){
-            pid.activate();
-        }
-        this.inflatedMap = prm.getInflatedMap();
-        this.obstacleInflatedMap = null;
+//        if (pid != null){
+//            pid.activate();
+//        }
     }
+
 
     /*
      * Gets the next waypoint on the route by removing the head of the list. Returns
@@ -342,20 +463,20 @@ public class Navigator extends AbstractNodeMain {
     public Twist computeMovementValues() {
         Twist pub = movement.newMessage();
 
-        System.out.println("Next point: " + wayPoint.getPosition().getX() + "," + wayPoint.getPosition().getY());
+        //System.out.println("Next point: " + wayPoint.getPosition().getX() + "," + wayPoint.getPosition().getY());
 
         double rotReq = computeAngularMovement();
         double moveReq = computeLinearMovement();
 
-        System.out.println("Publishing rotation: " + rotReq + " and movement: " + moveReq);
+        //System.out.println("Publishing rotation: " + rotReq + " and movement: " + moveReq);
 
         pub.getAngular().setZ(rotReq);
 
-        System.out.println("Rotating on waypoint: " + turnOnSpot);
+        //System.out.println("Rotating on waypoint: " + turnOnSpot);
 
         if (turnOnSpot){
-            System.out.println("Rotation to next waypoint: " + rotationToWaypoint);
-            if (Math.abs(rotationToWaypoint) < 0.1){
+            //System.out.println("Rotation to next waypoint: " + rotationToWaypoint);
+            if (Math.abs(rotationToWaypoint) < NEXT_WAYPOINT_HEADING_ERROR){
                 turnOnSpot = false;
             }
         } else {
@@ -427,8 +548,8 @@ public class Navigator extends AbstractNodeMain {
         Quaternion rot = lastEstimate.getOrientation();
         double robotHeading = AbstractLocaliser.getHeading(rot);
         double bearing = bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition());
-        System.out.println("curheading: " + robotHeading);
-        System.out.println("bearing to point: " + bearing);
+//        System.out.println("curheading: " + robotHeading);
+//        System.out.println("bearing to point: " + bearing);
         double req = 0;
         double diff = bearing - robotHeading;
         // If we're not aligned particularly well with the heading to the waypoint

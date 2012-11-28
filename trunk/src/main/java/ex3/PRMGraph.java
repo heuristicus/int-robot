@@ -53,6 +53,14 @@ public class PRMGraph {
         return true;
     }
 
+    /*
+     * Reconnects vertices within the given graph. This is useful to if you are
+     * severing connections to deal with obstacles.
+     */
+    public void reconnectGraph(PRMUtil util, OccupancyGrid map){
+        this.edges = util.connectVertices(vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS);
+    }
+
     public ArrayList<Edge> getEdges() {
         return edges;
     }

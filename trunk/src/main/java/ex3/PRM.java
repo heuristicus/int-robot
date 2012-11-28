@@ -292,6 +292,18 @@ public class PRM extends AbstractNodeMain {
         routePub.publish(pa);
     }
 
+    /*
+     * Reconnects the vertices in the graph. Useful to ensure that you maintain
+     * a reasonable number of connections if you are removing nodes and or edges
+     * from the graph to deal with obstacles.
+     *
+     * WARNING: MAY TAKE A LONG TIME!
+     */
+    public void reconnectGraph(OccupancyGrid mapToUse) {
+        graph.reconnectGraph(util, mapToUse);
+    }
+
+
     public boolean routeSearchDone() {
         return routeSearchDone;
     }
@@ -322,7 +334,7 @@ public class PRM extends AbstractNodeMain {
 
     public void setInflatedMap(OccupancyGrid infMap) {
         this.inflatedMap = infMap;
-        PRMUtil.checkAndPruneGraph(this.graph, this.inflatedMap);
+        PRMUtil._checkAndPruneGraph(this.graph, this.inflatedMap);
         inflatedMapPublisher.publish(this.inflatedMap);
         publishMarkers(this.graph);
     }
@@ -355,5 +367,6 @@ public class PRM extends AbstractNodeMain {
     public void onShutdownComplete(Node node) {
         System.out.println("PRM node successfully shut down.");
     }
+
 
 }

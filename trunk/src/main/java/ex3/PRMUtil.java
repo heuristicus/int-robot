@@ -902,7 +902,7 @@ public class PRMUtil {
 
     /** This method checks all nodes and vertices and removes any that go
      * through non-free space. Note that this is DESTRUCTIVE to the given graph. */
-    public static void checkAndPruneGraph(PRMGraph graph, OccupancyGrid map) {
+    public static void _checkAndPruneGraph(PRMGraph graph, OccupancyGrid map) {
         ChannelBuffer data = map.getData();
         int width = map.getInfo().getWidth();
         int height = map.getInfo().getHeight();
