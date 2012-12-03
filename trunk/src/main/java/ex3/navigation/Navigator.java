@@ -81,6 +81,7 @@ public class Navigator extends AbstractNodeMain {
 //    float[] lastScanMedians;
     LaserScan lastScan;
     Subscriber<Odometry> odom;
+    Subscriber<Odometry> odom;
     Subscriber<PoseWithCovarianceStamped> estimatedPose;
     Subscriber<LaserScan> laserSub;
     Subscriber<PoseArray> routeSub;
