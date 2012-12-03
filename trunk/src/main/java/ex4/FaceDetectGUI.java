@@ -1,3 +1,4 @@
+/*
 package ex4;
 
 import java.awt.Color;
@@ -79,3 +80,4 @@ public class FaceDetectGUI {
 //    	}
     }
 }
+*/

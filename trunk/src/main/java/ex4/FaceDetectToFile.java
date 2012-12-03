@@ -1,3 +1,4 @@
+/**
 package ex4;
 
 import com.googlecode.javacv.cpp.opencv_objdetect.CvHaarClassifierCascade;
@@ -57,3 +58,4 @@ public class FaceDetectToFile{
     cvSaveImage(args[2], originalImage);
   }
 }
+*/

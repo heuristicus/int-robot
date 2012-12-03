@@ -1,3 +1,4 @@
+/*
 package ex4;
 
 import com.googlecode.javacv.cpp.opencv_objdetect.CvHaarClassifierCascade;
@@ -99,7 +100,8 @@ public class FaceDetect extends AbstractNodeMain {
     /** Given an array of bytes which contains triplets of bytes which belong
      * in one int, this method combines them into an array of ints a third of
      * the size of the byte array. This is done by appending triplets of bytes
-     * into ints */
+     * into ints
+
     public static int[] convertToIntArray(byte[] bytes) {
         if (bytes.length % 3 != 0) {
             throw new IllegalArgumentException("Byte array is not divisible by 3");
@@ -119,7 +121,7 @@ public class FaceDetect extends AbstractNodeMain {
     }
 
     /** Given three bytes, combines into an int (by appending bytes).
-     * This is for combining rgb values from bytes into one RGB int value. */
+     * This is for combining rgb values from bytes into one RGB int value. 
     public static int combineBytes(byte a, byte b, byte c) {
         return (a << 16) + (b << 8) + c;
     }
@@ -129,3 +131,4 @@ public class FaceDetect extends AbstractNodeMain {
         return GraphName.of("FaceDetect");
     }
 }
+*/
