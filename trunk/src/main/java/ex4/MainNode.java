@@ -181,6 +181,7 @@ public class MainNode extends AbstractNodeMain {
                             // the exploration phase
                             Printer.println("Lost face (dissimilar). Returning to exploration", "CYANF");
                             returnToExploration();
+                            return;
                         }
                     }
 

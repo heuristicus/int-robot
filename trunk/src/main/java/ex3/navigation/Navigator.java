@@ -133,7 +133,7 @@ public class Navigator extends AbstractNodeMain {
                 if(val){
                     // We may have moved since we deactivated the navigator, so
                     // replan the route.
-                    System.out.println("Navigator activated.");
+                    Printer.println("Navigator activated. Goal point is " + goalPoint.getPosition().getX() + ", " + goalPoint.getPosition().getY(), "REDF");
                     route = null;
                     PoseStamped goal = goalPub.newMessage();
                     goal.setPose(goalPoint);
@@ -155,7 +155,7 @@ public class Navigator extends AbstractNodeMain {
                     distanceToWaypoint = PRMUtil.getEuclideanDistance(lastEstimate.getPosition(), wayPoint.getPosition());
                     if (distanceToWaypoint <= POINT_REACHED_THRESHOLD) {
                         if (nextWayPoint() == false) { // we have reached the goal.
-                            System.out.println("Goal reached.");
+                            Printer.println("Goal reached.", "REDF");
                             active = false;
                             route = null;
                             // When we reach the goal, we get rid of all obstacles on the map.
@@ -167,7 +167,7 @@ public class Navigator extends AbstractNodeMain {
                             prmInfoSub.publish(info);
                         } else { // Not yet reached the end of the path
                             turnOnSpot = true;
-                            System.out.println("Proceeding to next waypoint.");
+                            Printer.println("Proceeding to next waypoint.", "REDF");
                         }
                     }
                     if (obstacleWithinSafeDistance && OBSTACLE_DETECTION_ACTIVE) {
@@ -208,7 +208,7 @@ public class Navigator extends AbstractNodeMain {
                 public void onNewMessage(LaserScan scan) {
                     // If obstacle is too close and we are moving forward, stop
                     if (!turnOnSpot && checkObstacleWithinSafeDistance(scan)) {
-                        System.out.println("Setting obstacleWithinSafeDistance = true");
+                        Printer.println("Setting obstacleWithinSafeDistance = true", "REDF");
                         obstacleWithinSafeDistance = true;
                     }
                 }
@@ -219,6 +219,7 @@ public class Navigator extends AbstractNodeMain {
             @Override
             public void onNewMessage(PoseArray t) {
                 route = t;
+                Printer.println("Received message from PRM containing new route.", "REDF");
                 initRoute();
                 // if this is the first run
                 if (obstacleInflatedMap == null && inflatedMap == null) {
