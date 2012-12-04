@@ -7,6 +7,7 @@ package ex4;
 import geometry_msgs.Twist;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import launcher.RunParams;
 import nav_msgs.Odometry;
 import org.ros.node.topic.Publisher;
 
@@ -15,6 +16,8 @@ import org.ros.node.topic.Publisher;
  * @author robot
  */
 public class Driver {
+
+    public static final double DRIVER_HEADING_THRESHOLD = RunParams.getDouble("DRIVER_HEADING_THRESHOLD");
 
     //the maximum speed when driving
     //the twist publisher
@@ -40,14 +43,14 @@ public class Driver {
         double currentHeading = StaticMethods.getHeading(t.getPose().getPose().getOrientation());
         if (targetHeading == null) {
             targetHeading = currentHeading - angleR;
-            return;
         }
 
         Twist twist = twistPublisher.newMessage();
         double turnRate = 0;
         double diff = currentHeading - targetHeading;
 
-        if (Math.abs(diff) > Math.toRadians(10)) {
+        Printer.println("Diff in newOdom is: "+diff, "CYANF");
+        if (Math.abs(diff) > DRIVER_HEADING_THRESHOLD) {
             targetReached = false;
             if (diff > 0) {
                 turnRate = -maxTurnRate;
@@ -69,7 +72,7 @@ public class Driver {
         angleR = -angle;
         if (useShortest) {
             if (angleR < -Math.PI) {
-                angle += 2 * Math.PI;
+                angleR += 2 * Math.PI;
             } else if (angle > Math.PI) {
                 angleR -= 2 * Math.PI;
             }
@@ -86,6 +89,11 @@ public class Driver {
                 }
             }
         }
+    }
+
+    public void stopTurning(){
+        angleR = null;
+        targetReached = true;
     }
 
     public boolean isTargetReached() {

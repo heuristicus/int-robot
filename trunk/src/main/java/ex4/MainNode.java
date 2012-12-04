@@ -185,27 +185,31 @@ public class MainNode extends AbstractNodeMain {
                     }
 
                     // If we have made enough detections to confirm a face,
-                    // set a prm goal to get to the person.
+                    // set phase to rotate to person
                     if (faceCheckCount == FACE_CONFIRM_DETECTIONS) {
                         faceCheckCount = 0;
                         currentPhase = Phase.ROTATETOPERSON;
-                        lastFaceRectangle = null;
+                        rotateTowardsPerson(findPerson(lastFaceRectangle));
                         Printer.println("Face confirmed. Rotating to person", "CYANF");
                     }
                 }
 
                 if (currentPhase == Phase.ROTATETOPERSON){
+                    if (t.getData().length == 0){
+                        Printer.println("Person lost while rotating - returning to exploration.", "CYANF");
+                        driver.stopTurning();
+                        returnToExploration();
+                        return;
+                    }
+
                     // If we've not yet reached the target angle, then return.
                     // note that the rotation is done in small increments, so
                     // the initial target is not necessarily the full rotation to
                     // the heading which faces the person.
-                    if (!driver.isTargetReached()){
+                    if (!driver.isTargetReached()) {
                         return;
                     }
-                    if (t.getData().length == 0){
-                        Printer.println("Person lost while rotating - returning to exploration.", "CYANF");
-                        returnToExploration();
-                    } else if (isFaceCentred(lastFaceRectangle)) {
+                    if (isFaceCentred(lastFaceRectangle)) {
                         Printer.println("Face in centre. PRMing to person", "CYANF");
                         currentPhase = Phase.PRMTOPERSON;
                         setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
@@ -223,7 +227,6 @@ public class MainNode extends AbstractNodeMain {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped message) {
                 lastEstimatedPose = StaticMethods.copyPose(message.getPose().getPose());
-                Printer.println("Got an estimated pose", "CYANF");
                 if (currentPhase == Phase.INITIALISATION && map != null){
                     Printer.println("Got initial pose... Initialising exploratio", "CYANF");
                     initialiseExploration();
@@ -415,10 +418,11 @@ public class MainNode extends AbstractNodeMain {
     }
 
     public void rotateTowardsPerson(RectangleWithDepth lastRectangle) {
-        double areaCenterX = lastRectangle.getCenterX();
-        double fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
+        double areaCentreX = lastRectangle.getCenterX();
+        double distFromCentreX = areaCentreX - (CAMERA_DIMENSIONS.width / 2);
+        Printer.println("DistFromCentreX: "+distFromCentreX, "CYANF");
         double turnAngle = Math.toRadians(10);
-        if (fromCenterX > 0) {
+        if (distFromCentreX > 0) {
             //rectangle on the right
             driver.turn(-turnAngle, true, false);
         } else {
@@ -431,7 +435,7 @@ public class MainNode extends AbstractNodeMain {
         int numberOfRectangles = (int) (data.length / 5.0);
         RectangleWithDepth[] result = new RectangleWithDepth[numberOfRectangles];
         for (int i = 0; i < numberOfRectangles; i++) {
-            int index = numberOfRectangles * 5;
+            int index = i * 5;
             result[i] = new RectangleWithDepth(
                     data[index],
                     data[index + 1],

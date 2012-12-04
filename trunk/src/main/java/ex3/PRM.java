@@ -183,14 +183,15 @@ public class PRM extends AbstractNodeMain {
         if (route == null) {
             System.out.println("Could not find a path. Are you sure "
                     + "the destination is reachable?");
-            MarkerArray paths = pathMarkers.newMessage();
-            ArrayList<Marker> pathList = new ArrayList<Marker>();
-            paths.setMarkers(pathList);
-            pathMarkers.publish(paths);
-            route = new ArrayList<Vertex>();
+//            MarkerArray paths = pathMarkers.newMessage();
+//            ArrayList<Marker> pathList = new ArrayList<Marker>();
+//            paths.setMarkers(pathList);
+//            pathMarkers.publish(paths);
+//            route = new ArrayList<Vertex>();
             std_msgs.Int32 info = prmInfo.newMessage();
             info.setData(NO_PATH); // we could not find a route - send a message to the info topic
             prmInfo.publish(info);
+            return;
         }
 
         // Find a flattened path and print some information about it

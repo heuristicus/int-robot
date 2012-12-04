@@ -71,7 +71,7 @@ public class Navigator extends AbstractNodeMain {
     MessageFactory factory;
     Pose wayPoint;
     Pose lastEstimate;
-    PoseWithCovariance lastEstimatedPoseWithConvariance;
+    PoseWithCovarianceStamped lastEstimatedPoseWithConvariance;
     Pose goalPoint;
     boolean active = false;
     boolean turnOnSpot = true;
@@ -91,7 +91,7 @@ public class Navigator extends AbstractNodeMain {
     Subscriber<PoseWithCovarianceStamped> initialPositionSub;
     Publisher<Twist> movementPub;
     Publisher<Marker> obstacleMarkersPub;
-    Publisher<PoseWithCovariance> initialPosePub;
+    Publisher<PoseWithCovarianceStamped> initialPosePub;
     Publisher<std_msgs.Int32> prmInfoSub;
     Subscriber<std_msgs.Bool> navActiveSub;
     Publisher<PoseStamped> goalPub;
@@ -234,20 +234,20 @@ public class Navigator extends AbstractNodeMain {
                 Pose newEstimatedPose = t.getPose().getPose();
 
                 if (lastEstimatedPoseWithConvariance != null) {
-                    double distanceFromLastPose = PRMUtil.getEuclideanDistance(newEstimatedPose.getPosition(), lastEstimatedPoseWithConvariance.getPose().getPosition());
+                    double distanceFromLastPose = PRMUtil.getEuclideanDistance(newEstimatedPose.getPosition(), lastEstimatedPoseWithConvariance.getPose().getPose().getPosition());
 //                    System.out.println("----------DISTANCE IS ----------- " + distanceFromLastPose);
   //                  System.out.println("1) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
                     if (distanceFromLastPose > DISTANCE_FROM_LAST_ESTIMATED_POSE) {
     //                    System.out.println("2) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
-                        PoseWithCovariance initialPoseWithCS = initialPosePub.newMessage();
+                        PoseWithCovarianceStamped initialPoseWithCS = initialPosePub.newMessage();
                         initialPoseWithCS.setPose(lastEstimatedPoseWithConvariance.getPose());
                         initialPosePub.publish(initialPoseWithCS);
                         Printer.println("DETECTED AMCL JUMP.", "REDF");
                     } else {
-                        lastEstimatedPoseWithConvariance = t.getPose();
+                        lastEstimatedPoseWithConvariance = t;
                     }
                 } else {
-                    lastEstimatedPoseWithConvariance = t.getPose();
+                    lastEstimatedPoseWithConvariance = t;
                 }
 
                 lastEstimate = newEstimatedPose;
@@ -637,8 +637,6 @@ public class Navigator extends AbstractNodeMain {
             } else {
                 req = -MAX_ROTATION_SPEED;
             }
-
-            
         }
 
         return req;
