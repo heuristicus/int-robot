@@ -632,7 +632,13 @@ public class Navigator extends AbstractNodeMain {
         rotationToWaypoint = req;
 
         if (Math.abs(req) > MAX_ROTATION_SPEED) {
-            req = MAX_ROTATION_SPEED;
+            if (req > 0) {
+                req = MAX_ROTATION_SPEED;
+            } else {
+                req = -MAX_ROTATION_SPEED;
+            }
+
+            
         }
 
         return req;
