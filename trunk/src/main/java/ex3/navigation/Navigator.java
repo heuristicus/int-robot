@@ -3,6 +3,7 @@ package ex3.navigation;
 import ex3.PRM;
 import ex3.PRMUtil;
 import ex3.pid.PID;
+import ex4.Printer;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
@@ -234,14 +235,14 @@ public class Navigator extends AbstractNodeMain {
 
                 if (lastEstimatedPoseWithConvariance != null) {
                     double distanceFromLastPose = PRMUtil.getEuclideanDistance(newEstimatedPose.getPosition(), lastEstimatedPoseWithConvariance.getPose().getPosition());
-                    System.out.println("----------DISTANCE IS ----------- " + distanceFromLastPose);
-                    System.out.println("1) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
+//                    System.out.println("----------DISTANCE IS ----------- " + distanceFromLastPose);
+  //                  System.out.println("1) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
                     if (distanceFromLastPose > DISTANCE_FROM_LAST_ESTIMATED_POSE) {
-                        System.out.println("2) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
+    //                    System.out.println("2) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
                         PoseWithCovariance initialPoseWithCS = initialPosePub.newMessage();
                         initialPoseWithCS.setPose(lastEstimatedPoseWithConvariance.getPose());
                         initialPosePub.publish(initialPoseWithCS);
-                        System.out.println("Detected AMCL Jump!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                        Printer.println("DETECTED AMCL JUMP.", "REDF");
                     } else {
                         lastEstimatedPoseWithConvariance = t.getPose();
                     }
@@ -458,7 +459,6 @@ public class Navigator extends AbstractNodeMain {
      */
     public void _pruneObstacleMarkers(ArrayList<Point> markers, Point currentLocation) {
         ArrayList<Point> invalidMarkers = new ArrayList<Point>();
-        System.out.println("checking obstacle markers");
 
         for (Point point : markers) {
             double pointDist = PRMUtil.getEuclideanDistance(point, currentLocation);

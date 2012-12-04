@@ -350,6 +350,7 @@ public class PRM extends AbstractNodeMain {
      * do not pass through obstacles that have been added to the map.
      */
     public void setInflatedMap(OccupancyGrid infMap) {
+        System.out.println("Setting inflated map");
         this.inflatedMap = infMap;
         PRMUtil._checkAndPruneGraph(this.graph, this.inflatedMap);
         inflatedMapPublisher.publish(this.inflatedMap);

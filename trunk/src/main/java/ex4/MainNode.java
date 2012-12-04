@@ -10,10 +10,12 @@ import ex3.Vertex;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseStamped;
+import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Twist;
 import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Random;
 import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 import nav_msgs.Odometry;
@@ -58,7 +60,7 @@ public class MainNode extends AbstractNodeMain {
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
     private PoseStamped meetingRoomLocation = null;
-    private Phase currentPhase = Phase.FINDINGROOM;
+    private Phase currentPhase = Phase.INITIALISATION;
     private int pplCount = 0;
     private int targetPplCount = 3;
     public ArrayList<Vertex> explorationVertices;
@@ -76,7 +78,7 @@ public class MainNode extends AbstractNodeMain {
     Subscriber<Odometry> odom;
     Subscriber<std_msgs.Int32> prmInfo;
     Subscriber<std_msgs.Float32MultiArray> cameraRectSubscriber;
-    Subscriber<PoseStamped> estimatedPose;
+    Subscriber<PoseWithCovarianceStamped> estimatedPose;
     Subscriber<OccupancyGrid> mapSub;
     Publisher<std_msgs.Bool> navActivePub;
     Publisher<MarkerArray> explorationMarkerPub;
@@ -86,7 +88,6 @@ public class MainNode extends AbstractNodeMain {
         //set up the message factory
         messageFactory = NodeConfiguration.newPrivate().getTopicMessageFactory();
         StaticMethods.messageFactory = messageFactory;
-
 
         //set publisher for moving the robot
         twist_pub = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
@@ -98,6 +99,7 @@ public class MainNode extends AbstractNodeMain {
         navActivePub = connectedNode.newPublisher("nav_active", std_msgs.Bool._TYPE);
 
         explorationMarkerPub = connectedNode.newPublisher("exp_vert", MarkerArray._TYPE);
+        explorationMarkerPub.setLatchMode(true);
         //instantiate the driver with the twist publisher
         driver = new Driver(twist_pub);
 
@@ -115,7 +117,12 @@ public class MainNode extends AbstractNodeMain {
             public void onNewMessage(Int32 t) {
                 if (t.getData() == PRM.GOAL_REACHED) {
                     if (currentPhase == Phase.EXPLORING){
-                        goToNextExplorationVertex();
+                        if (explorationVertices.size() > 0) {
+                            goToNextExplorationVertex();
+                        } else {
+                            // Exploration path done. Let's go again
+                            initialiseExploration();
+                        }
                     }
                 } else if (t.getData() == PRM.NO_PATH) {
                     System.out.println("Could not find path");
@@ -130,7 +137,9 @@ public class MainNode extends AbstractNodeMain {
             @Override
             public void onNewMessage(OccupancyGrid t) {
                 if (currentPhase == Phase.INITIALISATION) {
+                    Printer.println("Got map in MainNode", "CYANF");
                     map = t;
+                    prmUtil = new PRMUtil(new Random(), messageFactory, map);
                 }
             }
         });
@@ -148,6 +157,7 @@ public class MainNode extends AbstractNodeMain {
                     deactivate.setData(false);
                     navActivePub.publish(deactivate);
                     currentPhase = Phase.FACECHECK;
+                    Printer.println("Face seen. Stopping and investigating face", "CYANF");
                 }
 
                 if (currentPhase == Phase.FACECHECK){ // if we are checking faces
@@ -156,6 +166,7 @@ public class MainNode extends AbstractNodeMain {
                         if (t.getData().length == 0){
                             // If we receive a zero length array while we are
                             // attempting to confirm a face, we abandon the check.
+                            Printer.println("Lost face (no faces). Returning to exploration", "CYANF");
                             returnToExploration();
                         }
                         RectangleWithDepth newFaceRect = findPerson(lastFaceRectangle);
@@ -164,9 +175,11 @@ public class MainNode extends AbstractNodeMain {
                         if (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect)) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
+                            Printer.println("Face matches last seen. FaceCheckCount="+faceCheckCount, "CYANF");
                         } else {
                             // If the rectangles are too dissimilar, we return to
                             // the exploration phase
+                            Printer.println("Lost face (dissimilar). Returning to exploration", "CYANF");
                             returnToExploration();
                         }
                     }
@@ -177,6 +190,7 @@ public class MainNode extends AbstractNodeMain {
                         faceCheckCount = 0;
                         currentPhase = Phase.ROTATETOPERSON;
                         lastFaceRectangle = null;
+                        Printer.println("Face confirmed. Rotating to person", "CYANF");
                     }
                 }
 
@@ -189,12 +203,14 @@ public class MainNode extends AbstractNodeMain {
                         return;
                     }
                     if (t.getData().length == 0){
-                        Printer.println("Person lost while rotating - returning to exploration.", "REDB");
+                        Printer.println("Person lost while rotating - returning to exploration.", "CYANF");
                         returnToExploration();
                     } else if (isFaceCentred(lastFaceRectangle)) {
+                        Printer.println("Face in centre. PRMing to person", "CYANF");
                         currentPhase = Phase.PRMTOPERSON;
                         setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
                     } else {
+                        Printer.println("Face not in centre. Rotating towards person again", "CYANF");
                         rotateTowardsPerson(findPerson(lastFaceRectangle));
                     }
                 }
@@ -202,16 +218,19 @@ public class MainNode extends AbstractNodeMain {
         });
 
         //set the subscriber for the estimated pose
-        estimatedPose = connectedNode.newSubscriber("estimated_pose", PoseStamped._TYPE);
-        estimatedPose.addMessageListener(new MessageListener<PoseStamped>() {
+        estimatedPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
+        estimatedPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
             @Override
-            public void onNewMessage(PoseStamped message) {
-                lastEstimatedPose = StaticMethods.copyPose(message.getPose());
+            public void onNewMessage(PoseWithCovarianceStamped message) {
+                lastEstimatedPose = StaticMethods.copyPose(message.getPose().getPose());
+                Printer.println("Got an estimated pose", "CYANF");
                 if (currentPhase == Phase.INITIALISATION && map != null){
+                    Printer.println("Got initial pose... Initialising exploratio", "CYANF");
                     initialiseExploration();
                 }
             }
         });
+        Printer.println("MainNode initialised", "CYANF");
     }
 
     /*
@@ -243,6 +262,8 @@ public class MainNode extends AbstractNodeMain {
         mlist.add(m);
         markers.setMarkers(mlist);
         explorationMarkerPub.publish(markers);
+        goToNextExplorationVertex();
+        Printer.println("Exploratio initialised and markers published", "CYANF");
     }
 
     public ArrayList<Vertex> getExplorationPath(Pose startPose, ArrayList<Vertex> vertices){
