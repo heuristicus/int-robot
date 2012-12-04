@@ -45,7 +45,11 @@ public class PRMUtil {
     }
 
     public static double getEuclideanDistance(Point p1, Point p2){
-        return Math.sqrt(Math.pow(p1.getX() - p2.getX(), 2) + Math.pow(p1.getY() - p2.getY(), 2));
+        return getEuclideanDistance(p1.getX(),p2.getX(),p1.getY(),p2.getY());
+    }
+
+    public static double getEuclideanDistance(double x1, double y1, double x2, double y2){
+        return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
     }
 
     /* Calculates the weight of an edge. */
@@ -645,7 +649,7 @@ public class PRMUtil {
      * Makes a list of markers out of a path list, so that the path can be displayed
      * in rviz.
      */
-    public Marker makePathMarker(List<Vertex> path, String namespace, String colour){
+    public Marker makePathMarker(List<Vertex> path, String namespace, String colour, int frameID){
         Vector3 edgeVector = factory.newFromType(Vector3._TYPE);
         edgeVector.setX(MARKER_EDGE_WIDTH);
 
@@ -668,7 +672,7 @@ public class PRMUtil {
         }
 
 
-        Marker rtMarker = setUpMarker("/map", namespace, 2, Marker.ADD, Marker.LINE_LIST, edgeColour, edgePose, edgeVector);
+        Marker rtMarker = setUpMarker("/map", namespace, frameID, Marker.ADD, Marker.LINE_LIST, edgeColour, edgePose, edgeVector);
 
         for (int i = 0; i < path.size() - 1; i++) {
 //            System.out.println("Adding vertex " + vertex);

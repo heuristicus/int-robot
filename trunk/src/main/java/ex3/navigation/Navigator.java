@@ -6,6 +6,7 @@ import ex3.pid.PID;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
+import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovariance;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
@@ -30,6 +31,7 @@ import org.ros.node.topic.Subscriber;
 
 import pf.AbstractLocaliser;
 import sensor_msgs.LaserScan;
+import std_msgs.Bool;
 import util.LaserUtil;
 import visualization_msgs.Marker;
 
@@ -62,6 +64,7 @@ public class Navigator extends AbstractNodeMain {
 
         ADD, REMOVE
     };
+    
     OccupancyGrid inflatedMap;
     OccupancyGrid obstacleInflatedMap = null;
     MessageFactory factory;
@@ -80,15 +83,17 @@ public class Navigator extends AbstractNodeMain {
     boolean obstacleWithinSafeDistance = false;
 //    float[] lastScanMedians;
     LaserScan lastScan;
-    Subscriber<Odometry> odom;
-    Subscriber<Odometry> odom;
-    Subscriber<PoseWithCovarianceStamped> estimatedPose;
+    Subscriber<Odometry> odomPub;
+    Subscriber<PoseWithCovarianceStamped> estimatedPoseSub;
     Subscriber<LaserScan> laserSub;
     Subscriber<PoseArray> routeSub;
-    Subscriber<PoseWithCovarianceStamped> initialPosition;
-    Publisher<Twist> movement;
+    Subscriber<PoseWithCovarianceStamped> initialPositionSub;
+    Publisher<Twist> movementPub;
     Publisher<Marker> obstacleMarkersPub;
-    Publisher<PoseWithCovariance> estimatedPosePub;
+    Publisher<PoseWithCovariance> initialPosePub;
+    Publisher<std_msgs.Int32> prmInfoSub;
+    Subscriber<std_msgs.Bool> navActiveSub;
+    Publisher<PoseStamped> goalPub;
 
     public Navigator(PRM prm) {
         this.prm = prm;
@@ -108,17 +113,38 @@ public class Navigator extends AbstractNodeMain {
 
         System.out.println("Obstacle detection active: " + OBSTACLE_DETECTION_ACTIVE);
 
-        movement = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
-        odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
-        estimatedPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
+        movementPub = connectedNode.newPublisher("cmd_vel", Twist._TYPE);
+        odomPub = connectedNode.newSubscriber("odom", Odometry._TYPE);
+        estimatedPoseSub = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
         laserSub = connectedNode.newSubscriber("base_scan", LaserScan._TYPE);
         routeSub = connectedNode.newSubscriber("route", PoseArray._TYPE);
         obstacleMarkersPub = connectedNode.newPublisher("obstacleMarkers", Marker._TYPE);
-        estimatedPosePub = connectedNode.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
-        initialPosition = connectedNode.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
+        initialPosePub = connectedNode.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
+        initialPositionSub = connectedNode.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
+        prmInfoSub = connectedNode.newPublisher("goalInfo", std_msgs.Int32._TYPE);
+        navActiveSub = connectedNode.newSubscriber("nav_active", std_msgs.Bool._TYPE);
+        goalPub = connectedNode.newPublisher("goal", PoseStamped._TYPE);
 
-        odom.addMessageListener(new MessageListener<Odometry>() {
+        navActiveSub.addMessageListener(new MessageListener<Bool>() {
+            @Override
+            public void onNewMessage(Bool t) {
+                boolean val = t.getData();
+                if(val){
+                    // We may have moved since we deactivated the navigator, so
+                    // replan the route.
+                    System.out.println("Navigator activated.");
+                    route = null;
+                    PoseStamped goal = goalPub.newMessage();
+                    goal.setPose(goalPoint);
+                    goalPub.publish(goal);
+                } else {
+                    System.out.println("Navigator deactivated.");
+                }
+                active = val;
+            }
+        });
 
+        odomPub.addMessageListener(new MessageListener<Odometry>() {
             @Override
             public void onNewMessage(Odometry t) {
                 // Each time we receive an odometry message, publish a movement to cmd_vel.
@@ -135,6 +161,9 @@ public class Navigator extends AbstractNodeMain {
                             // and reset the obstacle map.
                             prm.setInflatedMap(inflatedMap);
                             obstacleInflatedMap = null;
+                            std_msgs.Int32 info = prmInfoSub.newMessage();
+                            info.setData(PRM.GOAL_REACHED); // we reached the goal - send info
+                            prmInfoSub.publish(info);
                         } else { // Not yet reached the end of the path
                             turnOnSpot = true;
                             System.out.println("Proceeding to next waypoint.");
@@ -148,7 +177,7 @@ public class Navigator extends AbstractNodeMain {
                         obstacleMarkers.addAll(obstacles); // Track the obstacles in a list
                         publishObstacleMarkers(obstacles);
 
-                        // Add obstacle(s) to map
+                        // Add obtstacle(s) to map
                         OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         // Add obstacles to the map
                         obstaclesOntoMap(mapToInflate, obstacles, ObstacleAction.ADD);
@@ -164,7 +193,7 @@ public class Navigator extends AbstractNodeMain {
                         if (obstacleMarkers.size() > 0) {
                             _pruneObstacleMarkers(obstacleMarkers, lastEstimate.getPosition());
                         }
-                        movement.publish(computeMovementValues());
+                        movementPub.publish(computeMovementValues());
                     }
 //                    movement.publish(PIDcontrol());
                 }
@@ -186,7 +215,6 @@ public class Navigator extends AbstractNodeMain {
         }
 
         routeSub.addMessageListener(new MessageListener<PoseArray>() {
-
             @Override
             public void onNewMessage(PoseArray t) {
                 route = t;
@@ -198,8 +226,7 @@ public class Navigator extends AbstractNodeMain {
             }
         });
 
-        estimatedPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
-
+        estimatedPoseSub.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped t) {
                 // Each time we get an update for the pose estimate, we update our position
@@ -211,9 +238,9 @@ public class Navigator extends AbstractNodeMain {
                     System.out.println("1) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
                     if (distanceFromLastPose > DISTANCE_FROM_LAST_ESTIMATED_POSE) {
                         System.out.println("2) newEstimatedPose: " + newEstimatedPose.getPosition().getX() + "     lastEstimatedPose: " + lastEstimatedPoseWithConvariance.getPose().getPosition().getX());
-                        PoseWithCovariance initialPoseWithCS = estimatedPosePub.newMessage();
+                        PoseWithCovariance initialPoseWithCS = initialPosePub.newMessage();
                         initialPoseWithCS.setPose(lastEstimatedPoseWithConvariance.getPose());
-                        estimatedPosePub.publish(initialPoseWithCS);
+                        initialPosePub.publish(initialPoseWithCS);
                         System.out.println("Detected AMCL Jump!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     } else {
                         lastEstimatedPoseWithConvariance = t.getPose();
@@ -233,7 +260,7 @@ public class Navigator extends AbstractNodeMain {
             }
         });
 
-        initialPosition.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
+        initialPositionSub.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
 
             @Override
             public void onNewMessage(PoseWithCovarianceStamped t) {
@@ -501,7 +528,7 @@ public class Navigator extends AbstractNodeMain {
      * the next point.
      */
     public Twist computeMovementValues() {
-        Twist pub = movement.newMessage();
+        Twist pub = movementPub.newMessage();
 
         //System.out.println("Next point: " + wayPoint.getPosition().getX() + "," + wayPoint.getPosition().getY());
 
@@ -540,7 +567,7 @@ public class Navigator extends AbstractNodeMain {
      * The standard method for linear movement calculation is used.
      */
     public Twist PIDcontrol() {
-        Twist pub = movement.newMessage();
+        Twist pub = movementPub.newMessage();
 
         double rotReq = pid.getOutput();
 

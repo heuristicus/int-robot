@@ -42,12 +42,17 @@ public class PRM extends AbstractNodeMain {
     ArrayList<Vertex> flatRoute;
     Pose currentPosition;
     Pose goalPosition;
+
+    public static final int NO_PATH = 0;
+    public static final int PATH_FOUND = 1;
+    public static final int GOAL_REACHED = 2;
     
     Subscriber<OccupancyGrid> grid;
     Publisher<MarkerArray> PRMMarkers;
     Publisher<MarkerArray> pathMarkers;
     Publisher<PoseArray> routePub;
     Publisher<OccupancyGrid> inflatedMapPublisher;
+    Publisher<std_msgs.Int32> prmInfo;
     Subscriber<PoseStamped> goals;
     Subscriber<PoseWithCovarianceStamped> initialPosition;
 
@@ -75,6 +80,7 @@ public class PRM extends AbstractNodeMain {
         inflatedMapPublisher = node.newPublisher("inflatedMap", OccupancyGrid._TYPE);
         PRMMarkers = node.newPublisher("markers", MarkerArray._TYPE);
         routePub = node.newPublisher("route", PoseArray._TYPE);
+        prmInfo = node.newPublisher("goalInfo", std_msgs.Int32._TYPE);
 
         pathMarkers = node.newPublisher("pathMarkers", MarkerArray._TYPE);
         if (! experimentMode) {
@@ -182,6 +188,9 @@ public class PRM extends AbstractNodeMain {
             paths.setMarkers(pathList);
             pathMarkers.publish(paths);
             route = new ArrayList<Vertex>();
+            std_msgs.Int32 info = prmInfo.newMessage();
+            info.setData(NO_PATH); // we could not find a route - send a message to the info topic
+            prmInfo.publish(info);
         }
 
         // Find a flattened path and print some information about it
@@ -194,12 +203,15 @@ public class PRM extends AbstractNodeMain {
         System.out.printf("New path is %.2f times the size of the original.\n", percentage);
         MarkerArray paths = pathMarkers.newMessage();
         ArrayList<Marker> pathList = new ArrayList<Marker>();
-        pathList.add(util.makePathMarker(route, "originalPath", "blue"));
-        pathList.add(util.makePathMarker(flatRoute, "flattenedPath", "orange"));
+        pathList.add(util.makePathMarker(route,"originalPath", "blue", 2));
+        pathList.add(util.makePathMarker(flatRoute, "flattenedPath", "orange", 3));
 
         paths.setMarkers(pathList);
         pathMarkers.publish(paths);
         routeSearchDone = true;
+        std_msgs.Int32 info = prmInfo.newMessage();
+        info.setData(PATH_FOUND); // found a route
+        prmInfo.publish(info);
         
         // Publish the flattened route so that it can be used by others.
         publishRoute(flatRoute);
@@ -332,6 +344,11 @@ public class PRM extends AbstractNodeMain {
         return inflatedMap;
     }
 
+    /*
+     * When the PRM receives a map, the grid is updated with the new map.
+     * The nodes and edges in the graph are modified to make sure that paths
+     * do not pass through obstacles that have been added to the map.
+     */
     public void setInflatedMap(OccupancyGrid infMap) {
         this.inflatedMap = infMap;
         PRMUtil._checkAndPruneGraph(this.graph, this.inflatedMap);

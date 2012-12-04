@@ -1,8 +1,13 @@
 package launcher;
 
+
+//import ex4.FaceDetect;
+
 import ex3.PRM;
 import ex3.navigation.Navigator;
 import ex3.search.Dijkstra;
+import ex4.MainNode;
+
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -15,9 +20,8 @@ public class Launcher extends AbstractNodeMain {
 
     static {
         System.setProperty("org.apache.commons.logging.Log",
-                         "org.apache.commons.logging.impl.NoOpLog");
+                "org.apache.commons.logging.impl.NoOpLog");
     }
-
     // Create a default configuration for the nodes that we will be creating
     NodeConfiguration conf = NodeConfiguration.newPrivate();
     // Create an executor to use to execute nodes.
@@ -35,10 +39,13 @@ public class Launcher extends AbstractNodeMain {
 //        PFLocalisationNode.augmented = true;
 //        exec.execute(new PFLocalisationNode(), conf);
 
+//        exec.execute(new Mover(), conf);
         // PRM
         PRM prm = new PRM(new Dijkstra(), false);
         exec.execute(prm, conf);
         exec.execute(new Navigator(prm), conf);
+        
+        exec.execute(new MainNode(), conf);
 
         // Not currently working
 //        PID pid = new PID(0.5, 0.5, 0.5, 1.0, 1.0, PID.DIRECTION.DIRECT);
@@ -55,8 +62,10 @@ public class Launcher extends AbstractNodeMain {
 
 //        exec.execute(new ExperimentNav(PFLocalisationNode.realWorldMode), conf);
 
+
 //        FaceDetect face = new FaceDetect();
 //        exec.execute(face, conf);
+
     }
 
     @Override
@@ -66,7 +75,7 @@ public class Launcher extends AbstractNodeMain {
         exec.shutdown();
         System.out.println("All node shutdowns complete.");
     }
-    
+
     // Doesn't seem like this is being called?
     @Override
     public void onShutdownComplete(Node node) {
@@ -78,5 +87,4 @@ public class Launcher extends AbstractNodeMain {
     public GraphName getDefaultNodeName() {
         return GraphName.of("Launcher");
     }
-
 }
