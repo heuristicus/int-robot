@@ -33,14 +33,14 @@ public class LaserUtil extends AbstractNodeMain {
                 System.out.println("\n\nSEPARATOR----------------------------\n\n");
 
                 float[][] sectors = getSectors(5, scan);
-                for (int sector = 0; sector < sectors.length; sector++) {
+                /*for (int sector = 0; sector < sectors.length; sector++) {
                     System.out.println("Sector " + sector + " ---------");
                     for (int i = 0; i < sectors[sector].length; i++) {
                         System.out.println(i + ": " + sectors[sector][i]);
                     }
                     System.out.println();
                 }
-                System.out.println("\n\n");
+                System.out.println("\n\n");*/
 
                 float[] avgs = averageOfEachSector(sectors);
                 for (int i = 0; i < avgs.length; i++) {

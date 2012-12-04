@@ -18,11 +18,11 @@ import org.ros.node.topic.Publisher;
 public class Driver {
 
     public static final double DRIVER_HEADING_THRESHOLD = RunParams.getDouble("DRIVER_HEADING_THRESHOLD");
+    public static final double DRIVER_MAX_TURN_RATE = RunParams.getDouble("DRIVER_MAX_TURN_RATE");
 
     //the maximum speed when driving
     //the twist publisher
     private Publisher<Twist> twistPublisher;
-    private double maxTurnRate = 0.5;
     private Double angleR;
     private Double targetHeading;
     private boolean targetReached = false;
@@ -53,9 +53,9 @@ public class Driver {
         if (Math.abs(diff) > DRIVER_HEADING_THRESHOLD) {
             targetReached = false;
             if (diff > 0) {
-                turnRate = -maxTurnRate;
+                turnRate = -DRIVER_MAX_TURN_RATE; // Clockwise
             } else {
-                turnRate = maxTurnRate;
+                turnRate = DRIVER_MAX_TURN_RATE; // Counter-clockwise
             }
         } else {
             angleR = null;
@@ -63,7 +63,7 @@ public class Driver {
             System.out.println("No longer need to turn!");
         }
         twist.getAngular().setZ(turnRate);
-        System.out.println("Turning: " + twist.getAngular().getZ());
+        System.out.println("Turning " + (diff >0 ? "right" : "left") +": " + twist.getAngular().getZ());
         twistPublisher.publish(twist);
     }
 

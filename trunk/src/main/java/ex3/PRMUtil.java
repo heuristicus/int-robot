@@ -220,7 +220,7 @@ public class PRMUtil {
     /*
      * Checks whether the given pose is in free space on the given map.
      */
-    public boolean checkPositionValidity(Pose p, OccupancyGrid map){
+    public static boolean checkPositionValidity(Pose p, OccupancyGrid map){
         int mapWidth = map.getInfo().getWidth();
         int mapHeight = map.getInfo().getHeight();
         float mapRes = map.getInfo().getResolution();
@@ -234,7 +234,7 @@ public class PRMUtil {
 
     /*
      * Checks whether the position specified by the given x and y coordinates is
-     * a valid position on the given map.
+     * in free space on the given map.
      */
     public static boolean checkPositionValidity(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
         // get the index in the array for this random point

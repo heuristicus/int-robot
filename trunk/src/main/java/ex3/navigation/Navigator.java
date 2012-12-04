@@ -155,16 +155,7 @@ public class Navigator extends AbstractNodeMain {
                     distanceToWaypoint = PRMUtil.getEuclideanDistance(lastEstimate.getPosition(), wayPoint.getPosition());
                     if (distanceToWaypoint <= POINT_REACHED_THRESHOLD) {
                         if (nextWayPoint() == false) { // we have reached the goal.
-                            Printer.println("Goal reached.", "REDF");
-                            active = false;
-                            route = null;
-                            // When we reach the goal, we get rid of all obstacles on the map.
-                            // and reset the obstacle map.
-                            prm.setInflatedMap(inflatedMap);
-                            obstacleInflatedMap = null;
-                            std_msgs.Int32 info = prmInfoSub.newMessage();
-                            info.setData(PRM.GOAL_REACHED); // we reached the goal - send info
-                            prmInfoSub.publish(info);
+                            goalReached();
                         } else { // Not yet reached the end of the path
                             turnOnSpot = true;
                             Printer.println("Proceeding to next waypoint.", "REDF");
@@ -178,18 +169,23 @@ public class Navigator extends AbstractNodeMain {
                         obstacleMarkers.addAll(obstacles); // Track the obstacles in a list
                         publishObstacleMarkers(obstacles);
 
-                        // Add obtstacle(s) to map
+                        // Add obstacle(s) to map
                         OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         // Add obstacles to the map
                         obstaclesOntoMap(mapToInflate, obstacles, ObstacleAction.ADD);
 
                         prm.setInflatedMap(obstacleInflatedMap);
 
-                        // Regen route (also publishes)
-                        prm.generateRoute();
+                        if (goalIsInObstacle()) {
+                            goalReached();
+                        } else {
+                            Printer.println("Regenerating route around obstacle", "REDF");
+                            // Regen route (also publishes)
+                            prm.generateRoute();
 
-                        obstacleWithinSafeDistance = false;
-                        turnOnSpot = true; // New path so new movement
+                            obstacleWithinSafeDistance = false;
+                            turnOnSpot = true; // New path so new movement
+                        }
                     } else {
                         if (obstacleMarkers.size() > 0) {
                             _pruneObstacleMarkers(obstacleMarkers, lastEstimate.getPosition());
@@ -274,10 +270,27 @@ public class Navigator extends AbstractNodeMain {
 
     }
 
+    public boolean goalIsInObstacle() {
+        return PRMUtil.checkPositionValidity(this.goalPoint, obstacleInflatedMap);
+    }
+
+    public void goalReached() {
+        Printer.println("Goal reached.", "REDF");
+        active = false;
+        route = null;
+        // When we reach the goal, we get rid of all obstacles on the map.
+        // and reset the obstacle map.
+        prm.setInflatedMap(inflatedMap);
+        obstacleInflatedMap = null;
+        std_msgs.Int32 info = prmInfoSub.newMessage();
+        info.setData(PRM.GOAL_REACHED); // we reached the goal - send info
+        prmInfoSub.publish(info);
+    }
+
     public ArrayList<Point> getMarkersForObstaclesInLaserScan(float[][] sectors) {
         ArrayList<Point> markers = new ArrayList<Point>();
 
-        LaserUtil.printSectors(sectors);
+        //LaserUtil.printSectors(sectors);
 
         float[] medians = LaserUtil.medianOfEachSector(sectors);
         for (int i = 0; i < medians.length; i++) {
