@@ -37,7 +37,7 @@ public class PRMGraph {
 
         System.out.println("Got vertices. Connecting them together...");
         long start = System.currentTimeMillis();
-        this.edges = util.connectVertices(vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS, map);
+        this.edges = util.connectVertices(vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS);
         System.out.println("All vertices connected in: "+(System.currentTimeMillis()-start)+" ms");
     }
 
@@ -48,7 +48,7 @@ public class PRMGraph {
         }
         vertices.add(v);
 
-        edges.addAll(util.connectVertexToGraph(v, vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS, map));
+        edges.addAll(util.connectVertexToGraph(v, vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS));
 
         return true;
     }
