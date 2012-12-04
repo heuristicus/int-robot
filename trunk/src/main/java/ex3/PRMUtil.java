@@ -45,7 +45,7 @@ public class PRMUtil {
     }
 
     public static double getEuclideanDistance(Point p1, Point p2){
-        return getEuclideanDistance(p1.getX(),p2.getX(),p1.getY(),p2.getY());
+        return getEuclideanDistance(p1.getX(),p1.getY(),p2.getX(),p2.getY());
     }
 
     public static double getEuclideanDistance(double x1, double y1, double x2, double y2){
@@ -660,11 +660,11 @@ public class PRMUtil {
 
         ColorRGBA edgeColour = factory.newFromType(ColorRGBA._TYPE);
         edgeColour.setA(1.0f);
-        if (colour.equals("blue")){
+        if ("blue".equals(colour)){
             edgeColour.setB(1.0f);
-        } else if (colour.equals("green")){
+        } else if ("green".equals(colour)){
             edgeColour.setG(1.0f);
-        } else if (colour.equals("orange")){
+        } else if ("orange".equals(colour)){
             edgeColour.setR(1.0f);
             edgeColour.setG(0.8f); // I'm sorry
         } else {
