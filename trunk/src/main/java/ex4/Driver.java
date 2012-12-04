@@ -77,7 +77,7 @@ public class Driver {
         targetReached = false;
 
         if (wait) {
-            while (!getTargetReached()) {
+            while (!isTargetReached()) {
                 System.out.println("Turning...");
                 try {
                     Thread.sleep(50);
@@ -88,7 +88,7 @@ public class Driver {
         }
     }
 
-    public boolean getTargetReached() {
+    public boolean isTargetReached() {
         return targetReached;
     }
 }

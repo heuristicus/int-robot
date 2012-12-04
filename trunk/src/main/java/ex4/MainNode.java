@@ -41,6 +41,7 @@ public class MainNode extends AbstractNodeMain {
         FINDINGROOM,
         EXPLORING,
         FACECHECK,
+        ROTATETOPERSON,
         PRMTOPERSON,
         PRMTOROOM,
         INMEETINGROOM,
@@ -52,6 +53,7 @@ public class MainNode extends AbstractNodeMain {
     public static int FACE_CONFIRM_DETECTIONS = RunParams.getInt("FACE_CONFIRM_DETECTIONS");
     public static double MAX_RECTANGLE_CENTRE_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_CENTRE_DISPARITY");
     public static double MAX_RECTANGLE_DEPTH_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_DEPTH_DISPARITY");
+    public static double FACE_CENTRED_THRESHOLD = RunParams.getDouble("FACE_CENTRED_THRESHOLD");
 
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
@@ -149,7 +151,7 @@ public class MainNode extends AbstractNodeMain {
                 }
 
                 if (currentPhase == Phase.FACECHECK){ // if we are checking faces
-                    // if we have not received enough messaged to confirm a face
+                    // if we have not received enough messages to confirm a face
                     if (faceCheckCount < FACE_CONFIRM_DETECTIONS) {
                         if (t.getData().length == 0){
                             // If we receive a zero length array while we are
@@ -159,7 +161,7 @@ public class MainNode extends AbstractNodeMain {
                         RectangleWithDepth newFaceRect = findPerson(lastFaceRectangle);
                         // Check whether the rectangle received is close to the
                         // one we received in the previous message.
-                        if (rectangleOverlapValid(lastFaceRectangle, newFaceRect)){
+                        if (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect)) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
                         } else {
@@ -173,9 +175,27 @@ public class MainNode extends AbstractNodeMain {
                     // set a prm goal to get to the person.
                     if (faceCheckCount == FACE_CONFIRM_DETECTIONS) {
                         faceCheckCount = 0;
-                        currentPhase = Phase.PRMTOPERSON;
-                        setPRMGoal(getPersonLocation(lastEstimatedPose, lastFaceRectangle));
+                        currentPhase = Phase.ROTATETOPERSON;
                         lastFaceRectangle = null;
+                    }
+                }
+
+                if (currentPhase == Phase.ROTATETOPERSON){
+                    // If we've not yet reached the target angle, then return.
+                    // note that the rotation is done in small increments, so
+                    // the initial target is not necessarily the full rotation to
+                    // the heading which faces the person.
+                    if (!driver.isTargetReached()){
+                        return;
+                    }
+                    if (t.getData().length == 0){
+                        Printer.println("Person lost while rotating - returning to exploration.", "REDB");
+                        returnToExploration();
+                    } else if (isFaceCentred(lastFaceRectangle)) {
+                        currentPhase = Phase.PRMTOPERSON;
+                        setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
+                    } else {
+                        rotateTowardsPerson(findPerson(lastFaceRectangle));
                     }
                 }
             }
@@ -280,7 +300,7 @@ public class MainNode extends AbstractNodeMain {
             }
             currentPhase = Phase.PRMTOPERSON;
             Pose estimatedPoseCopy = StaticMethods.copyPose(lastEstimatedPose);
-            PoseStamped personLocation = getPersonLocation(estimatedPoseCopy, areaOfPerson);
+            PoseStamped personLocation = getObjectLocation(estimatedPoseCopy, areaOfPerson.depth);
 
             setPRMGoal(personLocation);
             if (personLost()) {
@@ -363,23 +383,26 @@ public class MainNode extends AbstractNodeMain {
         return xInRect && yInRect;
     }
 
-    public void turnToPerson() {
-        currentPhase = Phase.EXPLORING;
-        RectangleWithDepth areaOfPerson = findPerson(null);
-        double areaCenterX = areaOfPerson.getCenterX();
+    /*
+     * Checks whether the rectangle defining the face detection is withing some
+     * distance of the centre of the image.
+     */
+    public boolean isFaceCentred(RectangleWithDepth personDetection){
+        Point centre = getRectCentre(personDetection);
+
+        return Math.abs(centre.getX() - CAMERA_DIMENSIONS.width / 2) < FACE_CENTRED_THRESHOLD * CAMERA_DIMENSIONS.width;
+    }
+
+    public void rotateTowardsPerson(RectangleWithDepth lastRectangle) {
+        double areaCenterX = lastRectangle.getCenterX();
         double fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
         double turnAngle = Math.toRadians(10);
-        while (Math.abs(fromCenterX) > 10) {
-            if (fromCenterX > 0) {
-                //rectangle on the right
-                driver.turn(-turnAngle, true, true);
-            } else {
-                //rectangle on left
-                driver.turn(turnAngle, true, true);
-            }
-            areaOfPerson = findPerson(null);
-            areaCenterX = areaOfPerson.getCenterX();
-            fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
+        if (fromCenterX > 0) {
+            //rectangle on the right
+            driver.turn(-turnAngle, true, false);
+        } else {
+            //rectangle on left
+            driver.turn(turnAngle, true, false);
         }
     }
 
@@ -435,16 +458,19 @@ public class MainNode extends AbstractNodeMain {
         return mostSimilar;
     }
 
-    private PoseStamped getPersonLocation(Pose estimatedPoseCopy, RectangleWithDepth areaOfPerson) {
+    /*
+     * Calculates the position of a detected visual feature which is directly
+     * in front of the robot.
+     */
+    private PoseStamped getObjectLocation(Pose estimatedPoseCopy, double depth) {
         PoseStamped personLocation = messageFactory.newFromType(PoseStamped._TYPE);
         double heading = StaticMethods.getHeading(estimatedPoseCopy.getOrientation());
-        double distance = areaOfPerson.getDepth();
         personLocation.getPose().getPosition().setX(
                 estimatedPoseCopy.getPosition().getX()
-                + (distance * Math.cos(heading)));
+                + (depth * Math.cos(heading)));
         personLocation.getPose().getPosition().setY(
                 estimatedPoseCopy.getPosition().getY()
-                + (distance * Math.sin(heading)));
+                + (depth * Math.sin(heading)));
         return personLocation;
     }
 
