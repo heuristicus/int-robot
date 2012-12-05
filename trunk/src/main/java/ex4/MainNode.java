@@ -50,12 +50,15 @@ public class MainNode extends AbstractNodeMain {
         COMPLETED
     }
 
-    public static double INITIAL_EXPLORATION_GRID_STEP = RunParams.getDouble("INITIAL_EXPLORATION_GRID_STEP");
-    public static double MINIMUM_EXPLORATION_GRID_STEP = RunParams.getDouble("MINIMUM_EXPLORATION_GRID_STEP");
-    public static int FACE_CONFIRM_DETECTIONS = RunParams.getInt("FACE_CONFIRM_DETECTIONS");
-    public static double MAX_RECTANGLE_CENTRE_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_CENTRE_DISPARITY");
-    public static double MAX_RECTANGLE_DEPTH_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_DEPTH_DISPARITY");
-    public static double FACE_CENTRED_THRESHOLD = RunParams.getDouble("FACE_CENTRED_THRESHOLD");
+    public static Double INITIAL_EXPLORATION_GRID_STEP = RunParams.getDouble("INITIAL_EXPLORATION_GRID_STEP");
+    public static Double MINIMUM_EXPLORATION_GRID_STEP = RunParams.getDouble("MINIMUM_EXPLORATION_GRID_STEP");
+    public static Integer FACE_CONFIRM_DETECTIONS = RunParams.getInt("FACE_CONFIRM_DETECTIONS");
+    public static Double MAX_RECTANGLE_CENTRE_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_CENTRE_DISPARITY");
+    public static Double MAX_RECTANGLE_DEPTH_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_DEPTH_DISPARITY");
+    public static Double FACE_CENTRED_THRESHOLD = RunParams.getDouble("FACE_CENTRED_THRESHOLD");
+    public static Double INITIAL_EXPLORATION_CELL_SIZE = RunParams.getDouble("INITIAL_EXPLORATION_CELL_SIZE");
+    public static Integer EXPLORATION_TARGET_PER_CELL = RunParams.getInt("EXPLORATION_TARGET_PER_CELL");
+    public static String EXPLORATION_SAMPLING = RunParams.get("EXPLORATION_SAMPLING");
 
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
@@ -254,10 +257,16 @@ public class MainNode extends AbstractNodeMain {
      * needed to perform exploration of the map.
      */
     public void initialiseExploration() {
-        ArrayList<Vertex> gridVertices = prmUtil.gridSample(map,
-                INITIAL_EXPLORATION_GRID_STEP, INITIAL_EXPLORATION_GRID_STEP);
+        ArrayList<Vertex> vertices = null;
+        if (EXPLORATION_SAMPLING.equals("grid")) {
+            vertices = prmUtil.gridSample(map,
+                    INITIAL_EXPLORATION_GRID_STEP, INITIAL_EXPLORATION_GRID_STEP);
+        } else if (EXPLORATION_SAMPLING.equals("cell")) {
+            vertices = prmUtil.cellSample(map,
+                    INITIAL_EXPLORATION_CELL_SIZE, EXPLORATION_TARGET_PER_CELL);
+        }
 
-        explorationVertices = getExplorationPath(lastEstimatedPose, gridVertices);
+        explorationVertices = getExplorationPath(lastEstimatedPose, vertices);
         currentPhase = Phase.EXPLORING;
         
         MarkerArray markers = explorationMarkerPub.newMessage();
