@@ -13,6 +13,7 @@ import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Twist;
 import java.awt.Dimension;
+import java.awt.Polygon;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
@@ -38,9 +39,11 @@ import visualization_msgs.MarkerArray;
  */
 public class MainNode extends AbstractNodeMain {
 
-     private enum Phase {
+    private enum Phase {
+
         INITIALISATION,
-        FINDINGROOM,
+        FINDEMPTYROOM,
+        SCANNINGROOM,
         EXPLORING,
         FACECHECK,
         ROTATETOPERSON,
@@ -49,25 +52,29 @@ public class MainNode extends AbstractNodeMain {
         INMEETINGROOM,
         COMPLETED
     }
-
     public static Double INITIAL_EXPLORATION_GRID_STEP = RunParams.getDouble("INITIAL_EXPLORATION_GRID_STEP");
     public static Double MINIMUM_EXPLORATION_GRID_STEP = RunParams.getDouble("MINIMUM_EXPLORATION_GRID_STEP");
+    public static Double GRID_SIZE_REDUCTION_STEP = RunParams.getDouble("GRID_SIZE_REDUCTION_STEP");
     public static Integer FACE_CONFIRM_DETECTIONS = RunParams.getInt("FACE_CONFIRM_DETECTIONS");
     public static Double MAX_RECTANGLE_CENTRE_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_CENTRE_DISPARITY");
     public static Double MAX_RECTANGLE_DEPTH_DISPARITY = RunParams.getDouble("MAX_RECTANGLE_DEPTH_DISPARITY");
     public static Double FACE_CENTRED_THRESHOLD = RunParams.getDouble("FACE_CENTRED_THRESHOLD");
     public static Double INITIAL_EXPLORATION_CELL_SIZE = RunParams.getDouble("INITIAL_EXPLORATION_CELL_SIZE");
+    public static Double MINIMUM_EXPLORATION_CELL_SIZE = RunParams.getDouble("MINIMUM_EXPLORATION_CELL_SIZE");
+    public static Double CELL_SIZE_REDUCTION_STEP = RunParams.getDouble("CELL_SIZE_REDUCTION_STEP");
     public static Integer EXPLORATION_TARGET_PER_CELL = RunParams.getInt("EXPLORATION_TARGET_PER_CELL");
     public static String EXPLORATION_SAMPLING = RunParams.get("EXPLORATION_SAMPLING");
 
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
-    private PoseStamped meetingRoomLocation = null;
+    public double currentGridStep = INITIAL_EXPLORATION_GRID_STEP;
+    public double currentCellSize = INITIAL_EXPLORATION_CELL_SIZE;
     private Phase currentPhase = Phase.INITIALISATION;
     private int pplCount = 0;
     private int targetPplCount = 3;
     public ArrayList<Vertex> explorationVertices;
     public int faceCheckCount;
+
     RectangleWithDepth lastFaceRectangle;
 
     public static MessageFactory messageFactory;
@@ -75,6 +82,10 @@ public class MainNode extends AbstractNodeMain {
     protected Driver driver;
     public PRMUtil prmUtil;
     public OccupancyGrid map;
+
+    private Polygon[] meetingRooms;
+    private PoseStamped[] centreOfMeetingRooms;
+    private int meetingRoomIndex = -1;
 
     Publisher<Twist> twist_pub;
     Publisher<PoseStamped> goal;
@@ -85,7 +96,7 @@ public class MainNode extends AbstractNodeMain {
     Subscriber<OccupancyGrid> mapSub;
     Publisher<std_msgs.Bool> navActivePub;
     Publisher<MarkerArray> explorationMarkerPub;
-    
+
     @Override
     public void onStart(ConnectedNode connectedNode) {
         //set up the message factory
@@ -106,8 +117,25 @@ public class MainNode extends AbstractNodeMain {
         //instantiate the driver with the twist publisher
         driver = new Driver(twist_pub);
 
+        // This section is initialising the position of the rooms and the rectangles of the room 
+        // We are also hard coding the centre of the rooms
+        meetingRooms = new Polygon[2];
+        meetingRooms[0] = new Polygon(new int[]{322, 409, 369, 277}, new int[]{304, 210, 168, 260}, 4);
+        meetingRooms[1] = new Polygon(new int[]{240, 318, 276, 194}, new int[]{383, 305, 260, 342}, 4);
+        PoseStamped centreMeetingRoomOne = messageFactory.newFromType(PoseStamped._TYPE);
+        PoseStamped centreMeetingRoomTwo = messageFactory.newFromType(PoseStamped._TYPE);
+        centreMeetingRoomOne.getPose().getPosition().setX(342);
+        centreMeetingRoomOne.getPose().getPosition().setY(235);
+        centreMeetingRoomTwo.getPose().getPosition().setX(248);
+        centreMeetingRoomTwo.getPose().getPosition().setY(332);
+
+        centreOfMeetingRooms = new PoseStamped[2];
+        centreOfMeetingRooms[0] = centreMeetingRoomOne;
+        centreOfMeetingRooms[1] = centreMeetingRoomTwo;
+
         odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
         odom.addMessageListener(new MessageListener<Odometry>() {
+
             @Override
             public void onNewMessage(Odometry t) {
                 driver.onNewOdomMessage(t);
@@ -116,19 +144,58 @@ public class MainNode extends AbstractNodeMain {
 
         prmInfo = connectedNode.newSubscriber("goalInfo", std_msgs.Int32._TYPE);
         prmInfo.addMessageListener(new MessageListener<Int32>() {
+
             @Override
             public void onNewMessage(Int32 t) {
                 if (t.getData() == PRM.GOAL_REACHED) {
-                    if (currentPhase == Phase.EXPLORING){
+                    if(currentPhase == Phase.FINDEMPTYROOM){
+                        //DISCUSS THIS
+                        if(!scanRoomForFace()){
+                            Printer.println("Got initial pose... Initialising exploratio", "CYANF");
+                            initialiseExploration();
+                            return;
+                        }else if(meetingRoomIndex + 1 == meetingRooms.length){
+                            Printer.println("NO MEETING ROOMS LEFT TO EXPLORE", "REDB");
+                            initialiseExploration();
+                            return;
+                        }else{
+                             findEmptyRoom();
+                        }
+                    }else if (currentPhase == Phase.EXPLORING) {
                         if (explorationVertices.size() > 0) {
                             goToNextExplorationVertex();
                         } else {
-                            // Exploration path done. Let's go again
+                            // Exploration path done. Let's go again, but increase
+                            // the granularity
+                            if (EXPLORATION_SAMPLING.equals("cell")){
+                                currentCellSize -= CELL_SIZE_REDUCTION_STEP;
+                            } else if (EXPLORATION_SAMPLING.equals("grid")){
+                                currentGridStep -= GRID_SIZE_REDUCTION_STEP;
+                            }
                             initialiseExploration();
+                        }
+                    } else if (currentPhase == Phase.PRMTOPERSON) {
+                        //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
+                        Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
+                        prmToMeetingRoom();
+                    } else if (currentPhase == Phase.PRMTOROOM){
+                        // we are at the room now, drop person off and tell them they are at meeting room and then begin exploring again
+                        Printer.println("Currently in a room, returning to exploration", "CYANF");
+                        pplCount++;
+                        // Before leaving meeting room check if the task is complete, if so then print statement else continue
+                        if(isTaskComplete()){
+                            Printer.println("I have completed the whole task", "GREENB");
+                            currentPhase = Phase.COMPLETED;
+                        } else {
+                            returnToExploration();
                         }
                     }
                 } else if (t.getData() == PRM.NO_PATH) {
-                    System.out.println("Could not find path");
+                    // If we can't find a route to the exploration node, give up
+                    // and go to the next one.
+                    if (currentPhase == Phase.EXPLORING) {
+                        goToNextExplorationVertex();
+                    }
                 } else if (t.getData() == PRM.PATH_FOUND) {
                     System.out.println("Path found.");
                 }
@@ -137,6 +204,7 @@ public class MainNode extends AbstractNodeMain {
 
         mapSub = connectedNode.newSubscriber("inflatedMap", OccupancyGrid._TYPE);
         mapSub.addMessageListener(new MessageListener<OccupancyGrid>() {
+
             @Override
             public void onNewMessage(OccupancyGrid t) {
                 if (currentPhase == Phase.INITIALISATION) {
@@ -152,6 +220,7 @@ public class MainNode extends AbstractNodeMain {
         // empty (length 0)
         cameraRectSubscriber = connectedNode.newSubscriber("face_rects", std_msgs.Float32MultiArray._TYPE);
         cameraRectSubscriber.addMessageListener(new MessageListener<Float32MultiArray>() {
+
             @Override
             public void onNewMessage(Float32MultiArray t) {
                 onNewCameraRectanglePoints(t.getData());
@@ -163,10 +232,10 @@ public class MainNode extends AbstractNodeMain {
                     Printer.println("Face seen. Stopping and investigating face", "CYANF");
                 }
 
-                if (currentPhase == Phase.FACECHECK){ // if we are checking faces
+                if (currentPhase == Phase.FACECHECK) { // if we are checking faces
                     // if we have not received enough messages to confirm a face
                     if (faceCheckCount < FACE_CONFIRM_DETECTIONS) {
-                        if (t.getData().length == 0){
+                        if (t.getData().length == 0) {
                             // If we receive a zero length array while we are
                             // attempting to confirm a face, we abandon the check.
                             Printer.println("Lost face (no faces). Returning to exploration", "CYANF");
@@ -178,7 +247,7 @@ public class MainNode extends AbstractNodeMain {
                         if (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect)) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
-                            Printer.println("Face matches last seen. FaceCheckCount="+faceCheckCount, "CYANF");
+                            Printer.println("Face matches last seen. FaceCheckCount=" + faceCheckCount, "CYANF");
                         } else {
                             // If the rectangles are too dissimilar, we return to
                             // the exploration phase
@@ -198,8 +267,8 @@ public class MainNode extends AbstractNodeMain {
                     }
                 }
 
-                if (currentPhase == Phase.ROTATETOPERSON){
-                    if (t.getData().length == 0){
+                if (currentPhase == Phase.ROTATETOPERSON) {
+                    if (t.getData().length == 0) {
                         Printer.println("Person lost while rotating - returning to exploration.", "CYANF");
                         driver.stopTurning();
                         returnToExploration();
@@ -228,22 +297,36 @@ public class MainNode extends AbstractNodeMain {
         //set the subscriber for the estimated pose
         estimatedPose = connectedNode.newSubscriber("amcl_pose", PoseWithCovarianceStamped._TYPE);
         estimatedPose.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
+
             @Override
             public void onNewMessage(PoseWithCovarianceStamped message) {
                 lastEstimatedPose = StaticMethods.copyPose(message.getPose().getPose());
-                if (currentPhase == Phase.INITIALISATION && map != null){
-                    Printer.println("Got initial pose... Initialising exploratio", "CYANF");
+                if (currentPhase == Phase.INITIALISATION && map != null) {
+                    //findEmptyRoom();
                     initialiseExploration();
                 }
+
             }
         });
         Printer.println("MainNode initialised", "CYANF");
     }
+    
+    public void findEmptyRoom(){
+        currentPhase = Phase.FINDEMPTYROOM;
+        meetingRoomIndex++;
+        setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
+    }
 
+    public boolean scanRoomForFace(){
+        currentPhase = Phase.SCANNINGROOM;
+
+        return false;
+    }
+    
     /*
      * Returns the node state to exploration phase from the facecheck phase
      */
-    public void returnToExploration(){
+    public void returnToExploration() {
         std_msgs.Bool activate = navActivePub.newMessage();
         activate.setData(true);
         navActivePub.publish(activate);
@@ -260,15 +343,16 @@ public class MainNode extends AbstractNodeMain {
         ArrayList<Vertex> vertices = null;
         if (EXPLORATION_SAMPLING.equals("grid")) {
             vertices = prmUtil.gridSample(map,
-                    INITIAL_EXPLORATION_GRID_STEP, INITIAL_EXPLORATION_GRID_STEP);
+                    currentGridStep, currentGridStep);
         } else if (EXPLORATION_SAMPLING.equals("cell")) {
             vertices = prmUtil.cellSample(map,
-                    INITIAL_EXPLORATION_CELL_SIZE, EXPLORATION_TARGET_PER_CELL);
+                    currentCellSize, EXPLORATION_TARGET_PER_CELL);
         }
 
         explorationVertices = getExplorationPath(lastEstimatedPose, vertices);
+        removeVerticesInMeetingRooms(explorationVertices);
         currentPhase = Phase.EXPLORING;
-        
+
         MarkerArray markers = explorationMarkerPub.newMessage();
         Marker m = prmUtil.makePathMarker(explorationVertices, "expvert", null, 23);
         ArrayList<Marker> mlist = new ArrayList<Marker>();
@@ -279,7 +363,7 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("Exploratio initialised and markers published", "CYANF");
     }
 
-    public ArrayList<Vertex> getExplorationPath(Pose startPose, ArrayList<Vertex> vertices){
+    public ArrayList<Vertex> getExplorationPath(Pose startPose, ArrayList<Vertex> vertices) {
         ArrayList<Vertex> explorePath = new ArrayList<Vertex>(vertices.size());
         Point curPoint = startPose.getPosition();
 
@@ -288,7 +372,7 @@ public class MainNode extends AbstractNodeMain {
             double minDist = Double.MAX_VALUE;
             for (int i = 0; i < vertices.size(); i++) {
                 double thisDist = PRMUtil.getEuclideanDistance(curPoint, vertices.get(i).getLocation());
-                if (thisDist < minDist){
+                if (thisDist < minDist) {
                     minIndex = i;
                     minDist = thisDist;
                 }
@@ -304,59 +388,94 @@ public class MainNode extends AbstractNodeMain {
      * Send a goal message to the PRM containing the next position that the
      * explorer should go to.
      */
-    public void goToNextExplorationVertex(){
+    public void goToNextExplorationVertex() {
         Vertex nextVertex = this.explorationVertices.remove(0);
         PoseStamped goalPose = messageFactory.newFromType(PoseStamped._TYPE);
         goalPose.getPose().setPosition(nextVertex.getLocation());
         setPRMGoal(goalPose);
     }
-
-    public void start() {
-        meetingRoomLocation = messageFactory.newFromType(PoseStamped._TYPE);
-        while (meetingRoomLocation == null) {
-            //find room
-        }
-        while (currentPhase != Phase.COMPLETED) {
-            currentPhase = Phase.EXPLORING;
-            RectangleWithDepth areaOfPerson = findPerson(null);
-            double areaCenterX = areaOfPerson.getCenterX();
-            double fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
-            double turnAngle = Math.toRadians(10);
-            while (Math.abs(fromCenterX) > 10) {
-                if (fromCenterX > 0) {
-                    //rectangle on the right
-                    driver.turn(-turnAngle, true, true);
-                } else {
-                    //rectangle on left
-                    driver.turn(turnAngle, true, true);
+    
+    /**
+     * Removes exploration vertices which exist within the meeting room as meeting room does not need to be explored
+     * counter used to tell us how many have been removed
+     */
+    public void removeVerticesInMeetingRooms(ArrayList<Vertex> vertices){
+        int removedCounter = 0;
+        System.out.println("vertices size " + vertices.size());
+        for(int i = vertices.size()-1; i >= 0; i--){
+            System.out.println("i is currently " + i);
+            // if vertex is within meeting room, then remove the vertex so it is not explored   
+            Vertex nextVertex = vertices.get(i);
+            for (int j= 0; j < meetingRooms.length; j++) {
+                if (meetingRooms[j].contains(nextVertex.getLocation().getX(), nextVertex.getLocation().getY())) {
+                    System.out.println("removed " + i);
+                    vertices.remove(i);
+                    removedCounter++;
+                    // A vertex can only be in a single meeting room (assuming 
+                    // non-overlapping rooms), so don't bother checking other ones
+                    break;
                 }
-                areaOfPerson = findPerson(null);
-            }
-            currentPhase = Phase.PRMTOPERSON;
-            Pose estimatedPoseCopy = StaticMethods.copyPose(lastEstimatedPose);
-            PoseStamped personLocation = getObjectLocation(estimatedPoseCopy, areaOfPerson.depth);
-
-            setPRMGoal(personLocation);
-            if (personLost()) {
-                continue;
-            }
-            if (personAcceptsInvite()) {
-                currentPhase = Phase.PRMTOROOM;
-                setPRMGoal(meetingRoomLocation);
-                pplCount++;
-                currentPhase = Phase.INMEETINGROOM;
-                if (isTaskComplete()) {
-                    currentPhase = Phase.COMPLETED;
-                } else {
-                    //currently within meeting room
-                    //get out of meeting room
-                }
-            } else {
-                //person did not accept invite
-                //turn away from the person
             }
         }
+        Printer.println("removed " + removedCounter + " vertices found inside meeting rooms", "CYANF");
     }
+
+    /**
+     * Change current phase to prm to meeting room
+     * set the PRM goal to be the location of the empty meeting room
+     */
+    private void prmToMeetingRoom() {
+        currentPhase = Phase.PRMTOROOM;
+        setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
+    }
+    /*
+    public void start() {
+    meetingRoomLocation = messageFactory.newFromType(PoseStamped._TYPE);
+    while (meetingRoomLocation == null) {
+    //find room
+    }
+    while (currentPhase != Phase.COMPLETED) {
+    currentPhase = Phase.EXPLORING;
+    RectangleWithDepth areaOfPerson = findPerson(null);
+    double areaCenterX = areaOfPerson.getCenterX();
+    double fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
+    double turnAngle = Math.toRadians(10);
+    while (Math.abs(fromCenterX) > 10) {
+    if (fromCenterX > 0) {
+    //rectangle on the right
+    driver.turn(-turnAngle, true, true);
+    } else {
+    //rectangle on left
+    driver.turn(turnAngle, true, true);
+    }
+    areaOfPerson = findPerson(null);
+    }
+    currentPhase = Phase.PRMTOPERSON;
+    Pose estimatedPoseCopy = StaticMethods.copyPose(lastEstimatedPose);
+    PoseStamped personLocation = getObjectLocation(estimatedPoseCopy, areaOfPerson.depth);
+
+    setPRMGoal(personLocation);
+    if (personLost()) {
+    continue;
+    }
+    if (personAcceptsInvite()) {
+    currentPhase = Phase.PRMTOROOM;
+    setPRMGoal(meetingRoomLocation);
+    pplCount++;
+    currentPhase = Phase.INMEETINGROOM;
+    if (isTaskComplete()) {
+    currentPhase = Phase.COMPLETED;
+    } else {
+    //currently within meeting room
+    //get out of meeting room
+    }
+    } else {
+    //person did not accept invite
+    //turn away from the person
+    }
+    }
+    }
+     */
 
     private boolean isTaskComplete() {
         //extend to add 15min time limit and/or other limits
@@ -383,7 +502,7 @@ public class MainNode extends AbstractNodeMain {
      * Checks the disparity between two rectangles is below the value specified
      * in the parameter file.
      */
-    public boolean rectangleOverlapValid(RectangleWithDepth lastRect, RectangleWithDepth curRect){
+    public boolean rectangleOverlapValid(RectangleWithDepth lastRect, RectangleWithDepth curRect) {
         Point lastCentre = getRectCentre(lastRect);
         Point curCentre = getRectCentre(curRect);
 
@@ -396,7 +515,7 @@ public class MainNode extends AbstractNodeMain {
         return xValid && yValid;
     }
 
-    public Point getRectCentre(RectangleWithDepth rect){
+    public Point getRectCentre(RectangleWithDepth rect) {
         Point centre = messageFactory.newFromType(Point._TYPE);
         double lastX = rect.x + rect.width / 2;
         double lastY = rect.y + rect.height / 2;
@@ -408,7 +527,7 @@ public class MainNode extends AbstractNodeMain {
     /*
      * Checks whether the centre point of curRect is within the rectangle lastRect.
      */
-    public boolean checkPointCentreInRectangle(RectangleWithDepth lastRect, RectangleWithDepth curRect){
+    public boolean checkPointCentreInRectangle(RectangleWithDepth lastRect, RectangleWithDepth curRect) {
         Point centre = getRectCentre(curRect);
 
         boolean xInRect = centre.getX() > lastRect.x && centre.getX() < lastRect.x + lastRect.width;
@@ -421,7 +540,7 @@ public class MainNode extends AbstractNodeMain {
      * Checks whether the rectangle defining the face detection is withing some
      * distance of the centre of the image.
      */
-    public boolean isFaceCentred(RectangleWithDepth personDetection){
+    public boolean isFaceCentred(RectangleWithDepth personDetection) {
         Point centre = getRectCentre(personDetection);
 
         return Math.abs(centre.getX() - CAMERA_DIMENSIONS.width / 2) < FACE_CENTRED_THRESHOLD * CAMERA_DIMENSIONS.width;
@@ -430,7 +549,7 @@ public class MainNode extends AbstractNodeMain {
     public void rotateTowardsPerson(RectangleWithDepth lastRectangle) {
         double areaCentreX = lastRectangle.getCenterX();
         double distFromCentreX = areaCentreX - (CAMERA_DIMENSIONS.width / 2);
-        Printer.println("DistFromCentreX: "+distFromCentreX, "CYANF");
+        Printer.println("DistFromCentreX: " + distFromCentreX, "CYANF");
         double turnAngle = Math.toRadians(10);
         if (distFromCentreX > 0) {
             //rectangle on the right
@@ -474,7 +593,7 @@ public class MainNode extends AbstractNodeMain {
      * given.
      */
     private RectangleWithDepth getMostSimilarRectangle(RectangleWithDepth[] rectangles,
-            RectangleWithDepth testRect){
+            RectangleWithDepth testRect) {
         RectangleWithDepth mostSimilar = null;
         double similarDist = Double.MAX_VALUE;
         for (RectangleWithDepth rect : rectangles) {
@@ -521,10 +640,11 @@ public class MainNode extends AbstractNodeMain {
         goal.publish(targetLocation);
     }
 
+    /*
     public void updateMeetingRoomLocation(Point location) {
-        meetingRoomLocation.getPose().setPosition(location);
+    meetingRoomLocation.getPose().setPosition(location);
     }
-
+     */
     public void onNewCameraRectanglePoints(float[] data) {
         lastCameraData = data;
     }
@@ -537,6 +657,4 @@ public class MainNode extends AbstractNodeMain {
     public GraphName getDefaultNodeName() {
         return GraphName.of("Arbitrator");
     }
-
-
 }

@@ -42,16 +42,16 @@ public class Navigator extends AbstractNodeMain {
     public static final double MIN_ROTATION_SPEED = 0.05;
     public static final double MAX_MOVE_SPEED = 0.3;
     public static final double MIN_MOVE_SPEED = 0.1;
-    public static final double POINT_REACHED_THRESHOLD = 0.5;
+    public static final double POINT_REACHED_THRESHOLD = 0.2;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
     public static final double DISTANCE_FROM_LAST_ESTIMATED_POSE = 3.0;
     // Will attempt to align the robot within this range of the actual angle
     // to the next waypoint.
     public static final double NEXT_WAYPOINT_HEADING_ERROR = 0.15;
     // Obstacle avoidance params
-    public static final float SAFE_DISTANCE = 0.75f; // In metres
-    public static final float OBSTACLE_ZONE = SAFE_DISTANCE + 0.25f; // In metres
-    public static final int SECTORS_CHECKED = 11; // Check this many sectors
+    //public static final float SAFE_DISTANCE = 0.75f; // In metres
+    public static final float OBSTACLE_ZONE = RunParams.getFloat("OBSTACLE_ZONE"); // In metres
+    public static final int SECTORS_CHECKED = 15; // Check this many sectors
     public static final int READINGS_PER_SECTOR_OBSTACLE = 20; // Resolution for obstacle marker creation
     public static final float MARKER_POINT_WIDTH = 0.2f;
     // How many receipts of an estimatedPose we should wait before attempting to prune the obstacle array.
@@ -165,18 +165,20 @@ public class Navigator extends AbstractNodeMain {
                         // Stopped moving
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
-                        ArrayList<Point> obstacles = getMarkersForObstaclesInLaserScan(sectors);
-                        obstacleMarkers.addAll(obstacles); // Track the obstacles in a list
-                        publishObstacleMarkers(obstacles);
+                        ArrayList<Point> newObstacles = getMarkersForObstaclesInLaserScan(sectors);
+                        obstacleMarkers.addAll(newObstacles); // Track the obstacles in a list
+                        //publishObstacleMarkers(obstacleMarkers);
 
                         // Add obstacle(s) to map
-                        OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
+//                        OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
+                        OccupancyGrid mapToInflate = inflatedMap;
                         // Add obstacles to the map
-                        obstaclesOntoMap(mapToInflate, obstacles, ObstacleAction.ADD);
+                        inflateObstaclesOntoMap(mapToInflate, obstacleMarkers);
 
                         prm.setInflatedMap(obstacleInflatedMap);
 
                         if (goalIsInObstacle()) {
+                            Printer.println("Goal is in obstacle - goal reached", "REDF");
                             goalReached();
                         } else {
                             Printer.println("Regenerating route around obstacle", "REDF");
@@ -188,7 +190,7 @@ public class Navigator extends AbstractNodeMain {
                         }
                     } else {
                         if (obstacleMarkers.size() > 0) {
-                            _pruneObstacleMarkers(obstacleMarkers, lastEstimate.getPosition());
+                            _pruneObstacleMarkers(lastEstimate.getPosition());
                         }
                         movementPub.publish(computeMovementValues());
                     }
@@ -271,13 +273,19 @@ public class Navigator extends AbstractNodeMain {
     }
 
     public boolean goalIsInObstacle() {
-        return PRMUtil.checkPositionValidity(this.goalPoint, obstacleInflatedMap);
+        System.out.println("Goal point coords x: " + goalPoint.getPosition().getX() + ", " + goalPoint.getPosition().getY());
+        if (PRMUtil.isPositionValid(this.goalPoint, obstacleInflatedMap)){
+            return false;
+        } else {
+            return true;
+        }
     }
 
     public void goalReached() {
         Printer.println("Goal reached.", "REDF");
         active = false;
         route = null;
+        goalPoint = null;
         // When we reach the goal, we get rid of all obstacles on the map.
         // and reset the obstacle map.
         prm.setInflatedMap(inflatedMap);
@@ -314,8 +322,11 @@ public class Navigator extends AbstractNodeMain {
      * @param heading The heading of the point in RADIANS */
     public Point calculateMarkerPosition(double heading, float distanceReading,
             double robotHeading) {
-        double xDisplacement = Math.cos(robotHeading) * distanceReading;
-        double yDisplacement = Math.sin(robotHeading) * distanceReading;
+        // We add a bit onto the distance reading so that we place the obstacle
+        // point slightly behind where we detect it, so that we do not inflate
+        // too much into empty space.
+        double xDisplacement = Math.cos(robotHeading) * (distanceReading + OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
+        double yDisplacement = Math.sin(robotHeading) * (distanceReading + OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
 
 //        if ((robotHeading > Math.PI/2  && robotHeading < Math.PI) ||
 //                (robotHeading > -Math.PI/2 && robotHeading < 0)) {
@@ -471,10 +482,10 @@ public class Navigator extends AbstractNodeMain {
      * of the robot.
      * ****DESTRUCTIVE******
      */
-    public void _pruneObstacleMarkers(ArrayList<Point> markers, Point currentLocation) {
+    public void _pruneObstacleMarkers(Point currentLocation) {
         ArrayList<Point> invalidMarkers = new ArrayList<Point>();
 
-        for (Point point : markers) {
+        for (Point point : this.obstacleMarkers) {
             double pointDist = PRMUtil.getEuclideanDistance(point, currentLocation);
             if (pointDist > OBSTACLE_EXPIRY_DISTANCE) {
                 System.out.printf("Obstacle at point [%f, %f] is over %f metres away. Removing\n", point.getX(), point.getY(), OBSTACLE_EXPIRY_DISTANCE);
@@ -482,12 +493,14 @@ public class Navigator extends AbstractNodeMain {
             }
         }
 
-
         // Remove the obstacles on the map which represent the points we removed.
         if (invalidMarkers.size() > 0) {
-            markers.removeAll(invalidMarkers);
-            OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
-            prm.setInflatedMap(obstaclesOntoMap(mapToInflate, invalidMarkers, ObstacleAction.REMOVE));
+            this.obstacleMarkers.removeAll(invalidMarkers);
+            //OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
+            
+            // Re-inflate the obstacles onto map with pruned obstacles gone
+            OccupancyGrid mapToInflate = inflatedMap;
+            prm.setInflatedMap(inflateObstaclesOntoMap(mapToInflate, this.obstacleMarkers));
             // we want to reconnect the graph once we remove the obstacles, otherwise
             // we may end up cutting off areas of the graph, resulting in worse
             // paths

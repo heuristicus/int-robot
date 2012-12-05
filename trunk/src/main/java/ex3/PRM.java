@@ -108,7 +108,7 @@ public class PRM extends AbstractNodeMain {
                     return;
                 }
 
-                boolean inFreeSpace = util.checkPositionValidity(t.getPose(), inflatedMap);
+                boolean inFreeSpace = util.isPositionValid(t.getPose(), inflatedMap);
                 if (inFreeSpace){
                     goalPosition = t.getPose();
                 } else {
@@ -123,7 +123,7 @@ public class PRM extends AbstractNodeMain {
         initialPosition.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped t) {
-                boolean inFreeSpace = util.checkPositionValidity(t.getPose().getPose(), inflatedMap);
+                boolean inFreeSpace = util.isPositionValid(t.getPose().getPose(), inflatedMap);
 
                 if (inFreeSpace){
                     currentPosition = t.getPose().getPose();

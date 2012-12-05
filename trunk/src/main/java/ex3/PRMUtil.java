@@ -87,7 +87,7 @@ public class PRMUtil {
             randX = (randGen.nextFloat() * mapWidth);
             randY = (randGen.nextFloat() * mapHeight);
 
-            foundOpen = checkPositionValidity((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
+            foundOpen = isPositionValid((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
 
         }
 
@@ -110,7 +110,7 @@ public class PRMUtil {
             randX = (randGen.nextFloat() * cellWidth) + startX;
             randY = (randGen.nextFloat() * cellWidth) + startY;
 
-            foundOpen = checkPositionValidity((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
+            foundOpen = isPositionValid((int) Math.round(randX), (int) Math.round(randY), mapWidth, mapHeight, buff, buffLength);
 
         }
 
@@ -139,7 +139,7 @@ public class PRMUtil {
         for (int i = 0; curX < mapWidth; i++) {
             curY = 0;
             for (int j = 0; curY < mapHeight; j++) {
-                boolean valid = checkPositionValidity((int) Math.round(curX),
+                boolean valid = isPositionValid((int) Math.round(curX),
                         (int) Math.round(curY),
                         mapWidth,
                         mapHeight,
@@ -208,7 +208,7 @@ public class PRMUtil {
                 if (j > mapHeight || j < 0) {
                     break;
                 }
-                if (checkPositionValidity(i, j, mapWidth, mapHeight, buff, buffLength)){
+                if (isPositionValid(i, j, mapWidth, mapHeight, buff, buffLength)){
                     freeCount++;
                 }
             }
@@ -220,11 +220,11 @@ public class PRMUtil {
     /*
      * Checks whether the given pose is in free space on the given map.
      */
-    public static boolean checkPositionValidity(Pose p, OccupancyGrid map){
+    public static boolean isPositionValid(Pose p, OccupancyGrid map){
         int mapWidth = map.getInfo().getWidth();
         int mapHeight = map.getInfo().getHeight();
         float mapRes = map.getInfo().getResolution();
-        return checkPositionValidity((int) Math.round(p.getPosition().getX() / mapRes),
+        return isPositionValid((int) Math.round(p.getPosition().getX() / mapRes),
                 (int) Math.round(p.getPosition().getY() / mapRes),
                 mapWidth,
                 mapHeight,
@@ -236,7 +236,7 @@ public class PRMUtil {
      * Checks whether the position specified by the given x and y coordinates is
      * in free space on the given map.
      */
-    public static boolean checkPositionValidity(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
+    public static boolean isPositionValid(int x, int y, int mapWidth, int mapHeight, ChannelBuffer buff, int buffLength){
         // get the index in the array for this random point
         int index = getMapIndex(x, y, mapWidth, mapHeight);
         if (index > 0 && index < buffLength) {
@@ -923,7 +923,7 @@ public class PRMUtil {
             int scaledX = (int) Math.round(vertex.getLocation().getX() / mapRes);
             int scaledY = (int) Math.round(vertex.getLocation().getY() / mapRes);
 
-            if (! PRMUtil.checkPositionValidity(scaledX, scaledY,
+            if (! PRMUtil.isPositionValid(scaledX, scaledY,
                     width, height, data, data.capacity())) {
                 // Remove this vertex from all neighbours
                 Iterator<Vertex> neighbours = vertex.getConnectedVertices().iterator();
