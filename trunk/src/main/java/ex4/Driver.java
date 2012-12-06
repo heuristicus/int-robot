@@ -5,8 +5,6 @@
 package ex4;
 
 import geometry_msgs.Twist;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import launcher.RunParams;
 import nav_msgs.Odometry;
 import org.ros.node.topic.Publisher;
@@ -22,10 +20,16 @@ public class Driver {
     //the maximum speed when driving
     //the twist publisher
     private Publisher<Twist> twistPublisher;
-    private Double angleR;
+//    private Double angleR;
     private Double targetHeading;
     private boolean targetReached = false;
-    private double angleTurned = 0;
+    private double angleTurned;
+    private double requestAngleMagnitude;
+    private Odometry lastOdom = null;
+    private boolean active = true;
+
+    public enum TurnDirection { LEFT, RIGHT }
+    public TurnDirection direction;
 
     /**
      * Constructor
@@ -36,70 +40,95 @@ public class Driver {
     }
 
     public void onNewOdomMessage(Odometry t) {
-        if (angleR == null) {
+        if (targetHeading == null || ! active || targetReached) {
             return;
         }
-
+        
         double currentHeading = StaticMethods.getHeading(t.getPose().getPose().getOrientation());
-        if (targetHeading == null) {
-            targetHeading = currentHeading - angleR;
-        }
 
-        angleTurned = (targetHeading + angleR) - currentHeading;
+        if(lastOdom != null){
+            double lastOdomHeading = StaticMethods.getHeading(lastOdom.getPose().getPose().getOrientation());
+            Printer.println("currentHeading: " + currentHeading, "REDF");
+            Printer.println("lastOdomHeading: " + lastOdomHeading, "REDF");
+            if (currentHeading < 0 && lastOdomHeading > 0) {
+                Printer.println("Special case heading", "REDF");
+                if (lastOdomHeading >= Math.PI / 2) {
+                    Printer.println("2Pi - " + currentHeading + " - " + lastOdomHeading + " = "
+                            + (Math.PI * 2 - currentHeading - lastOdomHeading), "REDF");
+                    angleTurned += Math.PI * 2 + currentHeading - lastOdomHeading;
+                } else {
+                    angleTurned += lastOdomHeading - currentHeading;
+                }
+            } else if (lastOdomHeading < 0 && currentHeading > 0) {
+                if (currentHeading >= Math.PI / 2) {
+                    angleTurned += Math.PI * 2 - currentHeading + lastOdomHeading;
+                } else {
+                    angleTurned += currentHeading - lastOdomHeading;
+                }
+            } else {
+                Printer.println("Standard case heading", "REDF");
+                angleTurned += Math.abs(currentHeading - lastOdomHeading);
+            }
+        }
 
         Twist twist = twistPublisher.newMessage();
-        double turnRate = 0;
-        double diff = currentHeading - targetHeading;
+        double turnReq = 0;
 
-        Printer.println("Diff in newOdom is: " + diff, "CYANF");
-        if (Math.abs(diff) > DRIVER_HEADING_THRESHOLD) {
+        Printer.println("AngleTurned is " + angleTurned + ", magnitude-angleTurned: " + (requestAngleMagnitude - angleTurned), "REDF");
+
+        if (requestAngleMagnitude - angleTurned > DRIVER_HEADING_THRESHOLD){
             targetReached = false;
-            if (diff > 0) {
-                turnRate = -DRIVER_MAX_TURN_RATE; // Clockwise
+            if (direction == TurnDirection.LEFT) {
+                turnReq = DRIVER_MAX_TURN_RATE; // Clockwise
             } else {
-                turnRate = DRIVER_MAX_TURN_RATE; // Counter-clockwise
+                turnReq = -DRIVER_MAX_TURN_RATE; // Counter-clockwise
             }
         } else {
-            angleR = null;
             targetReached = true;
+            lastOdom = null;
+            targetHeading = null;
             System.out.println("No longer need to turn!");
         }
-        twist.getAngular().setZ(turnRate);
-        System.out.println("Turning " + (diff > 0 ? "right" : "left") + ": " + twist.getAngular().getZ());
+        twist.getAngular().setZ(turnReq);
+        Printer.println("Turning " + direction.toString(), "REDF");
         twistPublisher.publish(twist);
+        lastOdom = t;
     }
 
-    public void turn(double angle, boolean useShortest, boolean wait) {
-        targetHeading = null;
-        angleTurned = 0;
-        angleR = -angle;
-        if (useShortest) {
-            if (angleR < -Math.PI) {
-                angleR += 2 * Math.PI;
-            } else if (angle > Math.PI) {
-                angleR -= 2 * Math.PI;
-            }
-        }
-        targetReached = false;
+     public void turn(double heading, double angle) {
+         angleTurned = 0;
+         requestAngleMagnitude = Math.abs(angle);
+         double targetAngle = heading + angle;
+         direction = angle < 0 ? TurnDirection.RIGHT : TurnDirection.LEFT;
+         System.out.println("angle is " + angle + "Turn direction " + direction.toString());
+         Printer.println("Driver.turn called with heading: " + heading + " angle: " + angle + " targetAngle: " + targetAngle, "REDF");
+         if (targetAngle > Math.PI) {
+             targetAngle = -Math.PI + (targetAngle - Math.PI);
+         } else if (targetAngle < -Math.PI) {
+             targetAngle = Math.PI + (targetAngle + Math.PI);
+         }
 
-        if (wait) {
-            while (!isTargetReached()) {
-                System.out.println("Turning...");
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Driver.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-        }
+         Printer.println("New targetangle " + targetAngle, "REDF");
+         this.targetHeading = targetAngle;
+         active = true;
     }
 
     public double getAngleTurned() {
         return angleTurned;
     }
 
+    /** Resuming after a temporary pause */
+    public void resumeTurning() {
+        active = true;
+    }
+
+    /** A temporary pause in turning */
+    public void pauseTurning() {
+        active = false;
+    }
+
+    /** Cancel this turning action fully (as opposed to pause, which is temporary) */
     public void stopTurning() {
-        angleR = null;
         targetReached = true;
     }
 

@@ -13,7 +13,6 @@ import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Twist;
 import java.awt.Dimension;
-import java.awt.Polygon;
 import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +28,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.NodeConfiguration;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+import pf.AbstractLocaliser;
 import std_msgs.Float32MultiArray;
 import std_msgs.Int32;
 import visualization_msgs.Marker;
@@ -43,7 +43,7 @@ public class MainNode extends AbstractNodeMain {
     private enum Phase {
 
         INITIALISATION,
-        FINDEMPTYROOM,
+        FINDROOM,
         SCANNINGROOM,
         FACECHECKINROOM,
         EXPLORING,
@@ -95,6 +95,8 @@ public class MainNode extends AbstractNodeMain {
     Publisher<std_msgs.Bool> navActivePub;
     Publisher<MarkerArray> explorationMarkerPub;
 
+    int a = 1; // DEBUGGING. PLEASE DELETE
+
     @Override
     public void onStart(ConnectedNode connectedNode) {
         //set up the message factory
@@ -139,9 +141,28 @@ public class MainNode extends AbstractNodeMain {
             public void onNewMessage(Odometry t) {
                 driver.onNewOdomMessage(t);
 
+//                if (driver.isTargetReached()) {
+//                    Printer.println("Driver rotation target reached (odom message)", "REDB");
+//                }
+
+                if (driver.isTargetReached()) {
+                    Printer.println("Driver rotation target reached", "REDB");
+                }
+
+                if (lastEstimatedPose == null){
+                    return;
+                }
+                double currentHeading = getHeadingFromLastPos();
+                Printer.println("Current heading is " + currentHeading, "REDF");
+                if (a == 1 || driver.isTargetReached()) {
+                    a = 2;
+                    Printer.println("Initialisation rotation test...", "REDF");
+                    int angle = -360;
+                    currentHeading = getHeadingFromLastPos();
+                    driver.turn(currentHeading, Math.toRadians(angle));
+                }
+
                 if (currentPhase == Phase.SCANNINGROOM) {
-                    //if the turn has
-                    turnRemaining = (Math.PI * -2.0) - driver.getAngleTurned();
                     if (turnRemaining >= 0) {
                         Printer.println("Got initial pose... Initialising exploratio", "CYANF");
                         initialiseExploration();
@@ -156,7 +177,7 @@ public class MainNode extends AbstractNodeMain {
             @Override
             public void onNewMessage(Int32 t) {
                 if (t.getData() == PRM.GOAL_REACHED) {
-                    if (currentPhase == Phase.FINDEMPTYROOM) {
+                    if (currentPhase == Phase.FINDROOM) {
                         //start scanning the room (360);
                         scanRoomForFace();
                     } else if (currentPhase == Phase.EXPLORING) {
@@ -327,8 +348,11 @@ public class MainNode extends AbstractNodeMain {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped message) {
                 lastEstimatedPose = StaticMethods.copyPose(message.getPose().getPose());
+                
                 if (currentPhase == Phase.INITIALISATION && map != null) {
-                    findEmptyRoom();
+                    //driver.onNewEstimatedPose(lastEstimatedPose);
+
+                    //findEmptyRoom();
                     //initialiseExploration();
                 }
 
@@ -337,22 +361,30 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("MainNode initialised", "CYANF");
     }
 
+    public double getHeadingFromLastPos() {
+        return AbstractLocaliser.getHeading(lastEstimatedPose.getOrientation());
+    }
+
     public void findEmptyRoom() {
-        currentPhase = Phase.FINDEMPTYROOM;
+        Printer.println("Kicking off find-room phase","CYANF");
+        currentPhase = Phase.FINDROOM;
         meetingRoomIndex++;
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
     }
 
     public void scanRoomForFace() {
+        Printer.println("Scanning room for face","CYANF");
         currentPhase = Phase.SCANNINGROOM;
-        turnRemaining = Math.PI * -2;
-        driver.turn(turnRemaining, false, false);
+        turnRemaining = Math.PI * 2;
+        driver.turn(getHeadingFromLastPos(), turnRemaining);
     }
 
     public void returnToScanningRoom() {
-        driver.turn(turnRemaining, false, false);
+        throw new UnsupportedOperationException("NOT YET");
+        //driver.turn(turnRemaining, false, false);
+        /*driver.turn(getHeadingFromLastPos(), turnRemaining);
         lastFaceRectangle = null;
-        faceCheckCount = 0;
+        faceCheckCount = 0;*/
     }
 
     /*
@@ -583,10 +615,12 @@ public class MainNode extends AbstractNodeMain {
         double turnAngle = Math.toRadians(10);
         if (distFromCentreX > 0) {
             //rectangle on the right
-            driver.turn(-turnAngle, true, false);
+            //driver.turn(-turnAngle, true, false);
+            driver.turn(getHeadingFromLastPos(), -turnAngle);
         } else {
             //rectangle on left
-            driver.turn(turnAngle, true, false);
+            //driver.turn(turnAngle, true, false);
+            driver.turn(getHeadingFromLastPos(), turnAngle);
         }
     }
 
