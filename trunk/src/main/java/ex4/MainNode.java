@@ -210,6 +210,7 @@ public class MainNode extends AbstractNodeMain {
                             Printer.println("I have completed the whole task", "GREENB");
                             currentPhase = Phase.COMPLETED;
                         } else {
+                            goToNextExplorationVertex();
                             returnToExploration();
                         }
                     }
