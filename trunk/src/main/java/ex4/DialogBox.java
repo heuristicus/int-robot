@@ -3,8 +3,19 @@ package ex4;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
 
 class DialogBox extends JDialog implements ActionListener, Runnable {
+
+    public static final String SOUND_FILE = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/gong.wav";
 
     enum response {
         YES, NO, NORESPONSE
@@ -46,11 +57,33 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
         buttonPanel.add(jButton_No);
         cont.add(buttonPanel, BorderLayout.SOUTH);
         pack();
+        try {
+            playAlertSound();
+        } catch (Exception e) {
+            Printer.println("COULDN'T PLAY SOUND", "REDB");
+            e.printStackTrace();
+        }
         thread = new Thread(this);
         thread.start();
         setSize(600, 300);
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    public void playAlertSound() throws LineUnavailableException,
+            UnsupportedAudioFileException, IOException, InterruptedException {
+        AudioInputStream stream = AudioSystem.getAudioInputStream(new File(SOUND_FILE));
+        AudioFormat format = stream.getFormat();
+        DataLine.Info info = new DataLine.Info(Clip.class, format);
+        Clip clip = (Clip) AudioSystem.getLine(info);
+        clip.open(stream);
+        clip.start();
+//        while (!clip.isRunning())
+//            Thread.sleep(10);
+//        while (clip.isRunning()) {
+//            Thread.sleep(10);
+//        }
+//        clip.close();
     }
 
     @Override

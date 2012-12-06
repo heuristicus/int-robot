@@ -203,7 +203,7 @@ public class MainNode extends AbstractNodeMain {
                         if(dialog.getUserResponse() == DialogBox.response.YES){
                             Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
                             prmToMeetingRoom();
-                        }else{
+                        } else {
                             Printer.println("Person rejected or timed oout invite, continuing exploration", "CYANF");
                             goToNextExplorationVertex();
                             returnToExploration();
@@ -267,8 +267,8 @@ public class MainNode extends AbstractNodeMain {
                         deactivate.setData(false);
                         navActivePub.publish(deactivate);
                         currentPhase = Phase.FACECHECK;
+                        Printer.println("Face seen. Stopping and investigating face", "CYANF");
                     }
-                    Printer.println("Face seen. Stopping and investigating face", "CYANF");
                 }
 
                 if (currentPhase == Phase.FACECHECK || currentPhase == Phase.FACECHECKINROOM) { // if we are checking faces
@@ -345,6 +345,7 @@ public class MainNode extends AbstractNodeMain {
                         Printer.println("Face in centre. PRMing to person", "CYANF");
                         currentPhase = Phase.PRMTOPERSON;
                         setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
+                        Printer.println("Person goal set. Heading over...", "CYANF");
                     } else {
                         RectangleWithDepth rect = findPerson(lastFaceRectangle);
                         if (rect != null){

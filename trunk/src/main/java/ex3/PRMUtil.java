@@ -265,11 +265,13 @@ public class PRMUtil {
         ArrayList<Edge> edges = new ArrayList<Edge>();
         ArrayList<Edge> temp = new ArrayList<Edge>();
 
-        for (Vertex vertex : vertices) {
-            temp = connectVertexToGraph(vertex, vertices, distanceThreshold, maxConnections);
-            for (Edge edge : temp) {
-                if (!edges.contains(edge)) {
-                    edges.add(edge);
+        synchronized (vertices) {
+            for (Vertex vertex : vertices) {
+                temp = connectVertexToGraph(vertex, vertices, distanceThreshold, maxConnections);
+                for (Edge edge : temp) {
+                    if (!edges.contains(edge)) {
+                        edges.add(edge);
+                    }
                 }
             }
         }

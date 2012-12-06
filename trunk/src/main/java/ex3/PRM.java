@@ -112,11 +112,13 @@ public class PRM extends AbstractNodeMain {
                 boolean inFreeSpace = PRMUtil.isPositionValid(t.getPose(), inflatedMap);
                 if (inFreeSpace){
                     goalPosition = t.getPose();
+                    Printer.println("GoalPosition in free space", "REDF");
                 } else {
                     System.out.println("Cannot move to specified location. In a wall or outside the map.");
                     return; // If the pose is not in free space, we reject this goal.
                 }
 
+                Printer.println("Generating route...", "REDF");
                 generateRoute();
             }
         });
