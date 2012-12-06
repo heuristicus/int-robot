@@ -84,7 +84,7 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
 
     public static void main(String[] args) {//testing
         DialogBox cd = new DialogBox("Meeting", "Would you like to attend a meeting?");
-        System.out.println(cd.getUserResponse().name());
+//        System.out.println(cd.getUserResponse().name());
         cd = null;
         System.exit(0);
     }

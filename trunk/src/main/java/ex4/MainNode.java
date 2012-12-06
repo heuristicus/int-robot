@@ -199,8 +199,15 @@ public class MainNode extends AbstractNodeMain {
                         }
                     } else if (currentPhase == Phase.PRMTOPERSON) {
                         //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
-                        Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
-                        prmToMeetingRoom();
+                        DialogBox dialog = new DialogBox("Attend Meeting?", "Would you like to attend the meeting?");
+                        if(dialog.getUserResponse() == DialogBox.response.YES){
+                            Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
+                            prmToMeetingRoom();
+                        }else{
+                            Printer.println("Person rejected or timed oout invite, continuing exploration", "CYANF");
+                            goToNextExplorationVertex();
+                            returnToExploration();
+                        }
                     } else if (currentPhase == Phase.PRMTOROOM) {
                         // we are at the room now, drop person off and tell them they are at meeting room and then begin exploring again
                         Printer.println("Currently in a room, returning to exploration", "CYANF");
