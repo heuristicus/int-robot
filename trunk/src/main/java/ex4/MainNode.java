@@ -337,8 +337,13 @@ public class MainNode extends AbstractNodeMain {
                         currentPhase = Phase.PRMTOPERSON;
                         setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
                     } else {
-                        Printer.println("Face not in centre. Rotating towards person again", "CYANF");
-                        rotateTowardsPerson(findPerson(lastFaceRectangle));
+                        RectangleWithDepth rect = findPerson(lastFaceRectangle);
+                        if (rect != null){
+                            Printer.println("Face rectangle received was null. Returning to exploration.", "CYANF");
+                        } else {
+                            Printer.println("Face not in centre. Rotating towards person again", "CYANF");
+                            rotateTowardsPerson(rect);
+                        }
                     }
                 }
             }
@@ -371,6 +376,13 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("Kicking off find-room phase","CYANF");
         currentPhase = Phase.FINDROOM;
         meetingRoomIndex++;
+        if (PRMUtil.getEuclideanDistance(centreOfMeetingRooms[0].getPose().getPosition(), lastEstimatedPose.getPosition()) >
+                PRMUtil.getEuclideanDistance(centreOfMeetingRooms[1].getPose().getPosition(), lastEstimatedPose.getPosition())){
+            Printer.println("Room 1 was closer than room 0. Going to room 1.", "CYANF");
+            PoseStamped tmp = centreOfMeetingRooms[0];
+            centreOfMeetingRooms[0] = centreOfMeetingRooms[1];
+            centreOfMeetingRooms[1] = tmp;
+        }
         if (meetingRoomIndex >= centreOfMeetingRooms.length) {
             // No more free rooms! Panic
             Printer.println("NO FREE ROOMS! Exiting :(", "REDB");
