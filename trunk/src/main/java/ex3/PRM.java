@@ -114,7 +114,11 @@ public class PRM extends AbstractNodeMain {
                     goalPosition = t.getPose();
                     Printer.println("GoalPosition in free space", "REDF");
                 } else {
-                    System.out.println("Cannot move to specified location. In a wall or outside the map.");
+                    Printer.println("Cannot move to specified location. In a wall or outside the map.", "REDF");
+                    Printer.println("Publishing 'no path' back to MainNode", "REDF");
+                    std_msgs.Int32 info = prmInfo.newMessage();
+                    info.setData(NO_PATH); // we could not find a route - send a message to the info topic
+                    prmInfo.publish(info);
                     return; // If the pose is not in free space, we reject this goal.
                 }
 
