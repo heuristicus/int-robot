@@ -7,7 +7,6 @@ import java.awt.event.*;
 class DialogBox extends JDialog implements ActionListener, Runnable {
 
     enum response {
-
         YES, NO, NORESPONSE
     }
     private JButton jButton_Yes = null;
@@ -17,9 +16,13 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
     private int seconds = 0;
     private final int max = 15;//max number of seconds 
     private String title;
+    
+    private String message;
+    private JLabel jLabel;
 
     public DialogBox(String title, String message) {
         setModal(true);
+        this.message = message;
 
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         this.title = title;
@@ -30,7 +33,7 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
         jButton_No = new JButton("No");
         jButton_No.addActionListener(this);
 
-        JLabel jLabel = new JLabel(message);
+        jLabel = new JLabel(this.message);
         jLabel.setHorizontalAlignment(JLabel.CENTER);
 
         Font font = new Font("Dialog", Font.PLAIN, 24);
@@ -61,14 +64,16 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
         setVisible(false);
     }
 
+    @Override
     public void run() {
         while (seconds < max) {
             seconds++;
-            setTitle(title + " (" + (max - seconds) + "s)");
+            String secs = " (" + (max - seconds) + "s)";
+            setTitle(title + secs);
+            jLabel.setText(message + "\r\n" + secs);
             try {
                 Thread.sleep(1000);
-            } catch (InterruptedException exc) {
-            };
+            } catch (InterruptedException exc) {};
         }
         setVisible(false);
     }

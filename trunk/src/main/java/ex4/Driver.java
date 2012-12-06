@@ -48,13 +48,13 @@ public class Driver {
 
         if(lastOdom != null){
             double lastOdomHeading = StaticMethods.getHeading(lastOdom.getPose().getPose().getOrientation());
-            Printer.println("currentHeading: " + currentHeading, "REDF");
-            Printer.println("lastOdomHeading: " + lastOdomHeading, "REDF");
+            //Printer.println("currentHeading: " + currentHeading, "REDF");
+            //Printer.println("lastOdomHeading: " + lastOdomHeading, "REDF");
             if (currentHeading < 0 && lastOdomHeading > 0) {
-                Printer.println("Special case heading", "REDF");
+                //Printer.println("Special case heading", "REDF");
                 if (lastOdomHeading >= Math.PI / 2) {
-                    Printer.println("2Pi - " + currentHeading + " - " + lastOdomHeading + " = "
-                            + (Math.PI * 2 - currentHeading - lastOdomHeading), "REDF");
+                  //  Printer.println("2Pi - " + currentHeading + " - " + lastOdomHeading + " = "
+                  //          + (Math.PI * 2 - currentHeading - lastOdomHeading), "REDF");
                     angleTurned += Math.PI * 2 + currentHeading - lastOdomHeading;
                 } else {
                     angleTurned += lastOdomHeading - currentHeading;
@@ -66,7 +66,7 @@ public class Driver {
                     angleTurned += currentHeading - lastOdomHeading;
                 }
             } else {
-                Printer.println("Standard case heading", "REDF");
+                //Printer.println("Standard case heading", "REDF");
                 angleTurned += Math.abs(currentHeading - lastOdomHeading);
             }
         }
@@ -74,7 +74,7 @@ public class Driver {
         Twist twist = twistPublisher.newMessage();
         double turnReq = 0;
 
-        Printer.println("AngleTurned is " + angleTurned + ", magnitude-angleTurned: " + (requestAngleMagnitude - angleTurned), "REDF");
+        //Printer.println("AngleTurned is " + angleTurned + ", magnitude-angleTurned: " + (requestAngleMagnitude - angleTurned), "REDF");
 
         if (requestAngleMagnitude - angleTurned > DRIVER_HEADING_THRESHOLD){
             targetReached = false;
@@ -87,10 +87,10 @@ public class Driver {
             targetReached = true;
             lastOdom = null;
             targetHeading = null;
-            System.out.println("No longer need to turn!");
+//            System.out.println("No longer need to turn!");
         }
         twist.getAngular().setZ(turnReq);
-        Printer.println("Turning " + direction.toString(), "REDF");
+  //      Printer.println("Turning " + direction.toString(), "REDF");
         twistPublisher.publish(twist);
         lastOdom = t;
     }
@@ -100,7 +100,7 @@ public class Driver {
          requestAngleMagnitude = Math.abs(angle);
          double targetAngle = heading + angle;
          direction = angle < 0 ? TurnDirection.RIGHT : TurnDirection.LEFT;
-         System.out.println("angle is " + angle + "Turn direction " + direction.toString());
+//         System.out.println("angle is " + angle + "Turn direction " + direction.toString());
          Printer.println("Driver.turn called with heading: " + heading + " angle: " + angle + " targetAngle: " + targetAngle, "REDF");
          if (targetAngle > Math.PI) {
              targetAngle = -Math.PI + (targetAngle - Math.PI);
@@ -108,7 +108,7 @@ public class Driver {
              targetAngle = Math.PI + (targetAngle + Math.PI);
          }
 
-         Printer.println("New targetangle " + targetAngle, "REDF");
+         Printer.println("Updated targetangle " + targetAngle, "REDF");
          this.targetHeading = targetAngle;
          active = true;
     }

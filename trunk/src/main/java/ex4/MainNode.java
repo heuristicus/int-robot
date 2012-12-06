@@ -141,33 +141,33 @@ public class MainNode extends AbstractNodeMain {
             public void onNewMessage(Odometry t) {
                 driver.onNewOdomMessage(t);
 
-//                if (driver.isTargetReached()) {
-//                    Printer.println("Driver rotation target reached (odom message)", "REDB");
-//                }
-
-                if (driver.isTargetReached()) {
-                    Printer.println("Driver rotation target reached", "REDB");
-                }
-
-                if (lastEstimatedPose == null){
-                    return;
-                }
-                double currentHeading = getHeadingFromLastPos();
-                Printer.println("Current heading is " + currentHeading, "REDF");
-                if (a == 1 || driver.isTargetReached()) {
-                    a = 2;
-                    Printer.println("Initialisation rotation test...", "REDF");
-                    int angle = -360;
-                    currentHeading = getHeadingFromLastPos();
-                    driver.turn(currentHeading, Math.toRadians(angle));
-                }
-
                 if (currentPhase == Phase.SCANNINGROOM) {
-                    if (turnRemaining >= 0) {
-                        Printer.println("Got initial pose... Initialising exploratio", "CYANF");
+                    if (driver.isTargetReached()) {
+                        Printer.println("Driver rotation target reached", "REDB");
+                        Printer.println("Room is free. Exploring for humans!");
                         initialiseExploration();
                     }
                 }
+
+//                if (lastEstimatedPose == null){
+//                    return;
+//                }
+//                double currentHeading = getHeadingFromLastPos();
+//                Printer.println("Current heading is " + currentHeading, "REDF");
+//                if (a == 1 || driver.isTargetReached()) {
+//                    a = 2;
+//                    Printer.println("Initialisation rotation test...", "REDF");
+//                    int angle = -360;
+//                    currentHeading = getHeadingFromLastPos();
+//                    driver.turn(currentHeading, Math.toRadians(angle));
+//                }
+
+//                if (currentPhase == Phase.SCANNINGROOM) {
+//                    if (turnRemaining >= 0) {
+//                        Printer.println("Got initial pose... Initialising exploratio", "CYANF");
+//
+//                    }
+//                }
             }
         });
 
@@ -187,9 +187,13 @@ public class MainNode extends AbstractNodeMain {
                             // Exploration path done. Let's go again, but increase
                             // the granularity
                             if (EXPLORATION_SAMPLING.equals("cell")) {
-                                currentCellSize -= CELL_SIZE_REDUCTION_STEP;
+                                if (currentCellSize > MINIMUM_EXPLORATION_CELL_SIZE){
+                                    currentCellSize -= CELL_SIZE_REDUCTION_STEP;
+                                }
                             } else if (EXPLORATION_SAMPLING.equals("grid")) {
-                                currentGridStep -= GRID_SIZE_REDUCTION_STEP;
+                                if (currentGridStep > MINIMUM_EXPLORATION_GRID_STEP){
+                                    currentGridStep -= GRID_SIZE_REDUCTION_STEP;
+                                }
                             }
                             initialiseExploration();
                         }
@@ -224,7 +228,6 @@ public class MainNode extends AbstractNodeMain {
 
         mapSub = connectedNode.newSubscriber("inflatedMap", OccupancyGrid._TYPE);
         mapSub.addMessageListener(new MessageListener<OccupancyGrid>() {
-
             @Override
             public void onNewMessage(OccupancyGrid t) {
                 if (currentPhase == Phase.INITIALISATION) {
@@ -246,7 +249,7 @@ public class MainNode extends AbstractNodeMain {
                 onNewCameraRectanglePoints(t.getData());
                 if (t.getData().length != 0) {
                     if (currentPhase == Phase.SCANNINGROOM) {
-                        driver.stopTurning();
+                        driver.pauseTurning();
                         currentPhase = Phase.FACECHECKINROOM;
                     }
 
@@ -351,8 +354,7 @@ public class MainNode extends AbstractNodeMain {
                 
                 if (currentPhase == Phase.INITIALISATION && map != null) {
                     //driver.onNewEstimatedPose(lastEstimatedPose);
-
-                    //findEmptyRoom();
+                    findEmptyRoom();
                     //initialiseExploration();
                 }
 
@@ -369,6 +371,11 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("Kicking off find-room phase","CYANF");
         currentPhase = Phase.FINDROOM;
         meetingRoomIndex++;
+        if (meetingRoomIndex >= centreOfMeetingRooms.length) {
+            // No more free rooms! Panic
+            Printer.println("NO FREE ROOMS! Exiting :(", "REDB");
+            System.exit(0);
+        }
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
     }
 
@@ -380,11 +387,12 @@ public class MainNode extends AbstractNodeMain {
     }
 
     public void returnToScanningRoom() {
-        throw new UnsupportedOperationException("NOT YET");
         //driver.turn(turnRemaining, false, false);
-        /*driver.turn(getHeadingFromLastPos(), turnRemaining);
+        //driver.turn(getHeadingFromLastPos(), turnRemaining);
+        currentPhase = Phase.SCANNINGROOM;
+        driver.resumeTurning();
         lastFaceRectangle = null;
-        faceCheckCount = 0;*/
+        faceCheckCount = 0;
     }
 
     /*
