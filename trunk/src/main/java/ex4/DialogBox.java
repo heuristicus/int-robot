@@ -15,7 +15,9 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 
 class DialogBox extends JDialog implements ActionListener, Runnable {
 
-    public static final String SOUND_FILE = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/gong.wav";
+    public static final String GONG_SOUND = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/gong.wav";
+    public static final String SUCCESS_SOUND = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/applause.wav";
+    public static final String FAILURE_SOUND = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/falling.wav";
 
     enum response {
         YES, NO, NORESPONSE
@@ -57,12 +59,8 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
         buttonPanel.add(jButton_No);
         cont.add(buttonPanel, BorderLayout.SOUTH);
         pack();
-        try {
-            playAlertSound();
-        } catch (Exception e) {
-            Printer.println("COULDN'T PLAY SOUND", "REDB");
-            e.printStackTrace();
-        }
+
+        playAlertSound(GONG_SOUND);
         thread = new Thread(this);
         thread.start();
         setSize(600, 300);
@@ -70,14 +68,20 @@ class DialogBox extends JDialog implements ActionListener, Runnable {
         setVisible(true);
     }
 
-    public void playAlertSound() throws LineUnavailableException,
-            UnsupportedAudioFileException, IOException, InterruptedException {
-        AudioInputStream stream = AudioSystem.getAudioInputStream(new File(SOUND_FILE));
-        AudioFormat format = stream.getFormat();
-        DataLine.Info info = new DataLine.Info(Clip.class, format);
-        Clip clip = (Clip) AudioSystem.getLine(info);
-        clip.open(stream);
-        clip.start();
+    public static Clip playAlertSound(String file) {
+        Clip clip = null;
+        try {
+            AudioInputStream stream = AudioSystem.getAudioInputStream(new File(file));
+            AudioFormat format = stream.getFormat();
+            DataLine.Info info = new DataLine.Info(Clip.class, format);
+            clip = (Clip) AudioSystem.getLine(info);
+            clip.open(stream);
+            clip.start();
+        } catch (Exception e) {
+            Printer.println("COULDN'T PLAY SOUND", "REDB");
+            e.printStackTrace();
+        }
+        return clip;
 //        while (!clip.isRunning())
 //            Thread.sleep(10);
 //        while (clip.isRunning()) {

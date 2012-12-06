@@ -13,10 +13,10 @@ import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Twist;
 import java.awt.Dimension;
-import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
+import javax.sound.sampled.Clip;
 import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 import nav_msgs.Odometry;
@@ -66,6 +66,7 @@ public class MainNode extends AbstractNodeMain {
     public static Double CELL_SIZE_REDUCTION_STEP = RunParams.getDouble("CELL_SIZE_REDUCTION_STEP");
     public static Integer EXPLORATION_TARGET_PER_CELL = RunParams.getInt("EXPLORATION_TARGET_PER_CELL");
     public static String EXPLORATION_SAMPLING = RunParams.get("EXPLORATION_SAMPLING");
+    public static String SUCCESS_SOUND_FILE = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/applause.wav";
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
     public double currentGridStep = INITIAL_EXPLORATION_GRID_STEP;
@@ -186,16 +187,7 @@ public class MainNode extends AbstractNodeMain {
                         } else {
                             // Exploration path done. Let's go again, but increase
                             // the granularity
-                            if (EXPLORATION_SAMPLING.equals("cell")) {
-                                if (currentCellSize > MINIMUM_EXPLORATION_CELL_SIZE){
-                                    currentCellSize -= CELL_SIZE_REDUCTION_STEP;
-                                }
-                            } else if (EXPLORATION_SAMPLING.equals("grid")) {
-                                if (currentGridStep > MINIMUM_EXPLORATION_GRID_STEP){
-                                    currentGridStep -= GRID_SIZE_REDUCTION_STEP;
-                                }
-                            }
-                            initialiseExploration();
+                            exploreWithMoreGranularity();
                         }
                     } else if (currentPhase == Phase.PRMTOPERSON) {
                         //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
@@ -204,7 +196,7 @@ public class MainNode extends AbstractNodeMain {
                             Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
                             prmToMeetingRoom();
                         } else {
-                            Printer.println("Person rejected or timed oout invite, continuing exploration", "CYANF");
+                            Printer.println("Person rejected or timed out invite, continuing exploration", "CYANF");
                             goToNextExplorationVertex();
                             returnToExploration();
                         }
@@ -215,6 +207,7 @@ public class MainNode extends AbstractNodeMain {
                         // Before leaving meeting room check if the task is complete, if so then print statement else continue
                         if (isTaskComplete()) {
                             Printer.println("I have completed the whole task", "GREENB");
+                            DialogBox.playAlertSound(DialogBox.SUCCESS_SOUND);
                             currentPhase = Phase.COMPLETED;
                         } else {
                             goToNextExplorationVertex();
@@ -385,6 +378,19 @@ public class MainNode extends AbstractNodeMain {
         return AbstractLocaliser.getHeading(lastEstimatedPose.getOrientation());
     }
 
+    public void exploreWithMoreGranularity(){
+        if (EXPLORATION_SAMPLING.equals("cell")) {
+            if (currentCellSize > MINIMUM_EXPLORATION_CELL_SIZE) {
+                currentCellSize -= CELL_SIZE_REDUCTION_STEP;
+            }
+        } else if (EXPLORATION_SAMPLING.equals("grid")) {
+            if (currentGridStep > MINIMUM_EXPLORATION_GRID_STEP) {
+                currentGridStep -= GRID_SIZE_REDUCTION_STEP;
+            }
+        }
+        initialiseExploration();
+    }
+
     public void findEmptyRoom() {
         Printer.println("Kicking off find-room phase","CYANF");
         currentPhase = Phase.FINDROOM;
@@ -399,6 +405,17 @@ public class MainNode extends AbstractNodeMain {
         if (meetingRoomIndex >= centreOfMeetingRooms.length) {
             // No more free rooms! Panic
             Printer.println("NO FREE ROOMS! Exiting :(", "REDB");
+            Clip clip = DialogBox.playAlertSound(DialogBox.FAILURE_SOUND);
+            try {
+                if (clip != null) {
+                    while (!clip.isRunning())
+                        Thread.sleep(10);
+                    while (clip.isRunning()) {
+                        Thread.sleep(10);
+                    }
+                    clip.close();
+                }
+            } catch (Exception e) {}
             System.exit(0);
         }
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
@@ -487,6 +504,10 @@ public class MainNode extends AbstractNodeMain {
      */
     public void goToNextExplorationVertex() {
         Printer.println("Going to next exploration vertex.", "REDF");
+        if (explorationVertices.isEmpty()){
+            exploreWithMoreGranularity();
+            return;
+        }
         Vertex nextVertex = this.explorationVertices.remove(0);
         PoseStamped goalPose = messageFactory.newFromType(PoseStamped._TYPE);
         goalPose.getPose().setPosition(nextVertex.getLocation());
