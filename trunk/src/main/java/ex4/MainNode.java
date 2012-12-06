@@ -118,21 +118,8 @@ public class MainNode extends AbstractNodeMain {
         // This section is initialising the position of the rooms and the rectangles of the room 
         // We are also hard coding the centre of the rooms
         meetingRooms = new Polygon2D[2];
-        Path2D.Double meetingRoomOneBounds = new Path2D.Double();
-        meetingRoomOneBounds.lineTo(16.115, 15.175);
-        meetingRoomOneBounds.lineTo(20.435, 10.499);
-        meetingRoomOneBounds.lineTo(18.427, 8.38);
-        meetingRoomOneBounds.lineTo(13.835, 12.992);
-        meetingRoomOneBounds.lineTo(16.115, 15.175);
         meetingRooms[0] = new Polygon2D(new double[]{16.115, 20.435, 18.427, 13.835}, new double[]{15.175, 10.499, 8.38, 12.992}, 4);
-
-        Path2D.Double meetingRoomTwoBounds = new Path2D.Double();
-        meetingRoomTwoBounds.lineTo(11.993, 19.136);
-        meetingRoomTwoBounds.lineTo(15.885, 15.258);
-        meetingRoomTwoBounds.lineTo(13.793, 12.98);
-        meetingRoomTwoBounds.lineTo(9.703, 17.096);
-        meetingRoomTwoBounds.lineTo(11.993, 19.136);
-        meetingRooms[0] = new Polygon2D(new double[]{11.993, 15.885, 13.793, 9.703}, new double[]{19.136, 15.258, 12.987, 17.096}, 4);
+        meetingRooms[1] = new Polygon2D(new double[]{11.993, 15.885, 13.793, 9.703}, new double[]{19.136, 15.258, 12.987, 17.096}, 4);
 
         PoseStamped centreMeetingRoomOne = messageFactory.newFromType(PoseStamped._TYPE);
         PoseStamped centreMeetingRoomTwo = messageFactory.newFromType(PoseStamped._TYPE);
