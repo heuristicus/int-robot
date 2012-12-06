@@ -72,7 +72,7 @@ public class MainNode extends AbstractNodeMain {
     public double currentCellSize = INITIAL_EXPLORATION_CELL_SIZE;
     private Phase currentPhase = Phase.INITIALISATION;
     private int pplCount = 0;
-    private int targetPplCount = 3;
+    private int targetPplCount = 2;
     public ArrayList<Vertex> explorationVertices;
     public int faceCheckCount;
     RectangleWithDepth lastFaceRectangle;
@@ -226,8 +226,11 @@ public class MainNode extends AbstractNodeMain {
                     // and go to the next one.
                     if (currentPhase == Phase.EXPLORING) {
                         Printer.println("PRM could not find path. Popping next vertex.", "REDF");
-                        goToNextExplorationVertex();
+                    } else if (currentPhase == Phase.PRMTOPERSON){
+                        Printer.println("Person location blocked by obstacles. Continuing exploration.", "REDF");
                     }
+                    goToNextExplorationVertex();
+                    returnToExploration();
                 } else if (t.getData() == PRM.PATH_FOUND) {
                     System.out.println("Path found.");
                 }
