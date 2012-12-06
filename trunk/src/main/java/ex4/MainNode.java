@@ -280,7 +280,7 @@ public class MainNode extends AbstractNodeMain {
                         RectangleWithDepth newFaceRect = findPerson(lastFaceRectangle);
                         // Check whether the rectangle received is close to the
                         // one we received in the previous message.
-                        if (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect)) {
+                        if (newFaceRect != null && (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect))) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
                             Printer.println("Face matches last seen. FaceCheckCount=" + faceCheckCount, "CYANF");
