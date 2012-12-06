@@ -119,16 +119,19 @@ public class Driver {
 
     /** Resuming after a temporary pause */
     public void resumeTurning() {
+        Printer.println("Driver -- Resuming turning", "REDF");
         active = true;
     }
 
     /** A temporary pause in turning */
     public void pauseTurning() {
+        Printer.println("Driver -- Pausing turning", "REDF");
         active = false;
     }
 
     /** Cancel this turning action fully (as opposed to pause, which is temporary) */
     public void stopTurning() {
+        Printer.println("Driver -- STOPPING turning", "REDF");
         targetReached = true;
     }
 

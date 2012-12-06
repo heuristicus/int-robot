@@ -249,6 +249,7 @@ public class MainNode extends AbstractNodeMain {
                 onNewCameraRectanglePoints(t.getData());
                 if (t.getData().length != 0) {
                     if (currentPhase == Phase.SCANNINGROOM) {
+                        Printer.println("Scanning room found face. Pausing and investigating face", "REDF");
                         driver.pauseTurning();
                         currentPhase = Phase.FACECHECKINROOM;
                     }
