@@ -2,6 +2,7 @@ package ex3;
 
 import geometry_msgs.Point;
 import java.util.ArrayList;
+import java.util.List;
 import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
 
@@ -57,7 +58,7 @@ public class PRMGraph {
      * Reconnects vertices within the given graph. This is useful to if you are
      * severing connections to deal with obstacles.
      */
-    public void reconnectGraph(PRMUtil util, OccupancyGrid map){
+    public void reconnectGraph(PRMUtil util){
         this.edges = util.connectVertices(vertices, PROXIMITY_DISTANCE_THRESHOLD, MAX_CONNECTIONS);
     }
 

@@ -205,6 +205,7 @@ public class MainNode extends AbstractNodeMain {
                     // If we can't find a route to the exploration node, give up
                     // and go to the next one.
                     if (currentPhase == Phase.EXPLORING) {
+                        Printer.println("PRM could not find path. Popping next vertex.", "REDF");
                         goToNextExplorationVertex();
                     }
                 } else if (t.getData() == PRM.PATH_FOUND) {
@@ -433,6 +434,7 @@ public class MainNode extends AbstractNodeMain {
      * explorer should go to.
      */
     public void goToNextExplorationVertex() {
+        Printer.println("Going to next exploration vertex.", "REDF");
         Vertex nextVertex = this.explorationVertices.remove(0);
         PoseStamped goalPose = messageFactory.newFromType(PoseStamped._TYPE);
         goalPose.getPose().setPosition(nextVertex.getLocation());
@@ -445,14 +447,11 @@ public class MainNode extends AbstractNodeMain {
      */
     public void removeVerticesInMeetingRooms(ArrayList<Vertex> vertices) {
         int removedCounter = 0;
-        System.out.println("vertices size " + vertices.size());
         for (int i = vertices.size() - 1; i >= 0; i--) {
-            System.out.println("i is currently " + i);
             // if vertex is within meeting room, then remove the vertex so it is not explored   
             Vertex nextVertex = vertices.get(i);
             for (int j = 0; j < meetingRooms.length; j++) {
                 if (meetingRooms[j].contains(nextVertex.getLocation().getX(), nextVertex.getLocation().getY())) {
-                    System.out.println("removed " + i);
                     vertices.remove(i);
                     removedCounter++;
                     // A vertex can only be in a single meeting room (assuming 

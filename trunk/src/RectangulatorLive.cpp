@@ -21,6 +21,7 @@ namespace enc = sensor_msgs::image_encodings;
 
 static const char WINDOW[] = "Image window";
 static const char DEPTHWIN[] = "Depth";
+static const bool USE_DEPTH_WIN = false;
 static const char DASH[] = "-----------------------"; // For cout
 
 static const int IMAGE_WIDTH = 640;
@@ -74,7 +75,7 @@ public:
 	depthReadingUsed = true; // Wait for depth reading to be filled the first time
 
     cv::namedWindow(WINDOW); // RGB window
-    cv::namedWindow(DEPTHWIN); // DEPTH WIN
+    if (USE_DEPTH_WIN) { cv::namedWindow(DEPTHWIN); } // DEPTH WIN
 
 	char OPENCV_ROOT[] = "/data/private/robot/Downloads/OpenCV-2.4.3/";
 	std::string cascadePath;
@@ -104,7 +105,7 @@ public:
 
   ~RectangulatorLive() {
     cv::destroyWindow(WINDOW);
-	cv::destroyWindow(DEPTHWIN);
+	if (USE_DEPTH_WIN) { cv::destroyWindow(DEPTHWIN); }
 	if(pCascade) cvReleaseHaarClassifierCascade(&pCascade);
 	if(pStorage) cvReleaseMemStorage(&pStorage);
   }
@@ -201,8 +202,10 @@ public:
       return;
     }
 	// Depth Window
-	cv::imshow(DEPTHWIN, lastDepthReading->image);
-    cv::waitKey(3);
+	if (USE_DEPTH_WIN) {
+		cv::imshow(DEPTHWIN, lastDepthReading->image);
+    	cv::waitKey(3);
+	}
   }
 
   // Gives the start and end pixels of the segment in the 

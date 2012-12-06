@@ -1,6 +1,7 @@
 package ex3;
 
 import ex3.search.SearchAlgorithm;
+import ex4.Printer;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
@@ -108,7 +109,7 @@ public class PRM extends AbstractNodeMain {
                     return;
                 }
 
-                boolean inFreeSpace = util.isPositionValid(t.getPose(), inflatedMap);
+                boolean inFreeSpace = PRMUtil.isPositionValid(t.getPose(), inflatedMap);
                 if (inFreeSpace){
                     goalPosition = t.getPose();
                 } else {
@@ -312,8 +313,8 @@ public class PRM extends AbstractNodeMain {
      *
      * WARNING: MAY TAKE A LONG TIME!
      */
-    public void reconnectGraph(OccupancyGrid mapToUse) {
-        graph.reconnectGraph(util, mapToUse);
+    public void reconnectGraph() {
+        graph.reconnectGraph(util);
     }
 
 
@@ -353,7 +354,9 @@ public class PRM extends AbstractNodeMain {
     public void setInflatedMap(OccupancyGrid infMap) {
         System.out.println("Setting inflated map");
         this.inflatedMap = infMap;
+        util.setInflatedMap(this.inflatedMap);
         PRMUtil._checkAndPruneGraph(this.graph, this.inflatedMap);
+        Printer.println("Graph pruned in PRM", "REDF");
         inflatedMapPublisher.publish(this.inflatedMap);
         publishMarkers(this.graph);
     }

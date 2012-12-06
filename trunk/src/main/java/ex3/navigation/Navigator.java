@@ -45,13 +45,14 @@ public class Navigator extends AbstractNodeMain {
     public static final double POINT_REACHED_THRESHOLD = 0.2;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
     public static final double DISTANCE_FROM_LAST_ESTIMATED_POSE = 3.0;
+    public static final double DISTANCE_FROM_CENTRE_TO_LASER = 0.22;
     // Will attempt to align the robot within this range of the actual angle
     // to the next waypoint.
     public static final double NEXT_WAYPOINT_HEADING_ERROR = 0.15;
     // Obstacle avoidance params
     //public static final float SAFE_DISTANCE = 0.75f; // In metres
     public static final float OBSTACLE_ZONE = RunParams.getFloat("OBSTACLE_ZONE"); // In metres
-    public static final int SECTORS_CHECKED = 15; // Check this many sectors
+    public static final int SECTORS_CHECKED = 11; // Check this many sectors
     public static final int READINGS_PER_SECTOR_OBSTACLE = 20; // Resolution for obstacle marker creation
     public static final float MARKER_POINT_WIDTH = 0.2f;
     // How many receipts of an estimatedPose we should wait before attempting to prune the obstacle array.
@@ -68,6 +69,7 @@ public class Navigator extends AbstractNodeMain {
     
     OccupancyGrid inflatedMap;
     OccupancyGrid obstacleInflatedMap = null;
+    int loopCount = 0;
     MessageFactory factory;
     Pose wayPoint;
     Pose lastEstimate;
@@ -92,9 +94,11 @@ public class Navigator extends AbstractNodeMain {
     Publisher<Twist> movementPub;
     Publisher<Marker> obstacleMarkersPub;
     Publisher<PoseWithCovarianceStamped> initialPosePub;
-    Publisher<std_msgs.Int32> prmInfoSub;
+    Publisher<std_msgs.Int32> prmInfoPub;
     Subscriber<std_msgs.Bool> navActiveSub;
     Publisher<PoseStamped> goalPub;
+    Publisher<OccupancyGrid> beforeInflationPub;
+    Publisher<OccupancyGrid> afterInflationPub;
 
     public Navigator(PRM prm) {
         this.prm = prm;
@@ -122,9 +126,13 @@ public class Navigator extends AbstractNodeMain {
         obstacleMarkersPub = connectedNode.newPublisher("obstacleMarkers", Marker._TYPE);
         initialPosePub = connectedNode.newPublisher("initialpose", PoseWithCovarianceStamped._TYPE);
         initialPositionSub = connectedNode.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
-        prmInfoSub = connectedNode.newPublisher("goalInfo", std_msgs.Int32._TYPE);
+        prmInfoPub = connectedNode.newPublisher("goalInfo", std_msgs.Int32._TYPE);
         navActiveSub = connectedNode.newSubscriber("nav_active", std_msgs.Bool._TYPE);
         goalPub = connectedNode.newPublisher("goal", PoseStamped._TYPE);
+        beforeInflationPub = connectedNode.newPublisher("beforeinflation", OccupancyGrid._TYPE);
+        beforeInflationPub.setLatchMode(true);
+        afterInflationPub = connectedNode.newPublisher("afterinflation", OccupancyGrid._TYPE);
+        afterInflationPub.setLatchMode(true);
 
         navActiveSub.addMessageListener(new MessageListener<Bool>() {
             @Override
@@ -166,22 +174,26 @@ public class Navigator extends AbstractNodeMain {
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
                         ArrayList<Point> newObstacles = getMarkersForObstaclesInLaserScan(sectors);
+                        System.out.println("ObstacleMarkers before adding: "+obstacleMarkers.size());
                         obstacleMarkers.addAll(newObstacles); // Track the obstacles in a list
-                        //publishObstacleMarkers(obstacleMarkers);
+                        System.out.println("ObstacleMarkers after adding: "+obstacleMarkers.size());
+                        publishObstacleMarkers(obstacleMarkers);
 
                         // Add obstacle(s) to map
 //                        OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         OccupancyGrid mapToInflate = inflatedMap;
                         // Add obstacles to the map
+                        beforeInflationPub.publish(inflatedMap);
                         inflateObstaclesOntoMap(mapToInflate, obstacleMarkers);
-
+                        afterInflationPub.publish(obstacleInflatedMap);
                         prm.setInflatedMap(obstacleInflatedMap);
 
                         if (goalIsInObstacle()) {
                             Printer.println("Goal is in obstacle - goal reached", "REDF");
                             goalReached();
                         } else {
-                            Printer.println("Regenerating route around obstacle", "REDF");
+                            Printer.println("Regenerating route around obstacle. "
+                                    + "ObstacleMarkers.size(): "+obstacleMarkers.size(), "REDF");
                             // Regen route (also publishes)
                             prm.generateRoute();
 
@@ -189,8 +201,13 @@ public class Navigator extends AbstractNodeMain {
                             turnOnSpot = true; // New path so new movement
                         }
                     } else {
-                        if (obstacleMarkers.size() > 0) {
-                            _pruneObstacleMarkers(lastEstimate.getPosition());
+                        if (loopCount == OBSTACLE_ARRAY_CHECK_TIME){
+                            if (obstacleMarkers.size() > 0) {
+                                _pruneObstacleMarkers(lastEstimate.getPosition());
+                            }
+                            loopCount = 0;
+                        } else {
+                            loopCount++;
                         }
                         movementPub.publish(computeMovementValues());
                     }
@@ -201,7 +218,6 @@ public class Navigator extends AbstractNodeMain {
 
         if (OBSTACLE_DETECTION_ACTIVE) { // only subscribe to laser if we are doing avoidance
             laserSub.addMessageListener(new MessageListener<LaserScan>() {
-
                 @Override
                 public void onNewMessage(LaserScan scan) {
                     // If obstacle is too close and we are moving forward, stop
@@ -241,7 +257,7 @@ public class Navigator extends AbstractNodeMain {
                         PoseWithCovarianceStamped initialPoseWithCS = initialPosePub.newMessage();
                         initialPoseWithCS.setPose(lastEstimatedPoseWithConvariance.getPose());
                         initialPosePub.publish(initialPoseWithCS);
-                        Printer.println("DETECTED AMCL JUMP.", "REDF");
+                        Printer.println("DETECTED AMCL JUMP.", "REDB");
                     } else {
                         lastEstimatedPoseWithConvariance = t;
                     }
@@ -256,7 +272,6 @@ public class Navigator extends AbstractNodeMain {
 //                if (pid != null && route != null){
 //                    pid.setSetpoint(bearingFromZero(lastEstimate.getPosition(), wayPoint.getPosition()));
 //                }
-
             }
         });
 
@@ -268,8 +283,6 @@ public class Navigator extends AbstractNodeMain {
                 //              System.out.println("Resetting estimated pose");
             }
         });
-
-
     }
 
     public boolean goalIsInObstacle() {
@@ -286,13 +299,15 @@ public class Navigator extends AbstractNodeMain {
         active = false;
         route = null;
         goalPoint = null;
+        Printer.println("Cleared "+obstacleMarkers.size()+" obstacle markers", "REDF");
+        obstacleMarkers.clear();
         // When we reach the goal, we get rid of all obstacles on the map.
         // and reset the obstacle map.
         prm.setInflatedMap(inflatedMap);
         obstacleInflatedMap = null;
-        std_msgs.Int32 info = prmInfoSub.newMessage();
+        std_msgs.Int32 info = prmInfoPub.newMessage();
         info.setData(PRM.GOAL_REACHED); // we reached the goal - send info
-        prmInfoSub.publish(info);
+        prmInfoPub.publish(info);
     }
 
     public ArrayList<Point> getMarkersForObstaclesInLaserScan(float[][] sectors) {
@@ -302,15 +317,19 @@ public class Navigator extends AbstractNodeMain {
 
         float[] medians = LaserUtil.medianOfEachSector(sectors);
         for (int i = 0; i < medians.length; i++) {
+            System.out.println("Median i: "+i+" isAnObstacle()="+medianIsAnObstacle(medians[i]));
             if (medianIsAnObstacle(medians[i])) {
                 double robotHeading = AbstractLocaliser.getHeading(this.lastEstimate.getOrientation());
                 double headingOfSector = LaserUtil.headingOfSector(
                         SECTORS_CHECKED, i, READINGS_PER_SECTOR_OBSTACLE);
+                System.out.println("Heading of sector: "+headingOfSector + "  robot heading: "+robotHeading);
+                System.out.println("Distance reading: "+medians[i]);
+
                 Point marker = calculateMarkerPosition(robotHeading + headingOfSector, medians[i], robotHeading);
                 markers.add(marker);
             }
         }
-        System.out.println();
+        System.out.println("MarkersForObstacles: "+markers.size());
         return markers;
     }
 
@@ -325,8 +344,8 @@ public class Navigator extends AbstractNodeMain {
         // We add a bit onto the distance reading so that we place the obstacle
         // point slightly behind where we detect it, so that we do not inflate
         // too much into empty space.
-        double xDisplacement = Math.cos(robotHeading) * (distanceReading + OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
-        double yDisplacement = Math.sin(robotHeading) * (distanceReading + OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
+        double xDisplacement = Math.cos(robotHeading) * (distanceReading + DISTANCE_FROM_CENTRE_TO_LASER);//+ OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
+        double yDisplacement = Math.sin(robotHeading) * (distanceReading + DISTANCE_FROM_CENTRE_TO_LASER);//+ OBSTACLE_INFLATION_RADIUS * inflatedMap.getInfo().getResolution());
 
 //        if ((robotHeading > Math.PI/2  && robotHeading < Math.PI) ||
 //                (robotHeading > -Math.PI/2 && robotHeading < 0)) {
@@ -338,6 +357,9 @@ public class Navigator extends AbstractNodeMain {
         Point newPoint = factory.newFromType(Point._TYPE);
         newPoint.setX(currentPoint.getX() + xDisplacement);
         newPoint.setY(currentPoint.getY() + yDisplacement);
+        System.out.println("xdisplacement " + xDisplacement + ", ydisplacement " + yDisplacement);
+        System.out.println("Current point x: " + currentPoint.getX() + " y: " + currentPoint.getY());
+        System.out.println("Marker point x: " + newPoint.getX() + " y: " + newPoint.getY());
 
 //        System.out.println("Distance to point at heading " + heading + " is " + distanceReading);
 //        System.out.println("Robot's heading: "+AbstractLocaliser.getHeading(lastEstimate.getOrientation()));
@@ -483,6 +505,7 @@ public class Navigator extends AbstractNodeMain {
      * ****DESTRUCTIVE******
      */
     public void _pruneObstacleMarkers(Point currentLocation) {
+        Printer.println("Pruning obstacle markers", "REDF");
         ArrayList<Point> invalidMarkers = new ArrayList<Point>();
 
         for (Point point : this.obstacleMarkers) {
@@ -500,11 +523,12 @@ public class Navigator extends AbstractNodeMain {
             
             // Re-inflate the obstacles onto map with pruned obstacles gone
             OccupancyGrid mapToInflate = inflatedMap;
-            prm.setInflatedMap(inflateObstaclesOntoMap(mapToInflate, this.obstacleMarkers));
+            inflateObstaclesOntoMap(mapToInflate, this.obstacleMarkers);
+            prm.setInflatedMap(obstacleInflatedMap);
             // we want to reconnect the graph once we remove the obstacles, otherwise
             // we may end up cutting off areas of the graph, resulting in worse
             // paths
-            prm.reconnectGraph(obstacleInflatedMap);
+            prm.reconnectGraph();
         }
     }
 

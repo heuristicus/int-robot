@@ -1,5 +1,6 @@
 package ex3;
 
+import ex4.Printer;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
@@ -37,6 +38,10 @@ public class PRMUtil {
         this.randGen = randGen;
         this.factory = factory;
         this.inflatedMap = inflatedMap;
+    }
+
+    public void setInflatedMap(OccupancyGrid map) {
+        inflatedMap = map;
     }
 
     /* Gets the euclidean distance between two points */
@@ -720,25 +725,27 @@ public class PRMUtil {
         Marker edgeMarker = setUpMarker(frameID, "edges", 0, Marker.ADD, Marker.LINE_LIST, edgeColour, edgePose, edgeVector);
         Marker pointMarker = setUpMarker(frameID, "points", 1, Marker.ADD, Marker.POINTS, pointColour, null, pointVector);
 
-        for (Vertex v : graph.getVertices()) {
-            // Add the vertices to the graph.
-            pointMarker.getPoints().add(v.getLocation());
-            for (Vertex connected : v.getConnectedVertices()) {
-                /* Add a line from the current vertex to each connected vertex
-                 * For some reason the coordinates must be reversed for this to
-                 * display correctly in rviz. Probably some error with transforms
-                 * or suchlike. */
-                Point cur = factory.newFromType(Point._TYPE);
-                cur.setX(-v.getLocation().getX());
-                cur.setY(-v.getLocation().getY());
-                Point link = factory.newFromType(Point._TYPE);
-                link.setX(-connected.getLocation().getX());
-                link.setY(-connected.getLocation().getY());
-                edgeMarker.getPoints().add(cur);
-                edgeMarker.getPoints().add(link);
+        ArrayList<Vertex> vertices = graph.getVertices();
+        synchronized(vertices) {
+            for (Vertex v : vertices) {
+                // Add the vertices to the graph.
+                pointMarker.getPoints().add(v.getLocation());
+                for (Vertex connected : v.getConnectedVertices()) {
+                    /* Add a line from the current vertex to each connected vertex
+                     * For some reason the coordinates must be reversed for this to
+                     * display correctly in rviz. Probably some error with transforms
+                     * or suchlike. */
+                    Point cur = factory.newFromType(Point._TYPE);
+                    cur.setX(-v.getLocation().getX());
+                    cur.setY(-v.getLocation().getY());
+                    Point link = factory.newFromType(Point._TYPE);
+                    link.setX(-connected.getLocation().getX());
+                    link.setY(-connected.getLocation().getY());
+                    edgeMarker.getPoints().add(cur);
+                    edgeMarker.getPoints().add(link);
+                }
             }
         }
-
         List<Marker> mList = new ArrayList<Marker>();
 
         mList.add(edgeMarker);
@@ -753,9 +760,12 @@ public class PRMUtil {
     public static double averageConnectionLength(PRMGraph graph){
         double sum = 0;
 
-        for (Edge e : graph.getEdges()) {
-         //   System.out.println(e);
-            sum += e.edgeWeight();
+        ArrayList<Edge> edges = graph.getEdges();
+        synchronized(edges) {
+            for (Edge e : edges) {
+                //   System.out.println(e);
+                sum += e.edgeWeight();
+            }
         }
 
         return sum/graph.getEdges().size();
@@ -915,50 +925,56 @@ public class PRMUtil {
         ArrayList<Edge> edges = graph.getEdges();
         ArrayList<Vertex> vertices = graph.getVertices();
 
-        Iterator<Vertex> vertexIt = vertices.iterator();
+        long start = System.currentTimeMillis();
+        synchronized(vertices) {
+            Iterator<Vertex> vertexIt = vertices.iterator();
 
-        // Remove invalid vertices and the edges that contain them
-        while (vertexIt.hasNext()) {
-            Vertex vertex = vertexIt.next();
-            int scaledX = (int) Math.round(vertex.getLocation().getX() / mapRes);
-            int scaledY = (int) Math.round(vertex.getLocation().getY() / mapRes);
+            // Remove invalid vertices and the edges that contain them
+            while (vertexIt.hasNext()) {
+                Vertex vertex = vertexIt.next();
+                int scaledX = (int) Math.round(vertex.getLocation().getX() / mapRes);
+                int scaledY = (int) Math.round(vertex.getLocation().getY() / mapRes);
 
-            if (! PRMUtil.isPositionValid(scaledX, scaledY,
-                    width, height, data, data.capacity())) {
-                // Remove this vertex from all neighbours
-                Iterator<Vertex> neighbours = vertex.getConnectedVertices().iterator();
-                while (neighbours.hasNext()) {
-                    neighbours.next().getConnectedVertices().remove(vertex);
+                if (!PRMUtil.isPositionValid(scaledX, scaledY,
+                        width, height, data, data.capacity())) {
+                    Printer.println("Removed vertex from all its neighbours because it's in an invalid pos", "REDF");
+                    // Remove this vertex from all neighbours
+                    Iterator<Vertex> neighbours = vertex.getConnectedVertices().iterator();
+                    while (neighbours.hasNext()) {
+                        neighbours.next().getConnectedVertices().remove(vertex);
+                    }
+
+                    // Remove all edges containing naughty vertex
+                    Iterator<Edge> edgeIt = edges.iterator();
+                    while (edgeIt.hasNext()) {
+                        Edge edge = edgeIt.next();
+                        if (edge.getVertexA().equals(vertex)
+                                || edge.getVertexB().equals(vertex)) {
+                            edgeIt.remove();
+                        }
+                    }
+
+                    // Finally, remove the offending vertex
+                    vertexIt.remove();
                 }
+            }
 
-                // Remove all edges containing naughty vertex
+            synchronized(edges) {
+                // Remove edges which intersect with non-free space
                 Iterator<Edge> edgeIt = edges.iterator();
                 while (edgeIt.hasNext()) {
                     Edge edge = edgeIt.next();
-                    if (edge.getVertexA().equals(vertex)
-                            || edge.getVertexB().equals(vertex)) {
+                    if (!PRMUtil.connectedInFreeSpace(map, edge.getVertexA(), edge.getVertexB())) {
+                        // Remove vertices from each other's neighbour list
+                        edge.getVertexA().destroyConnection(edge.getVertexB());
                         edgeIt.remove();
                     }
                 }
-
-                // Finally, remove the offending vertex
-                vertexIt.remove();
+                graph.setEdges(edges);
+                graph.setVertices(vertices);
             }
         }
-
-        // Remove edges which intersect with non-free space
-        Iterator<Edge> edgeIt = edges.iterator();
-        while (edgeIt.hasNext()) {
-            Edge edge = edgeIt.next();
-            if (! PRMUtil.connectedInFreeSpace(map, edge.getVertexA(), edge.getVertexB())) {
-                // Remove vertices from each other's neighbour list
-                edge.getVertexA().destroyConnection(edge.getVertexB());
-
-                edgeIt.remove();
-            }
-        }
-        graph.setEdges(edges);
-        graph.setVertices(vertices);
+        System.out.println("Synchronised block took " + (System.currentTimeMillis()-start)+"ms");
     }
 
 }
