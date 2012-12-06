@@ -141,11 +141,12 @@ public class Navigator extends AbstractNodeMain {
                 if(val){
                     // We may have moved since we deactivated the navigator, so
                     // replan the route.
-                    Printer.println("Navigator activated. Goal point is " + goalPoint.getPosition().getX() + ", " + goalPoint.getPosition().getY(), "REDF");
-                    route = null;
-                    PoseStamped goal = goalPub.newMessage();
-                    goal.setPose(goalPoint);
-                    goalPub.publish(goal);
+//                    Printer.println("Navigator activated. Goal point is " + goalPoint.getPosition().getX() + ", " + goalPoint.getPosition().getY(), "REDF");
+//                    route = null;
+//                    PoseStamped goal = goalPub.newMessage();
+//                    goal.setPose(goalPoint);
+//                    goalPub.publish(goal);
+                    System.out.println("Navigator activated.");
                 } else {
                     System.out.println("Navigator deactivated.");
                 }
