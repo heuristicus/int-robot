@@ -416,7 +416,9 @@ public class MainNode extends AbstractNodeMain {
                     clip.close();
                 }
             } catch (Exception e) {}
-            System.exit(0);
+
+            meetingRoomIndex = 0; // Restart meeting room search
+//            System.exit(0);
         }
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
     }
