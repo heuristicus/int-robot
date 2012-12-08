@@ -8,10 +8,32 @@
 \maketitle
 
 \begin{abstract}
-  We were required to implement a robot system to perform a task similar to the one assigned to participants at the AAAI Mobile Robot Competition in 1996. We did various things to complete the task.
+  We were required to implement a robot system to perform a task similar to the one assigned to participants at the AAAI Mobile Robot Competition in 1996\cite{AAAIcomp}. We did various things to complete the task.
 \end{abstract}
 \section{Background}
+\subsection{Robot Motion}
+holonomic robots, PID control, reactive control
+\subsection{Localisation}
+Bayes filter, Kalman filter, particle filter (MCL), small section about mapping---still an active area of research in robotics. Mention SLAM, which has been pretty much solved.
+\subsection{Route Planning}
+PRM (sampling methods, graph search), RRT
+\subsection{Exploration}
+frontier based techniques
+\subsection{Robot Vision}
 \section{Design}
+\subsection{System Structure}
+brief ROS description, callback based system, finite state automaton
+\subsection{Platform}
+Stuff about the pioneer---available sensors, some data about its size, specifications, our additions to it. Kinect specs. Include a picture of the robot with the kinect on it. 
 \section{Experimentation}
+\subsection{PRM}
+\subsection{Vision}
+\subsection{Exploration}
 \section{Discussion}
+\subsection{Performance}
+\subsection{Potential Improvements}
+\subsection{Conclusions}
+
+\bibliographystyle{ieeetr}
+\bibliography{report}
 \end{document}
