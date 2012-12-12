@@ -10,12 +10,19 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present our solution to the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. We give some background information about the areas of robotics that are relevant to the problem, with brief reference to literature. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
+  In this report, we present our solution to the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. We provide some background information about the areas of robotics that are relevant to the problem, with brief reference to literature. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 \end{abstract}
 \section{Background}
 \subsection{Robot Motion}
 holonomic robots, PID control, reactive control
 \subsection{Localisation}
+\begin{itemize}
+\item odometry issues
+\item beliefs, prior and posterior $\overline{bel}$
+\item sensor model, update
+\item motion model
+\end{itemize}
+The aim of localisation is to obtain an estimate of the position of the robot at any given time. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. It is possible to mitigate the effect of these errors on estimates of the robot's position by using Bayesian techniques. 
 \begin{algorithm}
   \caption{Basic Monte Carlo Localisation\cite{thrun}}
   \label{alg:basicMCL}
@@ -24,7 +31,7 @@ holonomic robots, PID control, reactive control
     \State $\bar{\mathcal{X}}_t=\mathcal{X}_t=\emptyset$
     \For{$m=1$ to $M$}
     \State $x_t^{[m]}=\textbf{sample\_motion\_model}(u_t,x_{t-1}^{[m]})$
-    \State $w_t^{[m]}=\textbf{measurement\_model}(z_t,x_t^{[m]},m)$
+    \State $w_t^{[m]}=\textbf{sensor\_model}(z_t,x_t^{[m]},m)$
     \State $\bar{\mathcal{X}}_t=\bar{\mathcal{X}}_t+\langle x_t^{[m]},w_t^{[m]}\rangle$
     \EndFor
     \For{$m=1$ to $M$}
@@ -36,6 +43,28 @@ holonomic robots, PID control, reactive control
 \end{algorithm}
 Bayes filter, Kalman filter, particle filter (MCL), small section about mapping---still an active area of research in robotics. Mention SLAM, which has been pretty much solved.
 \subsection{Route Planning}
+\begin{algorithm}
+  \caption{Probabilistic Road Map Generation}
+  \label{alg:prm}
+  \begin{algorithmic}[1]
+    \State \textbf{Algorithm generate\_PRM}\textnormal{(map,)}
+    \State $\mathbf{V} = $\textbf{ sample\_vertices}\textnormal{(map)}
+    \While{\textnormal{connectionCount $<$ maxConnections}}
+    \State $v =$\textnormal{get\_closest($\mathbf{V}$)}
+    \If{\textnormal{$\neg$ connectedInNeighbourhood($v$)}}
+    \If{\textnormal{connectedInFreeSpace($v, vert$)}}
+    \State \textnormal{connect($v, vert$)}
+    \EndIf
+    \Else
+    \If{\textnormal{$\neg$ connected($v, vert$)}}
+    \If{\textnormal{connectedInFreeSpace($v, vert$)}}
+    \State \textnormal{connect($v,vert$)}
+    \EndIf
+    \EndIf
+    \EndIf
+    \EndWhile
+  \end{algorithmic}
+\end{algorithm}
 \begin{algorithm}
   \caption{Path Flattening}
   \label{alg:pathflat}
@@ -75,7 +104,6 @@ Redo experiment for sampling methods. short, medium, long path length. Display i
 \subsection{Performance}
 \subsection{Potential Improvements}
 \subsection{Conclusions}
-
 \bibliographystyle{ieeetr}
 \bibliography{report}
 \end{document}
