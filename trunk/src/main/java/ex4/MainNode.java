@@ -346,6 +346,8 @@ public class MainNode extends AbstractNodeMain {
                         RectangleWithDepth rect = findPerson(lastFaceRectangle);
                         if (rect != null){
                             Printer.println("Face rectangle received was null. Returning to exploration.", "CYANF");
+                            returnToExploration();
+                            return;
                         } else {
                             Printer.println("Face not in centre. Rotating towards person again", "CYANF");
                             rotateTowardsPerson(rect);
@@ -546,55 +548,7 @@ public class MainNode extends AbstractNodeMain {
         currentPhase = Phase.PRMTOROOM;
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
     }
-    /*
-    public void start() {
-    meetingRoomLocation = messageFactory.newFromType(PoseStamped._TYPE);
-    while (meetingRoomLocation == null) {
-    //find room
-    }
-    while (currentPhase != Phase.COMPLETED) {
-    currentPhase = Phase.EXPLORING;
-    RectangleWithDepth areaOfPerson = findPerson(null);
-    double areaCenterX = areaOfPerson.getCenterX();
-    double fromCenterX = areaCenterX - (CAMERA_DIMENSIONS.width / 2);
-    double turnAngle = Math.toRadians(10);
-    while (Math.abs(fromCenterX) > 10) {
-    if (fromCenterX > 0) {
-    //rectangle on the right
-    driver.turn(-turnAngle, true, true);
-    } else {
-    //rectangle on left
-    driver.turn(turnAngle, true, true);
-    }
-    areaOfPerson = findPerson(null);
-    }
-    currentPhase = Phase.PRMTOPERSON;
-    Pose estimatedPoseCopy = StaticMethods.copyPose(lastEstimatedPose);
-    PoseStamped personLocation = getObjectLocation(estimatedPoseCopy, areaOfPerson.depth);
     
-    setPRMGoal(personLocation);
-    if (personLost()) {
-    continue;
-    }
-    if (personAcceptsInvite()) {
-    currentPhase = Phase.PRMTOROOM;
-    setPRMGoal(meetingRoomLocation);
-    pplCount++;
-    currentPhase = Phase.INMEETINGROOM;
-    if (isTaskComplete()) {
-    currentPhase = Phase.COMPLETED;
-    } else {
-    //currently within meeting room
-    //get out of meeting room
-    }
-    } else {
-    //person did not accept invite
-    //turn away from the person
-    }
-    }
-    }
-     */
-
     private boolean isTaskComplete() {
         //extend to add 15min time limit and/or other limits
         return pplCount == targetPplCount;
@@ -668,7 +622,7 @@ public class MainNode extends AbstractNodeMain {
         double areaCentreX = lastRectangle.getCenterX();
         double distFromCentreX = areaCentreX - (CAMERA_DIMENSIONS.width / 2);
         Printer.println("DistFromCentreX: " + distFromCentreX, "CYANF");
-        double turnAngle = Math.toRadians(10);
+        double turnAngle = Math.toRadians(5);
         if (distFromCentreX > 0) {
             //rectangle on the right
             //driver.turn(-turnAngle, true, false);
