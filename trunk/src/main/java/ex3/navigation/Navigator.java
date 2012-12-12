@@ -172,6 +172,7 @@ public class Navigator extends AbstractNodeMain {
                     }
                     if (obstacleWithinSafeDistance && OBSTACLE_DETECTION_ACTIVE) {
                         // Stopped moving
+                        System.out.println("Going through obstacle detection code.");
                         float[][] sectors = LaserUtil._getSectors(
                                 SECTORS_CHECKED, READINGS_PER_SECTOR_OBSTACLE, lastScan);
                         ArrayList<Point> newObstacles = getMarkersForObstaclesInLaserScan(sectors);
@@ -179,7 +180,7 @@ public class Navigator extends AbstractNodeMain {
                         obstacleMarkers.addAll(newObstacles); // Track the obstacles in a list
                         System.out.println("ObstacleMarkers after adding: "+obstacleMarkers.size());
                         publishObstacleMarkers(obstacleMarkers);
-
+                        System.out.println("Published markers");
                         // Add obstacle(s) to map
 //                        OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         OccupancyGrid mapToInflate = inflatedMap;
@@ -188,7 +189,7 @@ public class Navigator extends AbstractNodeMain {
                         inflateObstaclesOntoMap(mapToInflate, obstacleMarkers);
                         afterInflationPub.publish(obstacleInflatedMap);
                         prm.setInflatedMap(obstacleInflatedMap);
-
+                        System.out.println("published map.");
                         if (goalIsInObstacle()) {
                             Printer.println("Goal is in obstacle - goal reached", "REDF");
                             goalReached();

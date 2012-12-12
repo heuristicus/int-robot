@@ -149,6 +149,14 @@ public class LocalisationUtil {
                 + AbstractLocaliser.getHeading(p.getPose().getOrientation());
     }
 
+        public static String getTimeStampWithPose(Pose p, Time stamp){
+        return stamp.secs + "."
+                + stamp.nsecs + ","
+                + p.getPosition().getX() + ","
+                + p.getPosition().getY() + ","
+                + AbstractLocaliser.getHeading(p.getOrientation());
+    }
+
     public static boolean timeStampEqual(Time s1, Time s2){
         //System.out.println("s1: "+s1.secs+"."+s1.nsecs +
         //        "\t\tAND s2: " + s2.secs + "." + s2.nsecs +
