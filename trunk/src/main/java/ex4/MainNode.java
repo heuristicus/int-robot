@@ -64,6 +64,7 @@ public class MainNode extends AbstractNodeMain {
     public static Double FOV_DISTANCE = RunParams.getDouble("FOV_DISTANCE");
     public static Integer FOV_ANGLE = RunParams.getInt("FOV_ANGLE");
     public static Double FOV_MIN_DIST = RunParams.getDouble("FOV_MIN_DIST");
+    public static Double FOV_ANGLE_STEP = RunParams.getDouble("FOV_ANGLE_STEP");
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
     public double currentGridStep = INITIAL_EXPLORATION_GRID_STEP;
@@ -430,7 +431,7 @@ public class MainNode extends AbstractNodeMain {
                     PRMUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
-                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, originalMap, exploredMap);
+                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap);
                     exploredMapPub.publish(exploredMap);
 //                    normaliseHeatMap();
 //                    heatMapPub.publish(heatMap);

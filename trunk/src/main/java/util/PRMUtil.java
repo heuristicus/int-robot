@@ -819,7 +819,7 @@ public class PRMUtil {
      * the indices that each ray traced went through.
      */
     public static ArrayList<ArrayList<Integer>> projectFOV(double ox, double oy, double bearing, int fov_angle,
-            double range_min, double range_max, OccupancyGrid map, OccupancyGrid mapToModify) {
+            double range_min, double range_max, double angle_step, OccupancyGrid map, OccupancyGrid mapToModify) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
         ArrayList<ArrayList<Integer>> fovRays = new ArrayList<ArrayList<Integer>>();
@@ -834,7 +834,7 @@ public class PRMUtil {
         double firstRayAngle = GeneralUtil.normaliseAngle(bearing - fovRad / 2);
         double lastRayAngle = GeneralUtil.normaliseAngle(bearing + fovRad / 2);
         double currentRayAngle = firstRayAngle;
-        double rayAngleIncrement = Math.toRadians(1) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
+        double rayAngleIncrement = Math.toRadians(angle_step) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
 
         System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
         // Map data
@@ -842,7 +842,7 @@ public class PRMUtil {
         long map_height = map.getInfo().getHeight();
         float map_resolution = map.getInfo().getResolution(); // in m per pixel
 
-        for (int i = 0; i < fov_angle; i++) {
+        for (int i = 0; i < fov_angle / angle_step; i++) {
             ArrayList<Integer> ray = new ArrayList<Integer>();
             // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
             double grad_x = Math.sin(currentRayAngle);
