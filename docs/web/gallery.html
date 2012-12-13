@@ -1,0 +1,148 @@
+ <!--
+Design by Bryant Smith
+http://www.bryantsmith.com
+http://www.aszx.net
+email: template [-at-] bryantsmith [-dot-] com
+Released under Creative Commons Attribution 2.5 Generic.  In other words, do with it what you please; but please leave the link if you'd be so kind :)
+
+Name       : HD Monochrome
+Description: One column, with top naviation.  All divs, validations: XHTML Strict 1.0 & CSS
+Version    : 1.0
+Released   : 20081009
+-->
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="style.css" />
+<title>Intelligent Robotics - Leslie and Penny</title>
+</head>
+
+<body>
+    <div id="page">
+        <div class="topNaviagationLink"><a href="index.html">Home</a></div>
+		<div class="topNaviagationLink"><a href="callameeting.html">Call a meeting</a></div>
+        <div class="topNaviagationLink"><a href="gallery.html">Gallery</a></div>
+	    <div class="topNaviagationLink"><a href="advice.html">Advice</a></div>
+	</div>
+	<!--
+    <div id="mainPicture">
+    	<div class="picture">
+			<!--
+        	<div id="headerTitle">HD Monochrome</div>
+            <div id="headerSubtext">An XHTML 1.0 Strict Template by Bryant Smith</div>
+			-->
+        <!-- </div>
+    </div>
+	-->
+	</br>
+
+	<div id="container">
+	<ul>
+        <li><img src="Images/IntRob6.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob7.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob8.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob9.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob10.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob11.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob12.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob13.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob14.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob15.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob16.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob17.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob18.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob19.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob20.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob21.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob22.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob23.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob24.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob25.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob26.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob27.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob28.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob29.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob30.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob31.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob32.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob33.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob34.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob35.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob36.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob37.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob38.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob39.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob40.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob41.jpg" width="604" height="453" /></li>
+        <li><img src="Images/IntRob42.jpg" width="604" height="453" /></li>
+		<li><img src="Images/IntRob43.jpg" width="604" height="453" /></li>
+      </ul>
+      <span class="button prevButton"></span>
+      <span class="button nextButton"></span>
+</div>
+</center>
+
+<script src="jquery-1.4.2.min.js"></script>
+
+<!-- This slideshow code below is taken from http://www.html5marketplace.com/slideshow/ -->
+<script>
+$(window).load(function(){
+		var pages = $('#container li'), current=0;
+		var currentPage,nextPage;
+		var handler=function(){
+			$('#container .button').unbind('click');
+			currentPage= pages.eq(current);
+			if($(this).hasClass('prevButton'))
+			{
+				if (current <= 0)
+					current=pages.length-1;
+				else
+					current=current-1;
+				nextPage = pages.eq(current);	
+
+				nextPage.css("marginLeft",-604);
+				nextPage.show();
+				nextPage.animate({ marginLeft: 0 }, 800,function(){
+					currentPage.hide();
+				});
+				currentPage.animate({ marginLeft: 604 }, 800,function(){
+					$('#container .button').bind('click',handler);
+				});
+			}
+			else
+			{
+
+				if (current >= pages.length-1)
+					current=0;
+				else
+					current=current+1;
+				nextPage = pages.eq(current);	
+
+				nextPage.css("marginLeft",604);
+				nextPage.show();
+				nextPage.animate({ marginLeft: 0 }, 800,function(){
+				});
+				currentPage.animate({ marginLeft: -604 }, 800,function(){
+					currentPage.hide();
+					$('#container .button').bind('click',handler);
+				});
+			}
+		}
+
+		$('#container .button').click(handler);
+		
+});
+
+</script>
+
+<!-- Please leave this in place after all of your content - thanks :) -->
+<h4><a href="http://www.aszx.net">Page template</a> by <a href="http://www.bryantsmith.com">bryant smith</a></h4>
+<!-- Please leave this in place after all of your content - thanks :) -->
+    </div>
+</div>
+        
+</body>
+</html>

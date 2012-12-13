@@ -1,0 +1,11 @@
+\begin{thebibliography}{1}
+
+\bibitem{AAAIcomp}
+D.~Kortenkamp, I.~Nourbakhsh, and D.~Hinkle, ``The 1996 aaai mobile robot
+  competition and exhibition,'' in {\em AI Magazine}, vol.~18, 1997.
+
+\bibitem{thrun}
+S.~Thrun, W.~Burgard, and D.~Fox, {\em Probabilistic Robotics}.
+\newblock Intelligent Robotics and Autonomous Agents Series, Mit Press, 2005.
+
+\end{thebibliography}
