@@ -61,7 +61,7 @@ public class MainNode extends AbstractNodeMain {
     public static String EXPLORATION_SAMPLING = RunParams.get("EXPLORATION_SAMPLING");
     public static String SUCCESS_SOUND_FILE = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/applause.wav";
     public static Double FOV_DISTANCE = RunParams.getDouble("FOV_DISTANCE");
-    public static Double FOV_ANGLE = RunParams.getDouble("FOV_ANGLE");
+    public static Integer FOV_ANGLE = RunParams.getInt("FOV_ANGLE");
     public static Double FOV_MIN_DIST = RunParams.getDouble("FOV_MIN_DIST");
     private float[] lastCameraData;
     private Pose lastEstimatedPose;

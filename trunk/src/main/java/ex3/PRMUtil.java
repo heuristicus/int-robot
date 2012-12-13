@@ -1001,12 +1001,14 @@ public class PRMUtil {
      * fov_angle is the kinect vision fov in degrees, heading is the robot heading
      * in radians. range_min is the minimum range at which things can be detected
      * range_max is the maximum detection range. The projected fov will be drawn
-     * onto the map provided.
+     * onto the map provided. An arraylist of integers is returned which contains
+     * the indices that each ray traced went through.
      */
-    public static void projectFOV(double ox, double oy, double bearing, double fov_angle,
+    public static ArrayList<ArrayList<Integer>> projectFOV(double ox, double oy, double bearing, int fov_angle,
             double range_min, double range_max, OccupancyGrid map, OccupancyGrid mapToModify) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
+        ArrayList<ArrayList<Integer>> fovRays = new ArrayList<ArrayList<Integer>>();
          // As the ROS angle system has 0 deg = east and increases anti-clockwise
         // but the Quaternion trigonometry and particle raytracing assume 0 deg = north / clockwise,
         // we must first convert to 0 deg = north / clockwise by subtracting PI/2
@@ -1027,6 +1029,7 @@ public class PRMUtil {
         float map_resolution = map.getInfo().getResolution(); // in m per pixel
 
         for (int i = 0; i < fov_angle; i++) {
+            ArrayList<Integer> ray = new ArrayList<Integer>();
             // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
             double grad_x = Math.sin(currentRayAngle);
             double grad_y = Math.cos(currentRayAngle);
@@ -1064,6 +1067,7 @@ public class PRMUtil {
                         occupied = true;
                     } else {
                         occupied = false;
+                        ray.add(index);
                         modData.setByte(index, 100);
                     }
                 } else {
@@ -1071,7 +1075,9 @@ public class PRMUtil {
                 }
             }
             currentRayAngle = normaliseAngle(currentRayAngle + rayAngleIncrement);
+            fovRays.add(ray);
         }
+        return fovRays;
     }
 
     /*
