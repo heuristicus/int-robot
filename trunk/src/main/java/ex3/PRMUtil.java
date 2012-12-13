@@ -979,4 +979,19 @@ public class PRMUtil {
         System.out.println("Synchronised block took " + (System.currentTimeMillis()-start)+"ms");
     }
 
+
+    public static OccupancyGrid copyMap(OccupancyGrid origMap, MessageFactory factory) {
+        // Copy data in the grid to a new channel buffer
+        ChannelBuffer original = ChannelBuffers.copiedBuffer(origMap.getData());
+
+        // Get an occupancy grid for us to put modified data into.
+        OccupancyGrid newMap = factory.newFromType(OccupancyGrid._TYPE);
+
+        // Copy the original buffer into the newly created grid.
+        newMap.setInfo(origMap.getInfo());
+        newMap.setData(ChannelBuffers.copiedBuffer(origMap.getData()));
+
+        return newMap;
+    }
+
 }

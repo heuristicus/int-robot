@@ -157,6 +157,9 @@ public class Navigator extends AbstractNodeMain {
         odomPub.addMessageListener(new MessageListener<Odometry>() {
             @Override
             public void onNewMessage(Odometry t) {
+                if (obstacleWithinSafeDistance){
+                    System.out.println("odom");
+                }
                 // Each time we receive an odometry message, publish a movement to cmd_vel.
                 // This is probably not how we should do things - odometry is published even
                 // when the robot is not moving which could cause all sorts of weird problems.
@@ -180,7 +183,6 @@ public class Navigator extends AbstractNodeMain {
                         obstacleMarkers.addAll(newObstacles); // Track the obstacles in a list
                         System.out.println("ObstacleMarkers after adding: "+obstacleMarkers.size());
                         publishObstacleMarkers(obstacleMarkers);
-                        System.out.println("Published markers");
                         // Add obstacle(s) to map
 //                        OccupancyGrid mapToInflate = obstacleInflatedMap == null ? inflatedMap : obstacleInflatedMap;
                         OccupancyGrid mapToInflate = inflatedMap;

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package ex4;
 
 import ex3.PRM;
@@ -22,6 +18,7 @@ import nav_msgs.OccupancyGrid;
 import nav_msgs.Odometry;
 import org.ros.message.MessageFactory;
 import org.ros.message.MessageListener;
+import org.ros.message.Time;
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
@@ -34,14 +31,9 @@ import std_msgs.Int32;
 import visualization_msgs.Marker;
 import visualization_msgs.MarkerArray;
 
-/**
- *
- * @author HammyG
- */
 public class MainNode extends AbstractNodeMain {
 
     private enum Phase {
-
         INITIALISATION,
         FINDROOM,
         SCANNINGROOM,
@@ -67,6 +59,11 @@ public class MainNode extends AbstractNodeMain {
     public static Integer EXPLORATION_TARGET_PER_CELL = RunParams.getInt("EXPLORATION_TARGET_PER_CELL");
     public static String EXPLORATION_SAMPLING = RunParams.get("EXPLORATION_SAMPLING");
     public static String SUCCESS_SOUND_FILE = "/usr/lib/openoffice/basis3.2/share/gallery/sounds/applause.wav";
+    public static Double FOV_DISTANCE = RunParams.getDouble("FOV_DISTANCE");
+    public static Double FOV_ANGLE = RunParams.getDouble("FOV_ANGLE");
+    public static Double FOV_MIN_DIST = RunParams.getDouble("FOV_MIN_DIST");
+
+
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
     public double currentGridStep = INITIAL_EXPLORATION_GRID_STEP;
@@ -96,6 +93,10 @@ public class MainNode extends AbstractNodeMain {
     Publisher<std_msgs.Bool> navActivePub;
     Publisher<MarkerArray> explorationMarkerPub;
 
+    public OccupancyGrid exploredMap; // Map to chart explored portions of the map
+    Publisher<OccupancyGrid> exploredMapPub;
+    private static long explorationStartTime = 0;
+
     int a = 1; // DEBUGGING. PLEASE DELETE
 
     @Override
@@ -115,6 +116,8 @@ public class MainNode extends AbstractNodeMain {
 
         explorationMarkerPub = connectedNode.newPublisher("exp_vert", MarkerArray._TYPE);
         explorationMarkerPub.setLatchMode(true);
+        exploredMapPub = connectedNode.newPublisher("exp_map", OccupancyGrid._TYPE);
+        exploredMapPub.setLatchMode(true);
         //instantiate the driver with the twist publisher
         driver = new Driver(twist_pub);
 
@@ -187,7 +190,8 @@ public class MainNode extends AbstractNodeMain {
                         } else {
                             // Exploration path done. Let's go again, but increase
                             // the granularity
-                            exploreWithMoreGranularity();
+                            System.exit(0);
+//                            exploreWithMoreGranularity();
                         }
                     } else if (currentPhase == Phase.PRMTOPERSON) {
                         //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
@@ -238,6 +242,9 @@ public class MainNode extends AbstractNodeMain {
                     Printer.println("Got map in MainNode", "CYANF");
                     map = t;
                     prmUtil = new PRMUtil(new Random(), messageFactory, map);
+                    if (exploredMap == null) {
+                        exploredMap = PRMUtil.copyMap(map, messageFactory);
+                    }
                 }
             }
         });
@@ -367,13 +374,119 @@ public class MainNode extends AbstractNodeMain {
                 
                 if (currentPhase == Phase.INITIALISATION && map != null) {
                     //driver.onNewEstimatedPose(lastEstimatedPose);
-                    findEmptyRoom();
-                    //initialiseExploration();
+                    //findEmptyRoom();
+                    initialiseExploration();
                 }
 
             }
         });
         Printer.println("MainNode initialised", "CYANF");
+
+        //set the subscriber for the ground truth position (from stage)
+        Subscriber<Odometry> groundTruth = connectedNode.newSubscriber("base_pose_ground_truth", Odometry._TYPE);
+        groundTruth.addMessageListener(new MessageListener<Odometry>() {
+            @Override
+            public void onNewMessage(Odometry message) {
+                Pose lastRealPos = StaticMethods.copyPose(message.getPose().getPose());
+                // Invert x and y so that they match the actual position.
+                // Why? I have no idea.
+//                double y_temp = lastRealPos.getPosition().getY();// * -1.0;
+//                lastRealPos.getPosition().setY(lastRealPos.getPosition().getX());
+//                lastRealPos.getPosition().setX(y_temp);
+
+                if (exploredMap != null && explorationVertices != null) {
+                    Time time = message.getHeader().getStamp();
+                    plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
+                    exploredMapPub.publish(exploredMap);
+                }
+            }
+        });
+    }
+
+    private static Polygon2D getFOVpoly(Pose pose, double minDistance, double maxDistance, double fovAngle, double mapRes) {
+        double heading = StaticMethods.getHeading(pose.getOrientation());
+        double halfAngle = Math.toRadians(fovAngle / 2.0);
+        Polygon2D triangle = new Polygon2D();
+        
+        double scaledX, scaledY;
+//        scaledX = pose.getPosition().getX() / mapRes;
+//        scaledY = pose.getPosition().getY() / mapRes;
+//        triangle.addPoint(scaledX, -scaledY);
+
+
+        scaledX = (pose.getPosition().getX() + (minDistance * Math.cos(heading + halfAngle))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (minDistance * Math.sin(heading + halfAngle))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        scaledX = (pose.getPosition().getX() + (minDistance * Math.cos(heading - halfAngle))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (minDistance * Math.sin(heading - halfAngle))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading - halfAngle))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading - halfAngle / 2))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle/2))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle/2))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle/2))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle))) / mapRes;
+        triangle.addPoint(scaledX, -scaledY);
+
+        return triangle;
+    }
+
+    public void plotFieldOfViewOnMap(OccupancyGrid explorationMap,
+            Pose pose, Time time) {
+        final int mapHeight = explorationMap.getInfo().getHeight();
+        final int mapWidth = explorationMap.getInfo().getWidth();
+        final float mapRes = explorationMap.getInfo().getResolution();
+        Polygon2D tri = getFOVpoly(pose, FOV_MIN_DIST,FOV_DISTANCE, FOV_ANGLE, mapRes);
+
+        int index;
+        int pixel;
+        int freeBefore = 0;
+        int freeAfter = 0;
+        for (int y = 0; y < mapHeight; y++) {
+            for (int x = 0; x < mapWidth; x++) {
+                index = PRMUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
+                pixel = explorationMap.getData().getByte(index);
+                if (pixel != 100 && pixel != -1) {
+                    if (! isInMeetingRooms(y * mapRes, x * mapRes)) { // X and y flipped. Go figure
+                        freeBefore++;
+                        if (tri.contains(x, y)) {
+                            explorationMap.getData().setByte(index, 100);
+                        } else {
+                            freeAfter++;
+                        }
+                    }
+                }
+            }
+
+        }
+
+        double orientation = Math.toDegrees(AbstractLocaliser.getHeading(pose.getOrientation()))+ 90;
+        if (orientation > 180){
+            orientation = -(180 - orientation % 180);
+        }
+
+        long now = time.secs;
+        if (explorationStartTime == 0) { explorationStartTime = now; } //System.currentTimeMillis(); }
+        Printer.println("coverage: FREE AFTER:" + freeAfter + ","+(now-explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
+    }
+
+    public boolean isInMeetingRooms(float x, float y) {
+        for (int j = 0; j < meetingRooms.length; j++) {
+            if (meetingRooms[j].contains(x, y)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public double getHeadingFromLastPos() {
@@ -477,6 +590,7 @@ public class MainNode extends AbstractNodeMain {
         mlist.add(m);
         markers.setMarkers(mlist);
         explorationMarkerPub.publish(markers);
+        Printer.println("coverage: number of waypoints: " + explorationVertices.size()+ ", values:" + explorationVertices);
         goToNextExplorationVertex();
         Printer.println("Exploratio initialised and markers published", "CYANF");
     }
