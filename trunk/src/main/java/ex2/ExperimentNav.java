@@ -3,7 +3,6 @@ package ex2;
 import geometry_msgs.Point;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
-import geometry_msgs.Quaternion;
 import geometry_msgs.Twist;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -85,7 +84,7 @@ public class ExperimentNav extends AbstractNodeMain {
         odom = connectedNode.newSubscriber("odom", Odometry._TYPE);
         ground_truth = connectedNode.newSubscriber("base_pose_ground_truth", Odometry._TYPE);
 
-        publishInitialPose();
+        LocalisationUtil.publishInitialPose(12.75, 4.075, 128.92, initial_pose_pub, messageFactory);
 
         if (realWorldMode) {
             messages = connectedNode.newSubscriber("message", std_msgs.Bool._TYPE);
@@ -366,74 +365,4 @@ public class ExperimentNav extends AbstractNodeMain {
         logger.close();
     }
 
-    public Quaternion createQuaternion() {
-        Quaternion q = messageFactory.newFromType(Quaternion._TYPE);
-
-        // Set up 'identity' (blank) quaternion
-        q.setX(0);
-        q.setY(0);
-        q.setZ(0);
-        q.setW(1);
-        return q;
-    }
-
-    public Quaternion rotateQuaternion(Quaternion q_orig, double yaw) {
-        // Create a temporary Quaternion to represent the change in heading
-        Quaternion q_headingChange = createQuaternion();
-
-        double p = 0;
-        double y = yaw / 2.0;
-        double r = 0;
-
-        double sinp = Math.sin(p);
-        double siny = Math.sin(y);
-        double sinr = Math.sin(r);
-        double cosp = Math.cos(p);
-        double cosy = Math.cos(y);
-        double cosr = Math.cos(r);
-
-        q_headingChange.setX(sinr * cosp * cosy - cosr * sinp * siny);
-        q_headingChange.setY(cosr * sinp * cosy + sinr * cosp * siny);
-        q_headingChange.setZ(cosr * cosp * siny - sinr * sinp * cosy);
-        q_headingChange.setW(cosr * cosp * cosy + sinr * sinp * siny);
-
-        // Multiply new (heading-only) quaternion by the existing (pitch and bank) quaternion
-        // Order is important! Original orientation is the second argument;
-        // rotation which will be applied to the quaternion is the first argument.
-        return multiply_quaternions(q_headingChange, q_orig);
-    }
-
-    private Quaternion multiply_quaternions(Quaternion qa, Quaternion qb) {
-        Quaternion combined = createQuaternion();
-
-        combined.setW(qa.getW() * qb.getW() - qa.getX() * qb.getX() - qa.getY() * qb.getY() - qa.getZ() * qb.getZ());
-        combined.setX(qa.getX() * qb.getW() + qa.getW() * qb.getX() + qa.getY() * qb.getZ() - qa.getZ() * qb.getY());
-        combined.setY(qa.getW() * qb.getY() - qa.getX() * qb.getZ() + qa.getY() * qb.getW() + qa.getZ() * qb.getX());
-        combined.setZ(qa.getW() * qb.getZ() + qa.getX() * qb.getY() - qa.getY() * qb.getX() + qa.getZ() * qb.getW());
-        return combined;
-
-    }
-
-    private void publishInitialPose() {
-        PoseWithCovarianceStamped initialPose = initial_pose_pub.newMessage();
-        initialPose.getPose().getPose().getPosition().setX(12.75);
-        initialPose.getPose().getPose().getPosition().setY(4.075);
-        initialPose.getPose().getPose().setOrientation(rotateQuaternion(createQuaternion(), Math.toRadians(128.92)));
-
-        double[] cov = new double[36]; // 36 comes from the msg definition, and is fixed
-        for (int i = 0; i < cov.length; i++) {
-            cov[i] = 0.0;
-        }
-        initialPose.getPose().setCovariance(cov);
-
-        initialPose.getHeader().setFrameId("/map");
-
-        long timeNow = System.currentTimeMillis();
-
-        while (System.currentTimeMillis() - timeNow < 1000) {
-            initial_pose_pub.publish(initialPose);
-        }
-        System.out.println("Published intitial pose: X: " + initialPose.getPose().getPose().getPosition().getX()
-                + ", Y: " + initialPose.getPose().getPose().getPosition().getY());
-    }
 }

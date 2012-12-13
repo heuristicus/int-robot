@@ -8,7 +8,6 @@ import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
 import geometry_msgs.PoseStamped;
-import geometry_msgs.PoseWithCovariance;
 import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import geometry_msgs.Twist;
@@ -38,10 +37,10 @@ import visualization_msgs.Marker;
 
 public class Navigator extends AbstractNodeMain {
 
-    public static final double MAX_ROTATION_SPEED = 0.3;
+    public static final double MAX_ROTATION_SPEED = 0.4;
     public static final double MIN_ROTATION_SPEED = 0.05;
-    public static final double MAX_MOVE_SPEED = 0.3;
-    public static final double MIN_MOVE_SPEED = 0.1;
+    public static final double MAX_MOVE_SPEED = 0.7;
+    public static final double MIN_MOVE_SPEED = 0.2;
     public static final double POINT_REACHED_THRESHOLD = 0.2;
     public static final double POINT_PROXIMITY_THRESHOLD = 2.0;
     public static final double DISTANCE_FROM_LAST_ESTIMATED_POSE = 3.0;

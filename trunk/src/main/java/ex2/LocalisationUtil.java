@@ -4,6 +4,7 @@ import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseArray;
 import geometry_msgs.PoseWithCovariance;
+import geometry_msgs.PoseWithCovarianceStamped;
 import geometry_msgs.Quaternion;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.ros.message.MessageFactory;
 import org.ros.message.Time;
+import org.ros.node.topic.Publisher;
 import pf.AbstractLocaliser;
 import pf.SensorModel;
 
@@ -211,6 +213,81 @@ public class LocalisationUtil {
 
         return rPose;
 
+    }
+
+           public static Quaternion createQuaternion(MessageFactory factory) {
+        Quaternion q = factory.newFromType(Quaternion._TYPE);
+
+        // Set up 'identity' (blank) quaternion
+        q.setX(0);
+        q.setY(0);
+        q.setZ(0);
+        q.setW(1);
+        return q;
+    }
+
+    public static Quaternion rotateQuaternion(Quaternion q_orig, double yaw, MessageFactory factory) {
+        // Create a temporary Quaternion to represent the change in heading
+        Quaternion q_headingChange = createQuaternion(factory);
+
+        double p = 0;
+        double y = yaw / 2.0;
+        double r = 0;
+
+        double sinp = Math.sin(p);
+        double siny = Math.sin(y);
+        double sinr = Math.sin(r);
+        double cosp = Math.cos(p);
+        double cosy = Math.cos(y);
+        double cosr = Math.cos(r);
+
+        q_headingChange.setX(sinr * cosp * cosy - cosr * sinp * siny);
+        q_headingChange.setY(cosr * sinp * cosy + sinr * cosp * siny);
+        q_headingChange.setZ(cosr * cosp * siny - sinr * sinp * cosy);
+        q_headingChange.setW(cosr * cosp * cosy + sinr * sinp * siny);
+
+        // Multiply new (heading-only) quaternion by the existing (pitch and bank) quaternion
+        // Order is important! Original orientation is the second argument;
+        // rotation which will be applied to the quaternion is the first argument.
+        return multiply_quaternions(q_headingChange, q_orig, factory);
+    }
+
+    private static Quaternion multiply_quaternions(Quaternion qa, Quaternion qb, MessageFactory factory) {
+        Quaternion combined = createQuaternion(factory);
+
+        combined.setW(qa.getW() * qb.getW() - qa.getX() * qb.getX() - qa.getY() * qb.getY() - qa.getZ() * qb.getZ());
+        combined.setX(qa.getX() * qb.getW() + qa.getW() * qb.getX() + qa.getY() * qb.getZ() - qa.getZ() * qb.getY());
+        combined.setY(qa.getW() * qb.getY() - qa.getX() * qb.getZ() + qa.getY() * qb.getW() + qa.getZ() * qb.getX());
+        combined.setZ(qa.getW() * qb.getZ() + qa.getX() * qb.getY() - qa.getY() * qb.getX() + qa.getZ() * qb.getW());
+        return combined;
+
+    }
+
+    /*
+     * The publisher passed in should be publishing to the initialpose topic.
+     * theta is in degrees.
+     */
+    public static void publishInitialPose(double x, double y, double theta, Publisher<PoseWithCovarianceStamped> pub, MessageFactory factory) {
+        PoseWithCovarianceStamped initialPose = pub.newMessage();
+        initialPose.getPose().getPose().getPosition().setX(12.75);
+        initialPose.getPose().getPose().getPosition().setY(4.075);
+        initialPose.getPose().getPose().setOrientation(rotateQuaternion(createQuaternion(factory), Math.toRadians(128.92), factory));
+
+        double[] cov = new double[36]; // 36 comes from the msg definition, and is fixed
+        for (int i = 0; i < cov.length; i++) {
+            cov[i] = 0.0;
+        }
+        initialPose.getPose().setCovariance(cov);
+
+        initialPose.getHeader().setFrameId("/map");
+
+        long timeNow = System.currentTimeMillis();
+
+        while (System.currentTimeMillis() - timeNow < 1000) {
+            pub.publish(initialPose);
+        }
+        System.out.println("Published intitial pose: X: " + initialPose.getPose().getPose().getPosition().getX()
+                + ", Y: " + initialPose.getPose().getPose().getPosition().getY());
     }
 
 }

@@ -1,5 +1,6 @@
 package ex3;
 
+import ex2.LocalisationUtil;
 import ex4.Printer;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
@@ -15,10 +16,12 @@ import java.util.Queue;
 import java.util.Random;
 import launcher.RunParams;
 import nav_msgs.OccupancyGrid;
+import nav_msgs.Odometry;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.ros.message.MessageFactory;
 import org.ros.node.topic.Publisher;
+import pf.AbstractLocaliser;
 import std_msgs.ColorRGBA;
 import visualization_msgs.Marker;
 
@@ -992,6 +995,130 @@ public class PRMUtil {
         newMap.setData(ChannelBuffers.copiedBuffer(origMap.getData()));
 
         return newMap;
+    }
+
+    /*
+     * fov_angle is the kinect vision fov in degrees, heading is the robot heading
+     * in radians. range_min is the minimum range at which things can be detected
+     * range_max is the maximum detection range. The projected fov will be drawn
+     * onto the map provided.
+     */
+    public static void projectFOV(double ox, double oy, double bearing, double fov_angle,
+            double range_min, double range_max, OccupancyGrid map, OccupancyGrid mapToModify) {
+        ChannelBuffer data = map.getData();
+        ChannelBuffer modData = mapToModify.getData();
+         // As the ROS angle system has 0 deg = east and increases anti-clockwise
+        // but the Quaternion trigonometry and particle raytracing assume 0 deg = north / clockwise,
+        // we must first convert to 0 deg = north / clockwise by subtracting PI/2
+//        bearing -= Math.PI / 2;
+        bearing *= -1;
+
+        double fovRad = Math.toRadians(fov_angle);
+
+        double firstRayAngle = normaliseAngle(bearing - fovRad / 2);
+        double lastRayAngle = normaliseAngle(bearing + fovRad / 2);
+        double currentRayAngle = firstRayAngle;
+        double rayAngleIncrement = Math.toRadians(1) * angleDirection(firstRayAngle, lastRayAngle);
+
+        System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
+        // Map data
+        long map_width = map.getInfo().getWidth();
+        long map_height = map.getInfo().getHeight();
+        float map_resolution = map.getInfo().getResolution(); // in m per pixel
+
+        for (int i = 0; i < fov_angle; i++) {
+            // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
+            double grad_x = Math.sin(currentRayAngle);
+            double grad_y = Math.cos(currentRayAngle);
+
+//            double grad_x = Math.sin(Math.toRadians(i));
+//            double grad_y = Math.cos(Math.toRadians(i));
+
+            // Particle position
+            double x_orig = ox / map_resolution;
+            double y_orig = oy / map_resolution;
+            // Max range position relative to the current position
+            double x_max_offset = range_max * grad_x / map_resolution;
+            double y_max_offset = range_max * grad_y / map_resolution;
+
+            double x = x_orig;
+            double y = y_orig;
+            boolean occupied = false; // Have we found an occupied cell yet?
+
+            // Stop travelling away from the robot when we reach max range of
+            // laser or an occupied cell
+            while (Math.abs(x - x_orig) < Math.abs(x_max_offset)
+                    && Math.abs(y - y_orig) < Math.abs(y_max_offset)
+                    && !occupied) {
+                x += grad_x;
+                y += grad_y;
+
+                int index = getMapIndex((int) Math.round(x), (int) Math.round(y), (int) map_width, (int) map_height);
+
+                if (index > 0 && index < data.capacity()) {
+                    // If we are on the map to begin with...
+                    Byte cellData = data.getByte(index);
+
+                    if (cellData.byteValue() < 0 || cellData.byteValue() > 65) {
+                        // If we're on the map, but the map has no data, or there is an obstacle...
+                        occupied = true;
+                    } else {
+                        occupied = false;
+                        modData.setByte(index, 100);
+                    }
+                } else {
+                    occupied = true;
+                }
+            }
+            currentRayAngle = normaliseAngle(currentRayAngle + rayAngleIncrement);
+        }
+    }
+
+    /*
+     * Modifies the angle given (in radians) to make it correspond with the required
+     * range of angles, -pi to pi, where -ve rotation is clockwise.
+     */
+    public static double normaliseAngle(double angleRad){
+        double res;
+        if (angleRad < -Math.PI) {
+            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
+            res = Math.PI + (angleRad%-Math.PI);
+            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (Math.PI%angleRad));
+        } else if (angleRad > Math.PI) {
+            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
+            res = -Math.PI + (angleRad%Math.PI);
+            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (-Math.PI % angleRad));
+        } else {
+            res = angleRad;
+        }
+
+        return res;
+    }
+
+    /*
+     * Calculate sign necessary to rotate from firstangle towards
+     * lastangle by the shortest rotation. i.e. if you are at -179 and want to
+     * rotate to 179, in which direction should you turn. (In this case, the
+     * answer is in the -ve direction.
+     */
+    public static double angleDirection(double firstAngle, double lastAngle){
+        int sign;
+        if (lastAngle < 0 && firstAngle > 0) {
+            if (firstAngle >= Math.PI / 2) {
+                sign = +1;
+            } else {
+                sign = -1;
+            }
+        } else if (firstAngle < 0 && lastAngle > 0) {
+            if (lastAngle >= Math.PI / 2) {
+                sign = -1;
+            } else {
+                sign = +1;
+            }
+        } else {
+            sign = +1;
+        }
+        return sign;
     }
 
 }

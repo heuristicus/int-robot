@@ -399,6 +399,7 @@ public class MainNode extends AbstractNodeMain {
                 if (currentPhase == Phase.INITIALISATION && inflatedMap != null) {
                     //driver.onNewEstimatedPose(lastEstimatedPose);
                     //findEmptyRoom();
+
                     initialiseExploration();
                 }
             }
@@ -420,10 +421,16 @@ public class MainNode extends AbstractNodeMain {
 
                 if (exploredMap != null && explorationVertices != null) {
                     Time time = message.getHeader().getStamp();
-                    plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
+//                   plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
+                    // Appears to require subtraction 0.6 to get the stage base pose to correspond
+                    // with correct position in rviz
+                    PRMUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
+                            lastRealPos.getPosition().getX() - 0.6,
+                            AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
+                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, originalMap, exploredMap);
                     exploredMapPub.publish(exploredMap);
-                    normaliseHeatMap();
-                    heatMapPub.publish(heatMap);
+//                    normaliseHeatMap();
+//                    heatMapPub.publish(heatMap);
                 }
             }
         });
