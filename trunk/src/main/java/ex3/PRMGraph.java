@@ -1,5 +1,6 @@
 package ex3;
 
+import util.PRMUtil;
 import geometry_msgs.Point;
 import java.util.ArrayList;
 import java.util.List;

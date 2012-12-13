@@ -1,7 +1,7 @@
 package ex3.experiment;
 
 import ex3.PRM;
-import ex3.PRMUtil;
+import util.PRMUtil;
 import ex3.Vertex;
 import ex3.search.Dijkstra;
 import geometry_msgs.Point;

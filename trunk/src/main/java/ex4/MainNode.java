@@ -1,7 +1,7 @@
 package ex4;
 
 import ex3.PRM;
-import ex3.PRMUtil;
+import util.PRMUtil;
 import ex3.Vertex;
 import geometry_msgs.Point;
 import geometry_msgs.Pose;
@@ -28,6 +28,7 @@ import org.ros.node.topic.Subscriber;
 import pf.AbstractLocaliser;
 import std_msgs.Float32MultiArray;
 import std_msgs.Int32;
+import util.GeneralUtil;
 import visualization_msgs.Marker;
 import visualization_msgs.MarkerArray;
 
@@ -77,6 +78,7 @@ public class MainNode extends AbstractNodeMain {
     public static Dimension CAMERA_DIMENSIONS = new Dimension(640, 480);
     protected Driver driver;
     public PRMUtil prmUtil;
+    public GeneralUtil genUtil;
     public OccupancyGrid inflatedMap;
     public OccupancyGrid originalMap;
     private Polygon2D[] meetingRooms;
@@ -249,8 +251,9 @@ public class MainNode extends AbstractNodeMain {
                     Printer.println("Got map in MainNode", "CYANF");
                     inflatedMap = t;
                     prmUtil = new PRMUtil(new Random(), messageFactory, inflatedMap);
+                    genUtil = new GeneralUtil(messageFactory);
                     if (exploredMap == null) {
-                        exploredMap = PRMUtil.copyMap(originalMap, messageFactory);
+                        exploredMap = GeneralUtil.copyMap(originalMap, messageFactory);
                     }
                 }
             }
@@ -487,7 +490,7 @@ public class MainNode extends AbstractNodeMain {
         int freeAfter = 0;
         for (int y = 0; y < mapHeight; y++) {
             for (int x = 0; x < mapWidth; x++) {
-                index = PRMUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
+                index = GeneralUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
                 pixel = explorationMap.getData().getByte(index);
                 if (pixel != 100 && pixel != -1) {
                     if (!isInMeetingRooms(y * mapRes, x * mapRes)) { // X and y flipped. Go figure
@@ -642,7 +645,7 @@ public class MainNode extends AbstractNodeMain {
         currentPhase = Phase.EXPLORING;
 
         MarkerArray markers = explorationMarkerPub.newMessage();
-        Marker m = prmUtil.makePathMarker(explorationVertices, "expvert", null, 23);
+        Marker m = genUtil.makePathMarker(explorationVertices, "expvert", null, 23);
         ArrayList<Marker> mlist = new ArrayList<Marker>();
         mlist.add(m);
         markers.setMarkers(mlist);

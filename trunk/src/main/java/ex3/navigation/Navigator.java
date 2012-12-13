@@ -1,7 +1,7 @@
 package ex3.navigation;
 
 import ex3.PRM;
-import ex3.PRMUtil;
+import util.PRMUtil;
 import ex3.pid.PID;
 import ex4.Printer;
 import geometry_msgs.Point;
@@ -32,6 +32,7 @@ import org.ros.node.topic.Subscriber;
 import pf.AbstractLocaliser;
 import sensor_msgs.LaserScan;
 import std_msgs.Bool;
+import util.GeneralUtil;
 import util.LaserUtil;
 import visualization_msgs.Marker;
 
@@ -409,7 +410,7 @@ public class Navigator extends AbstractNodeMain {
             for (int yOffset = -OBSTACLE_INFLATION_RADIUS; yOffset <= OBSTACLE_INFLATION_RADIUS; yOffset++) {
                 int xOffset = mapWidth * yOffset;
 
-                int index = PRMUtil.getMapIndex(scaledX, scaledY, mapWidth, mapHeight);
+                int index = GeneralUtil.getMapIndex(scaledX, scaledY, mapWidth, mapHeight);
 
                 for (int j = index + xOffset - OBSTACLE_INFLATION_RADIUS; j <= index + xOffset + OBSTACLE_INFLATION_RADIUS; j++) {
                     // If there is an obstacle very close to the zeroth index, avoid
@@ -459,7 +460,7 @@ public class Navigator extends AbstractNodeMain {
             for (int yOffset = -OBSTACLE_INFLATION_RADIUS; yOffset <= OBSTACLE_INFLATION_RADIUS; yOffset++) {
                 int xOffset = mapWidth * yOffset;
 
-                int index = PRMUtil.getMapIndex(scaledX, scaledY, mapWidth, mapHeight);
+                int index = GeneralUtil.getMapIndex(scaledX, scaledY, mapWidth, mapHeight);
 
                 for (int j = index + xOffset - OBSTACLE_INFLATION_RADIUS; j <= index + xOffset + OBSTACLE_INFLATION_RADIUS; j++) {
                     // If there is an obstacle very close to the zeroth index, avoid
@@ -536,7 +537,7 @@ public class Navigator extends AbstractNodeMain {
     }
 
     public void publishObstacleMarkers(List<Point> markers) {
-        Marker m = PRMUtil.setUpMarker("/map", "obstacle", 15, Marker.ADD, Marker.POINTS, null, null, null, factory);
+        Marker m = GeneralUtil.setUpMarker("/map", "obstacle", 15, Marker.ADD, Marker.POINTS, null, null, null, factory);
 
         m.getScale().setX(MARKER_POINT_WIDTH);
         m.getScale().setY(MARKER_POINT_WIDTH);

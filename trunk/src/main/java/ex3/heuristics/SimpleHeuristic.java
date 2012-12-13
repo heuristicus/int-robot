@@ -1,6 +1,6 @@
 package ex3.heuristics;
 
-import ex3.PRMUtil;
+import util.PRMUtil;
 import ex3.Vertex;
 
 public class SimpleHeuristic implements Heuristic {

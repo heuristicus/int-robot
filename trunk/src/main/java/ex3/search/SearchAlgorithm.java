@@ -1,7 +1,7 @@
 package ex3.search;
 
 import ex3.PRMGraph;
-import ex3.PRMUtil;
+import util.PRMUtil;
 import ex3.Vertex;
 import java.util.ArrayList;
 

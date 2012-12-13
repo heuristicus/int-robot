@@ -1,5 +1,6 @@
 package ex3;
 
+import util.PRMUtil;
 import ex3.search.SearchAlgorithm;
 import ex4.Printer;
 import geometry_msgs.Point;
@@ -19,6 +20,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.Node;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
+import util.GeneralUtil;
 import visualization_msgs.Marker;
 import visualization_msgs.MarkerArray;
 
@@ -26,7 +28,8 @@ public class PRM extends AbstractNodeMain {
 
     public int MAX_REGENERATION_ATTEMPTS = RunParams.getInt("MAX_REGENERATION_ATTEMPTS");//200;
     
-    PRMUtil util;
+    PRMUtil prmUtil;
+    GeneralUtil genUtil;
     PRMGraph graph;
     SearchAlgorithm search;
     boolean mapReceived = false;
@@ -75,6 +78,7 @@ public class PRM extends AbstractNodeMain {
 
     @Override
     public void onStart(final ConnectedNode node) {
+        prmUtil = new PRMUtil(new Random(), node.getTopicMessageFactory(), inflatedMap);
         grid = node.newSubscriber("map", OccupancyGrid._TYPE);
         goals = node.newSubscriber("goal", PoseStamped._TYPE);
         initialPosition = node.newSubscriber("initialpose", PoseWithCovarianceStamped._TYPE);
@@ -130,7 +134,7 @@ public class PRM extends AbstractNodeMain {
         initialPosition.addMessageListener(new MessageListener<PoseWithCovarianceStamped>() {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped t) {
-                boolean inFreeSpace = util.isPositionValid(t.getPose().getPose(), inflatedMap);
+                boolean inFreeSpace = prmUtil.isPositionValid(t.getPose().getPose(), inflatedMap);
 
                 if (inFreeSpace){
                     currentPosition = t.getPose().getPose();
@@ -153,15 +157,15 @@ public class PRM extends AbstractNodeMain {
 
             if (regenerationAttempts > 1) {
                 // Regenerate graph
-                graph.generatePRM(util, inflatedMap);
+                graph.generatePRM(prmUtil, inflatedMap);
             }
 
             Vertex start = new Vertex(currentPosition.getPosition());
             Vertex goal = new Vertex(goalPosition.getPosition());
 
             // Try and add the start and goal points to the graph
-            boolean startAdded = graph.addVertex(start, util, inflatedMap);
-            boolean goalAdded = graph.addVertex(goal, util, inflatedMap);
+            boolean startAdded = graph.addVertex(start, prmUtil, inflatedMap);
+            boolean goalAdded = graph.addVertex(goal, prmUtil, inflatedMap);
 
 
             // Check to see if we've already added the start or goal points to the
@@ -203,7 +207,7 @@ public class PRM extends AbstractNodeMain {
 
         // Find a flattened path and print some information about it
         System.out.println("Found route of size: " + route.size() + ". Flattening...");
-        flatRoute = util.flattenDrunkenPath(route, -1, inflatedMap); // -1 is flatten fully
+        flatRoute = prmUtil.flattenDrunkenPath(route, -1, inflatedMap); // -1 is flatten fully
         System.out.println("Flattened to size: " + flatRoute.size());
         double percentage = (double) flatRoute.size() / (double) route.size();
         System.out.println("Unflattened path length is: " + PRMUtil.getPathLength(route));
@@ -211,8 +215,8 @@ public class PRM extends AbstractNodeMain {
         System.out.printf("New path is %.2f times the size of the original.\n", percentage);
         MarkerArray paths = pathMarkers.newMessage();
         ArrayList<Marker> pathList = new ArrayList<Marker>();
-        pathList.add(util.makePathMarker(route,"originalPath", "blue", 2));
-        pathList.add(util.makePathMarker(flatRoute, "flattenedPath", "orange", 3));
+        pathList.add(genUtil.makePathMarker(route,"originalPath", "blue", 2));
+        pathList.add(genUtil.makePathMarker(flatRoute, "flattenedPath", "orange", 3));
 
         paths.setMarkers(pathList);
         pathMarkers.publish(paths);
@@ -228,9 +232,10 @@ public class PRM extends AbstractNodeMain {
     /* Initialises the PRM with a utility object and a graph. */
     public void initialisePRM(MessageFactory factory) {
         inflatedMap = PRMUtil.inflateMap(originalMap, inflatedMapPublisher);
-        util = new PRMUtil(new Random(seed), factory, inflatedMap);
+        prmUtil = new PRMUtil(new Random(seed), factory, inflatedMap);
+        genUtil = new GeneralUtil(factory);
         graph = new PRMGraph();
-        graph.generatePRM(util, inflatedMap);
+        graph.generatePRM(prmUtil, inflatedMap);
 
         publishMarkers(graph);
         if (! experimentMode) {
@@ -240,7 +245,7 @@ public class PRM extends AbstractNodeMain {
 
         publishGrid();
 
-        System.out.println("Average path length: " + util.averageConnectionLength(graph));
+        System.out.println("Average path length: " + prmUtil.averageConnectionLength(graph));
         graphGenerationComplete = true;
     }
 
@@ -250,7 +255,7 @@ public class PRM extends AbstractNodeMain {
      */
     private ArrayList<Vertex> findRoute(Vertex v1, Vertex v2){
         double start = System.currentTimeMillis();
-        ArrayList<Vertex> path =  search.shortestPath(v1, v2, graph, util);
+        ArrayList<Vertex> path =  search.shortestPath(v1, v2, graph, prmUtil);
         System.out.println(search + " search took " + (System.currentTimeMillis() - start) + "ms.");
         return path;
     }
@@ -260,7 +265,7 @@ public class PRM extends AbstractNodeMain {
      */
     public void publishMarkers(PRMGraph graph){
         MarkerArray array = PRMMarkers.newMessage();
-        array.setMarkers(util.getGraphMarkers(graph, inflatedMap, "/map"));
+        array.setMarkers(genUtil.getGraphMarkers(graph, inflatedMap, "/map"));
         PRMMarkers.publish(array);
     }
 
@@ -269,15 +274,15 @@ public class PRM extends AbstractNodeMain {
         double mapWidth = inflatedMap.getInfo().getWidth();
         double mapRes = inflatedMap.getInfo().getResolution();
         MarkerArray arr = PRMMarkers.newMessage();
-        Marker m = util.setUpMarker("/map", "grid", 10, Marker.ADD, Marker.LINE_LIST, null, null, null);
+        Marker m = genUtil.setUpMarker("/map", "grid", 10, Marker.ADD, Marker.LINE_LIST, null, null, null);
         m.getPose().getOrientation().setZ(0.1f);
         m.getColor().setA(1.0f);
         m.getColor().setB(1.0f);
         m.getScale().setX(0.1f);
         int cellWidthMap = (int)(RunParams.getDouble("CELL_WIDTH")/mapRes);
         for (int i = 0; i < mapWidth; i += cellWidthMap) {
-            Point p1 = util.factory.newFromType(Point._TYPE);
-            Point p2 = util.factory.newFromType(Point._TYPE);
+            Point p1 = prmUtil.getFactory().newFromType(Point._TYPE);
+            Point p2 = prmUtil.getFactory().newFromType(Point._TYPE);
             p1.setX(-i*mapRes);
             p1.setY(0);
             p2.setX(-i*mapRes);
@@ -287,8 +292,8 @@ public class PRM extends AbstractNodeMain {
             m.getPoints().add(p2);
         }
         for (int j = 0; j < mapHeight; j += cellWidthMap) {
-            Point p1 = util.factory.newFromType(Point._TYPE);
-            Point p2 = util.factory.newFromType(Point._TYPE);
+            Point p1 = prmUtil.getFactory().newFromType(Point._TYPE);
+            Point p2 = prmUtil.getFactory().newFromType(Point._TYPE);
             p1.setX(0);
             p1.setY(-j*mapRes);
             p2.setX(-mapWidth*mapRes);
@@ -308,7 +313,7 @@ public class PRM extends AbstractNodeMain {
      * Converts the given arraylist of vertices into poses and then publishes it
      */
     public void publishRoute(ArrayList<Vertex> rt){
-        PoseArray pa = util.convertVertexList(rt);
+        PoseArray pa = genUtil.convertVertexList(rt);
         routePub.publish(pa);
     }
 
@@ -320,7 +325,7 @@ public class PRM extends AbstractNodeMain {
      * WARNING: MAY TAKE A LONG TIME!
      */
     public void reconnectGraph() {
-        graph.reconnectGraph(util);
+        graph.reconnectGraph(prmUtil);
     }
 
 
@@ -360,7 +365,7 @@ public class PRM extends AbstractNodeMain {
     public void setInflatedMap(OccupancyGrid infMap) {
         System.out.println("Setting inflated map");
         this.inflatedMap = infMap;
-        util.setInflatedMap(this.inflatedMap);
+        prmUtil.setInflatedMap(this.inflatedMap);
         PRMUtil._checkAndPruneGraph(this.graph, this.inflatedMap);
         Printer.println("Graph pruned in PRM", "REDF");
         inflatedMapPublisher.publish(this.inflatedMap);
