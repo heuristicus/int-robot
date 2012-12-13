@@ -104,11 +104,12 @@ public class MapViewerJPanel extends JPanel {
     }
 
     private Color getHeatColor(double value, double maxValue) {
+        //colour
         float minHue = 0; //blue;
         float maxHue = 0.6875f; //red
         float hue = maxHue - ((float) (value / maxValue) * (maxHue- minHue));
         return Color.getHSBColor(hue, 1, 1);
-        
+        //monotone
     //    int colour = (int)((value / maxValue) * 255.0);
     //    return new Color(colour, 0, 0);
     }
