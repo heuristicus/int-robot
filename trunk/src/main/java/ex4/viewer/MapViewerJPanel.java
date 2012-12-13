@@ -53,12 +53,7 @@ public class MapViewerJPanel extends JPanel {
                             //occupied
                             g.setColor(Color.BLACK);
                         }
-                        int offset = 100;
-                        if (x <= offset) {
-                            g.drawLine(mapWidth - offset + x, y, mapWidth - offset + x, y);
-                        } else {
-                            g.drawLine(x - offset, y, x - offset, y);
-                        }
+                        drawPixel(g, x, y);
                     }
                 }
             }
@@ -66,7 +61,8 @@ public class MapViewerJPanel extends JPanel {
 
         //paint heat map
         if (heatMapData != null) {
-            byte[] heatDataCopy = (byte[])heatMapData.clone();
+            byte[] heatDataCopy = (byte[]) heatMapData.clone();
+            //get max heat value
             double maxHeatValue = 0;
             for (double heatValue : heatDataCopy) {
                 if (heatValue > maxHeatValue) {
@@ -80,14 +76,9 @@ public class MapViewerJPanel extends JPanel {
                     if (index > 0 && index < heatDataCopy.length) {
                         int heatValue = heatDataCopy[index];
                         if (heatValue > 0) {
+                            System.out.println("Heat value: " + heatValue);
                             g.setColor(getHeatColor(heatValue, maxHeatValue));
-
-                            int offset = 100;
-                            if (x <= offset) {
-                                g.drawLine(mapWidth - offset + x, y, mapWidth - offset + x, y);
-                            } else {
-                                g.drawLine(x - offset, y, x - offset, y);
-                            }
+                            drawPixel(g, x, y);
                         }
                     }
                 }
@@ -103,14 +94,24 @@ public class MapViewerJPanel extends JPanel {
         }
     }
 
+    private void drawPixel(Graphics g, int x, int y) {
+        int offset = 100;
+        //mapHeight - y: flip map
+        if (x <= offset) {
+            g.drawLine(mapWidth - offset + x, mapHeight - y, mapWidth - offset + x, mapHeight - y);
+        } else {
+            g.drawLine(x - offset, mapHeight - y, x - offset, mapHeight - y);
+        }
+    }
+
     private Color getHeatColor(double value, double maxValue) {
         //colour
         float minHue = 0; //blue;
         float maxHue = 0.6875f; //red
-        float hue = maxHue - ((float) (value / maxValue) * (maxHue- minHue));
+        float hue = maxHue - ((float) (value / maxValue) * (maxHue - minHue));
         return Color.getHSBColor(hue, 1, 1);
         //monotone
-    //    int colour = (int)((value / maxValue) * 255.0);
-    //    return new Color(colour, 0, 0);
+        //    int colour = (int)((value / maxValue) * 255.0);
+        //    return new Color(colour, 0, 0);
     }
 }
