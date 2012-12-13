@@ -1020,7 +1020,8 @@ public class PRMUtil {
         double firstRayAngle = normaliseAngle(bearing - fovRad / 2);
         double lastRayAngle = normaliseAngle(bearing + fovRad / 2);
         double currentRayAngle = firstRayAngle;
-        double rayAngleIncrement = Math.toRadians(1) * angleDirection(firstRayAngle, lastRayAngle);
+        double angleIncrementStep = 0.5;
+        double rayAngleIncrement = Math.toRadians(angleIncrementStep) * angleDirection(firstRayAngle, lastRayAngle);
 
         System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
         // Map data
@@ -1028,7 +1029,7 @@ public class PRMUtil {
         long map_height = map.getInfo().getHeight();
         float map_resolution = map.getInfo().getResolution(); // in m per pixel
 
-        for (int i = 0; i < fov_angle; i++) {
+        for (int i = 0; i < fov_angle / angleIncrementStep; i++) {
             ArrayList<Integer> ray = new ArrayList<Integer>();
             // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
             double grad_x = Math.sin(currentRayAngle);

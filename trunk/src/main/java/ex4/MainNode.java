@@ -403,7 +403,6 @@ public class MainNode extends AbstractNodeMain {
                 if (currentPhase == Phase.INITIALISATION && inflatedMap != null) {
                     //driver.onNewEstimatedPose(lastEstimatedPose);
                     //findEmptyRoom();
-
                     initialiseExploration();
                 }
             }
@@ -416,7 +415,7 @@ public class MainNode extends AbstractNodeMain {
 
             @Override
             public void onNewMessage(Odometry message) {
-                Pose lastRealPos = StaticMethods.copyPose(message.getPose().getPose());
+                 Pose lastRealPos = StaticMethods.copyPose(message.getPose().getPose());
                 // Invert x and y so that they match the actual position.
                 // Why? I have no idea.
 //                double y_temp = lastRealPos.getPosition().getY();// * -1.0;
@@ -425,16 +424,19 @@ public class MainNode extends AbstractNodeMain {
 
                 if (exploredMap != null && explorationVertices != null) {
                     Time time = message.getHeader().getStamp();
+                    ArrayList<ArrayList<Integer>> clone;
 //                   plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
                     // Appears to require subtraction 0.6 to get the stage base pose to correspond
                     // with correct position in rviz
-                    PRMUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
+                    ArrayList<ArrayList<Integer>> rayIndexes = PRMUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
                             FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap);
                     exploredMapPub.publish(exploredMap);
-//                    normaliseHeatMap();
-//                    heatMapPub.publish(heatMap);
+clone = (ArrayList<ArrayList<Integer>>)rayIndexes.clone();
+                    updateHeatData(clone, heatMapData);
+                    normaliseHeatMap(heatMap, heatMapData);
+                    heatMapPub.publish(heatMap);
                 }
             }
         });
@@ -526,16 +528,28 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("coverage: FREE AFTER:" + freeAfter + "," + (now - explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
     }
 
-    private void normaliseHeatMap() {
+    private void normaliseHeatMap(OccupancyGrid heatMapGrid, double[] heatDataArray) {
         double maxHeatValue = 0;
-        for (double heatValue : heatMapData) {
+        for (double heatValue : heatDataArray) {
             if (heatValue > maxHeatValue) {
                 maxHeatValue = heatValue;
             }
         }
 
-        for (int i = 0; i < heatMap.getData().array().length; i++) {
-            heatMap.getData().array()[i] = (byte) ((heatMapData[i] / maxHeatValue) * 100.0);
+        for (int i = 0; i < heatMapGrid.getData().array().length; i++) {
+            int value =  (int)((heatDataArray[i] / maxHeatValue) * 100.0);
+            if(value >100){
+                Printer.println("*****************************VALUE OVER 100!!!!!" + value, "REDB");
+            }
+            heatMapGrid.getData().array()[i] = (byte) value;
+        }
+    }
+
+    private synchronized void updateHeatData(ArrayList<ArrayList<Integer>> coveredIndexes, double[] heatDataArray){
+        for(ArrayList<Integer> ray : coveredIndexes){
+            for(Integer index: ray){
+                heatDataArray[index]++;
+            }
         }
     }
 
