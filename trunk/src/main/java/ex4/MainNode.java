@@ -34,6 +34,7 @@ import visualization_msgs.MarkerArray;
 public class MainNode extends AbstractNodeMain {
 
     private enum Phase {
+
         INITIALISATION,
         FINDROOM,
         SCANNINGROOM,
@@ -62,8 +63,6 @@ public class MainNode extends AbstractNodeMain {
     public static Double FOV_DISTANCE = RunParams.getDouble("FOV_DISTANCE");
     public static Double FOV_ANGLE = RunParams.getDouble("FOV_ANGLE");
     public static Double FOV_MIN_DIST = RunParams.getDouble("FOV_MIN_DIST");
-
-
     private float[] lastCameraData;
     private Pose lastEstimatedPose;
     public double currentGridStep = INITIAL_EXPLORATION_GRID_STEP;
@@ -78,7 +77,8 @@ public class MainNode extends AbstractNodeMain {
     public static Dimension CAMERA_DIMENSIONS = new Dimension(640, 480);
     protected Driver driver;
     public PRMUtil prmUtil;
-    public OccupancyGrid map;
+    public OccupancyGrid inflatedMap;
+    public OccupancyGrid originalMap;
     private Polygon2D[] meetingRooms;
     private PoseStamped[] centreOfMeetingRooms;
     private int meetingRoomIndex = -1;
@@ -89,14 +89,16 @@ public class MainNode extends AbstractNodeMain {
     Subscriber<std_msgs.Int32> prmInfo;
     Subscriber<std_msgs.Float32MultiArray> cameraRectSubscriber;
     Subscriber<PoseWithCovarianceStamped> estimatedPose;
-    Subscriber<OccupancyGrid> mapSub;
+    Subscriber<OccupancyGrid> inflatedMapSub;
+    Subscriber<OccupancyGrid> originalMapSub;
     Publisher<std_msgs.Bool> navActivePub;
     Publisher<MarkerArray> explorationMarkerPub;
-
     public OccupancyGrid exploredMap; // Map to chart explored portions of the map
+    private OccupancyGrid heatMap;
+    private double[] heatMapData;
+    Publisher<OccupancyGrid> heatMapPub;
     Publisher<OccupancyGrid> exploredMapPub;
     private static long explorationStartTime = 0;
-
     int a = 1; // DEBUGGING. PLEASE DELETE
 
     @Override
@@ -118,6 +120,10 @@ public class MainNode extends AbstractNodeMain {
         explorationMarkerPub.setLatchMode(true);
         exploredMapPub = connectedNode.newPublisher("exp_map", OccupancyGrid._TYPE);
         exploredMapPub.setLatchMode(true);
+
+        heatMapPub = connectedNode.newPublisher("heat_map", OccupancyGrid._TYPE);
+        heatMapPub.setLatchMode(true);
+
         //instantiate the driver with the twist publisher
         driver = new Driver(twist_pub);
 
@@ -196,7 +202,7 @@ public class MainNode extends AbstractNodeMain {
                     } else if (currentPhase == Phase.PRMTOPERSON) {
                         //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
                         DialogBox dialog = new DialogBox("Attend Meeting?", "Would you like to attend the meeting?");
-                        if(dialog.getUserResponse() == DialogBox.response.YES){
+                        if (dialog.getUserResponse() == DialogBox.response.YES) {
                             Printer.println("Person accepted invite, PRMing to meeting room", "CYANF");
                             prmToMeetingRoom();
                         } else {
@@ -223,7 +229,7 @@ public class MainNode extends AbstractNodeMain {
                     // and go to the next one.
                     if (currentPhase == Phase.EXPLORING) {
                         Printer.println("PRM could not find path. Popping next vertex.", "REDF");
-                    } else if (currentPhase == Phase.PRMTOPERSON){
+                    } else if (currentPhase == Phase.PRMTOPERSON) {
                         Printer.println("Person location blocked by obstacles. Continuing exploration.", "REDF");
                     }
                     goToNextExplorationVertex();
@@ -234,17 +240,35 @@ public class MainNode extends AbstractNodeMain {
             }
         });
 
-        mapSub = connectedNode.newSubscriber("inflatedMap", OccupancyGrid._TYPE);
-        mapSub.addMessageListener(new MessageListener<OccupancyGrid>() {
+        inflatedMapSub = connectedNode.newSubscriber("inflatedMap", OccupancyGrid._TYPE);
+        inflatedMapSub.addMessageListener(new MessageListener<OccupancyGrid>() {
+
             @Override
             public void onNewMessage(OccupancyGrid t) {
                 if (currentPhase == Phase.INITIALISATION) {
                     Printer.println("Got map in MainNode", "CYANF");
-                    map = t;
-                    prmUtil = new PRMUtil(new Random(), messageFactory, map);
+                    inflatedMap = t;
+                    prmUtil = new PRMUtil(new Random(), messageFactory, inflatedMap);
                     if (exploredMap == null) {
-                        exploredMap = PRMUtil.copyMap(map, messageFactory);
+                        exploredMap = PRMUtil.copyMap(originalMap, messageFactory);
                     }
+                }
+            }
+        });
+
+        originalMapSub = connectedNode.newSubscriber("map", OccupancyGrid._TYPE);
+        originalMapSub.addMessageListener(new MessageListener<OccupancyGrid>() {
+
+            @Override
+            public void onNewMessage(OccupancyGrid t) {
+                if (originalMap == null) {
+                    originalMap = t;
+                    heatMap = messageFactory.newFromType(OccupancyGrid._TYPE);
+                    heatMap.setHeader(originalMap.getHeader());
+                    heatMap.setInfo(originalMap.getInfo());
+                    heatMap.setData(originalMap.getData().copy());
+                    heatMap.getData().clear();
+                    heatMapData = new double[heatMap.getData().array().length];
                 }
             }
         });
@@ -351,7 +375,7 @@ public class MainNode extends AbstractNodeMain {
                         Printer.println("Person goal set. Heading over...", "CYANF");
                     } else {
                         RectangleWithDepth rect = findPerson(lastFaceRectangle);
-                        if (rect != null){
+                        if (rect != null) {
                             Printer.println("Face rectangle received was null. Returning to exploration.", "CYANF");
                             returnToExploration();
                             return;
@@ -371,13 +395,12 @@ public class MainNode extends AbstractNodeMain {
             @Override
             public void onNewMessage(PoseWithCovarianceStamped message) {
                 lastEstimatedPose = StaticMethods.copyPose(message.getPose().getPose());
-                
-                if (currentPhase == Phase.INITIALISATION && map != null) {
+
+                if (currentPhase == Phase.INITIALISATION && inflatedMap != null) {
                     //driver.onNewEstimatedPose(lastEstimatedPose);
                     //findEmptyRoom();
                     initialiseExploration();
                 }
-
             }
         });
         Printer.println("MainNode initialised", "CYANF");
@@ -385,6 +408,7 @@ public class MainNode extends AbstractNodeMain {
         //set the subscriber for the ground truth position (from stage)
         Subscriber<Odometry> groundTruth = connectedNode.newSubscriber("base_pose_ground_truth", Odometry._TYPE);
         groundTruth.addMessageListener(new MessageListener<Odometry>() {
+
             @Override
             public void onNewMessage(Odometry message) {
                 Pose lastRealPos = StaticMethods.copyPose(message.getPose().getPose());
@@ -398,6 +422,8 @@ public class MainNode extends AbstractNodeMain {
                     Time time = message.getHeader().getStamp();
                     plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
                     exploredMapPub.publish(exploredMap);
+                    normaliseHeatMap();
+                    heatMapPub.publish(heatMap);
                 }
             }
         });
@@ -407,7 +433,7 @@ public class MainNode extends AbstractNodeMain {
         double heading = StaticMethods.getHeading(pose.getOrientation());
         double halfAngle = Math.toRadians(fovAngle / 2.0);
         Polygon2D triangle = new Polygon2D();
-        
+
         double scaledX, scaledY;
 //        scaledX = pose.getPosition().getX() / mapRes;
 //        scaledY = pose.getPosition().getY() / mapRes;
@@ -427,11 +453,11 @@ public class MainNode extends AbstractNodeMain {
         triangle.addPoint(scaledX, -scaledY);
 
         scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading - halfAngle / 2))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle/2))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle / 2))) / mapRes;
         triangle.addPoint(scaledX, -scaledY);
 
-        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle/2))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle/2))) / mapRes;
+        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle / 2))) / mapRes;
+        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle / 2))) / mapRes;
         triangle.addPoint(scaledX, -scaledY);
 
         scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle))) / mapRes;
@@ -446,7 +472,7 @@ public class MainNode extends AbstractNodeMain {
         final int mapHeight = explorationMap.getInfo().getHeight();
         final int mapWidth = explorationMap.getInfo().getWidth();
         final float mapRes = explorationMap.getInfo().getResolution();
-        Polygon2D tri = getFOVpoly(pose, FOV_MIN_DIST,FOV_DISTANCE, FOV_ANGLE, mapRes);
+        Polygon2D tri = getFOVpoly(pose, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE, mapRes);
 
         int index;
         int pixel;
@@ -457,7 +483,7 @@ public class MainNode extends AbstractNodeMain {
                 index = PRMUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
                 pixel = explorationMap.getData().getByte(index);
                 if (pixel != 100 && pixel != -1) {
-                    if (! isInMeetingRooms(y * mapRes, x * mapRes)) { // X and y flipped. Go figure
+                    if (!isInMeetingRooms(y * mapRes, x * mapRes)) { // X and y flipped. Go figure
                         freeBefore++;
                         if (tri.contains(x, y)) {
                             explorationMap.getData().setByte(index, 100);
@@ -466,18 +492,40 @@ public class MainNode extends AbstractNodeMain {
                         }
                     }
                 }
+                if (!isInMeetingRooms(y * mapRes, x * mapRes) && tri.contains(x, y)) { // X and y flipped. Go figure
+                    int mapCellData = originalMap.getData().getByte(index);
+//                    Printer.println("Entering heat map code, Map cell value:" + mapCellData, "CYANB");
+                    if (mapCellData >= 0 && mapCellData <= 65) { //not occupied
+                        heatMapData[index]++;
+                        //Printer.println("Heat Map Data i:" + index + " value: " + heatMapData[index], "REDB");
+                    }
+                }
             }
-
         }
 
-        double orientation = Math.toDegrees(AbstractLocaliser.getHeading(pose.getOrientation()))+ 90;
-        if (orientation > 180){
+        double orientation = Math.toDegrees(AbstractLocaliser.getHeading(pose.getOrientation())) + 90;
+        if (orientation > 180) {
             orientation = -(180 - orientation % 180);
         }
 
         long now = time.secs;
-        if (explorationStartTime == 0) { explorationStartTime = now; } //System.currentTimeMillis(); }
-        Printer.println("coverage: FREE AFTER:" + freeAfter + ","+(now-explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
+        if (explorationStartTime == 0) {
+            explorationStartTime = now;
+        } //System.currentTimeMillis(); }
+        Printer.println("coverage: FREE AFTER:" + freeAfter + "," + (now - explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
+    }
+
+    private void normaliseHeatMap() {
+        double maxHeatValue = 0;
+        for (double heatValue : heatMapData) {
+            if (heatValue > maxHeatValue) {
+                maxHeatValue = heatValue;
+            }
+        }
+
+        for (int i = 0; i < heatMap.getData().array().length; i++) {
+            heatMap.getData().array()[i] = (byte) ((heatMapData[i] / maxHeatValue) * 100.0);
+        }
     }
 
     public boolean isInMeetingRooms(float x, float y) {
@@ -493,7 +541,7 @@ public class MainNode extends AbstractNodeMain {
         return AbstractLocaliser.getHeading(lastEstimatedPose.getOrientation());
     }
 
-    public void exploreWithMoreGranularity(){
+    public void exploreWithMoreGranularity() {
         if (EXPLORATION_SAMPLING.equals("cell")) {
             if (currentCellSize > MINIMUM_EXPLORATION_CELL_SIZE) {
                 currentCellSize -= CELL_SIZE_REDUCTION_STEP;
@@ -507,11 +555,11 @@ public class MainNode extends AbstractNodeMain {
     }
 
     public void findEmptyRoom() {
-        Printer.println("Kicking off find-room phase","CYANF");
+        Printer.println("Kicking off find-room phase", "CYANF");
         currentPhase = Phase.FINDROOM;
         meetingRoomIndex++;
-        if (PRMUtil.getEuclideanDistance(centreOfMeetingRooms[0].getPose().getPosition(), lastEstimatedPose.getPosition()) >
-                PRMUtil.getEuclideanDistance(centreOfMeetingRooms[1].getPose().getPosition(), lastEstimatedPose.getPosition())){
+        if (PRMUtil.getEuclideanDistance(centreOfMeetingRooms[0].getPose().getPosition(), lastEstimatedPose.getPosition())
+                > PRMUtil.getEuclideanDistance(centreOfMeetingRooms[1].getPose().getPosition(), lastEstimatedPose.getPosition())) {
             Printer.println("Room 1 was closer than room 0. Going to room 1.", "CYANF");
             PoseStamped tmp = centreOfMeetingRooms[0];
             centreOfMeetingRooms[0] = centreOfMeetingRooms[1];
@@ -523,14 +571,16 @@ public class MainNode extends AbstractNodeMain {
             Clip clip = DialogBox.playAlertSound(DialogBox.FAILURE_SOUND);
             try {
                 if (clip != null) {
-                    while (!clip.isRunning())
+                    while (!clip.isRunning()) {
                         Thread.sleep(10);
+                    }
                     while (clip.isRunning()) {
                         Thread.sleep(10);
                     }
                     clip.close();
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
 
             meetingRoomIndex = 0; // Restart meeting room search
 //            System.exit(0);
@@ -539,7 +589,7 @@ public class MainNode extends AbstractNodeMain {
     }
 
     public void scanRoomForFace() {
-        Printer.println("Scanning room for face","CYANF");
+        Printer.println("Scanning room for face", "CYANF");
         currentPhase = Phase.SCANNINGROOM;
         turnRemaining = Math.PI * 2;
         driver.turn(getHeadingFromLastPos(), turnRemaining);
@@ -573,10 +623,10 @@ public class MainNode extends AbstractNodeMain {
     public void initialiseExploration() {
         ArrayList<Vertex> vertices = null;
         if (EXPLORATION_SAMPLING.equals("grid")) {
-            vertices = prmUtil.gridSample(map,
+            vertices = prmUtil.gridSample(inflatedMap,
                     currentGridStep, currentGridStep);
         } else if (EXPLORATION_SAMPLING.equals("cell")) {
-            vertices = prmUtil.cellSample(map,
+            vertices = prmUtil.cellSample(inflatedMap,
                     currentCellSize, EXPLORATION_TARGET_PER_CELL);
         }
 
@@ -590,9 +640,9 @@ public class MainNode extends AbstractNodeMain {
         mlist.add(m);
         markers.setMarkers(mlist);
         explorationMarkerPub.publish(markers);
-        Printer.println("coverage: number of waypoints: " + explorationVertices.size()+ ", values:" + explorationVertices);
+        Printer.println("coverage: number of waypoints: " + explorationVertices.size() + ", values:" + explorationVertices);
         goToNextExplorationVertex();
-        Printer.println("Exploratio initialised and markers published", "CYANF");
+        Printer.println("Exploration initialised and markers published", "CYANF");
     }
 
     public ArrayList<Vertex> getExplorationPath(Pose startPose, ArrayList<Vertex> vertices) {
@@ -622,7 +672,7 @@ public class MainNode extends AbstractNodeMain {
      */
     public void goToNextExplorationVertex() {
         Printer.println("Going to next exploration vertex.", "REDF");
-        if (explorationVertices.isEmpty()){
+        if (explorationVertices.isEmpty()) {
             exploreWithMoreGranularity();
             return;
         }
@@ -662,7 +712,7 @@ public class MainNode extends AbstractNodeMain {
         currentPhase = Phase.PRMTOROOM;
         setPRMGoal(centreOfMeetingRooms[meetingRoomIndex]);
     }
-    
+
     private boolean isTaskComplete() {
         //extend to add 15min time limit and/or other limits
         return pplCount == targetPplCount;
