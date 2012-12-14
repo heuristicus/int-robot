@@ -818,8 +818,8 @@ public class PRMUtil {
      * onto the map provided. An arraylist of integers is returned which contains
      * the indices that each ray traced went through.
      */
-    public static ArrayList<ArrayList<Integer>> projectFOV(double ox, double oy, double bearing, int fov_angle,
-            double range_min, double range_max, double angle_step, OccupancyGrid map, OccupancyGrid mapToModify) {
+    public static ArrayList<ArrayList<Integer>> projectFOV(double x, double y, double bearing, int fovAngle,
+            double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
         ArrayList<ArrayList<Integer>> fovRays = new ArrayList<ArrayList<Integer>>();
@@ -829,48 +829,52 @@ public class PRMUtil {
 //        bearing -= Math.PI / 2;
         bearing *= -1;
 
-        double fovRad = Math.toRadians(fov_angle);
+        double fovRad = Math.toRadians(fovAngle);
 
         double firstRayAngle = GeneralUtil.normaliseAngle(bearing - fovRad / 2);
         double lastRayAngle = GeneralUtil.normaliseAngle(bearing + fovRad / 2);
         double currentRayAngle = firstRayAngle;
-        double rayAngleIncrement = Math.toRadians(angle_step) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
+        double rayAngleIncrement = Math.toRadians(angleStep) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
 
 //        System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
         // Map data
-        long map_width = map.getInfo().getWidth();
-        long map_height = map.getInfo().getHeight();
-        float map_resolution = map.getInfo().getResolution(); // in m per pixel
+        long mapWidth = map.getInfo().getWidth();
+        long mapHeight = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution(); // in m per pixel
 
-        for (int i = 0; i < fov_angle / angle_step; i++) {
+        for (int i = 0; i < fovAngle / angleStep; i++) {
             ArrayList<Integer> ray = new ArrayList<Integer>();
             // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
-            double grad_x = Math.sin(currentRayAngle);
-            double grad_y = Math.cos(currentRayAngle);
+            double gradX = Math.sin(currentRayAngle);
+            double gradY = Math.cos(currentRayAngle);
+
 //            double grad_x = Math.sin(Math.toRadians(i));
 //            double grad_y = Math.cos(Math.toRadians(i));
 
             // Particle position
-            double x_orig = ox / map_resolution;
-            double y_orig = oy / map_resolution;
-            // Max range position relative to the current position
-            double x_max_offset = range_max * grad_x / map_resolution;
-            double y_max_offset = range_max * grad_y / map_resolution;
+            double startX = x / mapRes;
+            double startY = y / mapRes;
+            
+            // Min and max range positions relative to the current position
+            double maxX = maxRange * gradX / mapRes;
+            double maxY = maxRange * gradY / mapRes;
 
-            // This should really be dynamic - based on range_min
-            double x = x_orig + grad_x * 10;
-            double y = y_orig + grad_y * 10;
+            double minX = minRange * gradX / mapRes;
+            double minY = minRange * gradY / mapRes;
+            
+            double curX = startX;
+            double curY = startY;
             boolean occupied = false; // Have we found an occupied cell yet?
 
             // Stop travelling away from the robot when we reach max range of
             // laser or an occupied cell
-            while (Math.abs(x - x_orig) < Math.abs(x_max_offset)
-                    && Math.abs(y - y_orig) < Math.abs(y_max_offset)
+            while (Math.abs(curX - startX) < Math.abs(maxX)
+                    && Math.abs(curY - startY) < Math.abs(maxY)
                     && !occupied) {
-                x += grad_x;
-                y += grad_y;
+                curX += gradX;
+                curY += gradY;
 
-                int index = GeneralUtil.getMapIndex((int) Math.round(x), (int) Math.round(y), (int) map_width, (int) map_height);
+                int index = GeneralUtil.getMapIndex((int) Math.round(curX), (int) Math.round(curY), (int) mapWidth, (int) mapHeight);
 
                 if (index > 0 && index < data.capacity()) {
                     // If we are on the map to begin with...
@@ -880,9 +884,15 @@ public class PRMUtil {
                         // If we're on the map, but the map has no data, or there is an obstacle...
                         occupied = true;
                     } else {
-                        occupied = false;
-                        ray.add(index);
-                        modData.setByte(index, 100);
+                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY)) {
+                            // Don't draw anything if the current range is smaller than the
+                            // minimum range.
+                            continue;
+                        } else {
+                            occupied = false;
+                            ray.add(index);
+                            modData.setByte(index, 100);
+                        }
                     }
                 } else {
                     occupied = true;
