@@ -198,9 +198,6 @@ public class GeneralUtil {
     }
 
     public static OccupancyGrid copyMap(OccupancyGrid origMap, MessageFactory factory) {
-        // Copy data in the grid to a new channel buffer
-        ChannelBuffer original = ChannelBuffers.copiedBuffer(origMap.getData());
-
         // Get an occupancy grid for us to put modified data into.
         OccupancyGrid newMap = factory.newFromType(OccupancyGrid._TYPE);
 

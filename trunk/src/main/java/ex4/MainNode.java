@@ -29,6 +29,7 @@ import pf.AbstractLocaliser;
 import std_msgs.Float32MultiArray;
 import std_msgs.Int32;
 import util.GeneralUtil;
+import util.MeetingUtil;
 import visualization_msgs.Marker;
 import visualization_msgs.MarkerArray;
 
@@ -285,7 +286,7 @@ public class MainNode extends AbstractNodeMain {
 
             @Override
             public void onNewMessage(Float32MultiArray t) {
-                onNewCameraRectanglePoints(t.getData());
+                lastCameraData = t.getData();
                 if (t.getData().length != 0) {
                     if (currentPhase == Phase.SCANNINGROOM) {
                         Printer.println("Scanning room found face. Pausing and investigating face", "REDF");
@@ -320,7 +321,7 @@ public class MainNode extends AbstractNodeMain {
                         RectangleWithDepth newFaceRect = findPerson(lastFaceRectangle);
                         // Check whether the rectangle received is close to the
                         // one we received in the previous message.
-                        if (newFaceRect != null && (lastFaceRectangle == null || rectangleOverlapValid(lastFaceRectangle, newFaceRect))) {
+                        if (newFaceRect != null && (lastFaceRectangle == null || MeetingUtil.rectangleOverlapValid(lastFaceRectangle, newFaceRect, MAX_RECTANGLE_CENTRE_DISPARITY))) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
                             Printer.println("Face matches last seen. FaceCheckCount=" + faceCheckCount, "CYANF");
@@ -375,7 +376,7 @@ public class MainNode extends AbstractNodeMain {
                     if (isFaceCentred(lastFaceRectangle)) {
                         Printer.println("Face in centre. PRMing to person", "CYANF");
                         currentPhase = Phase.PRMTOPERSON;
-                        setPRMGoal(getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth));
+                        setPRMGoal(MeetingUtil.getObjectLocation(lastEstimatedPose, lastFaceRectangle.depth, messageFactory));
                         Printer.println("Person goal set. Heading over...", "CYANF");
                     } else {
                         RectangleWithDepth rect = findPerson(lastFaceRectangle);
@@ -427,63 +428,24 @@ public class MainNode extends AbstractNodeMain {
 //                   plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
                     // Appears to require subtraction 0.6 to get the stage base pose to correspond
                     // with correct position in rviz
-                    ArrayList<ArrayList<Integer>> rayIndexes = PRMUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
+                    ArrayList<ArrayList<Integer>> rayIndexes = MeetingUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
                             FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap);
                     exploredMapPub.publish(exploredMap);
-                    updateHeatData(rayIndexes, heatMapData);
-                    normaliseHeatMap(heatMap, heatMapData);
+                    MeetingUtil.updateHeatData(rayIndexes, heatMapData);
+                    MeetingUtil.normaliseHeatMap(heatMap, heatMapData);
                     heatMapPub.publish(heatMap);
                 }
             }
         });
     }
 
-    private static Polygon2D getFOVpoly(Pose pose, double minDistance, double maxDistance, double fovAngle, double mapRes) {
-        double heading = StaticMethods.getHeading(pose.getOrientation());
-        double halfAngle = Math.toRadians(fovAngle / 2.0);
-        Polygon2D triangle = new Polygon2D();
-
-        double scaledX, scaledY;
-//        scaledX = pose.getPosition().getX() / mapRes;
-//        scaledY = pose.getPosition().getY() / mapRes;
-//        triangle.addPoint(scaledX, -scaledY);
-
-
-        scaledX = (pose.getPosition().getX() + (minDistance * Math.cos(heading + halfAngle))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (minDistance * Math.sin(heading + halfAngle))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        scaledX = (pose.getPosition().getX() + (minDistance * Math.cos(heading - halfAngle))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (minDistance * Math.sin(heading - halfAngle))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading - halfAngle))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading - halfAngle / 2))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading - halfAngle / 2))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle / 2))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle / 2))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        scaledX = (pose.getPosition().getX() + (maxDistance * Math.cos(heading + halfAngle))) / mapRes;
-        scaledY = (pose.getPosition().getY() + (maxDistance * Math.sin(heading + halfAngle))) / mapRes;
-        triangle.addPoint(scaledX, -scaledY);
-
-        return triangle;
-    }
-
-    public void plotFieldOfViewOnMap(OccupancyGrid explorationMap,
-            Pose pose, Time time) {
+    public void plotFieldOfViewOnMap(OccupancyGrid explorationMap, Pose pose, Time time) {
         final int mapHeight = explorationMap.getInfo().getHeight();
         final int mapWidth = explorationMap.getInfo().getWidth();
         final float mapRes = explorationMap.getInfo().getResolution();
-        Polygon2D tri = getFOVpoly(pose, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE, mapRes);
+        Polygon2D tri = MeetingUtil.getFOVpoly(pose, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE, mapRes);
 
         int index;
         int pixel;
@@ -494,7 +456,7 @@ public class MainNode extends AbstractNodeMain {
                 index = GeneralUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
                 pixel = explorationMap.getData().getByte(index);
                 if (pixel != 100 && pixel != -1) {
-                    if (!isInMeetingRooms(y * mapRes, x * mapRes)) { // X and y flipped. Go figure
+                    if (!MeetingUtil.isPointInMeetingRooms(meetingRooms, y * mapRes, x * mapRes)) { // X and y flipped. Go figure
                         freeBefore++;
                         if (tri.contains(x, y)) {
                             explorationMap.getData().setByte(index, 100);
@@ -503,7 +465,7 @@ public class MainNode extends AbstractNodeMain {
                         }
                     }
                 }
-                if (!isInMeetingRooms(y * mapRes, x * mapRes) && tri.contains(x, y)) { // X and y flipped. Go figure
+                if (!MeetingUtil.isPointInMeetingRooms(meetingRooms, y * mapRes, x * mapRes) && tri.contains(x, y)) { // X and y flipped. Go figure
                     int mapCellData = originalMap.getData().getByte(index);
 //                    Printer.println("Entering heat map code, Map cell value:" + mapCellData, "CYANB");
                     if (mapCellData >= 0 && mapCellData <= 65) { //not occupied
@@ -524,37 +486,6 @@ public class MainNode extends AbstractNodeMain {
             explorationStartTime = now;
         } //System.currentTimeMillis(); }
         Printer.println("coverage: FREE AFTER:" + freeAfter + "," + (now - explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
-    }
-
-    private void normaliseHeatMap(OccupancyGrid heatMapGrid, double[] heatDataArray) {
-        double maxHeatValue = 0;
-        for (double heatValue : heatDataArray) {
-            if (heatValue > maxHeatValue) {
-                maxHeatValue = heatValue;
-            }
-        }
-
-        for (int i = 0; i < heatMapGrid.getData().array().length; i++) {
-            int value =  (int)((heatDataArray[i] / maxHeatValue) * 100.0);
-            heatMapGrid.getData().array()[i] = (byte) value;
-        }
-    }
-
-    private synchronized void updateHeatData(ArrayList<ArrayList<Integer>> coveredIndexes, double[] heatDataArray){
-        for(ArrayList<Integer> ray : coveredIndexes){
-            for(Integer index: ray){
-                heatDataArray[index]++;
-            }
-        }
-    }
-
-    public boolean isInMeetingRooms(float x, float y) {
-        for (int j = 0; j < meetingRooms.length; j++) {
-            if (meetingRooms[j].contains(x, y)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public double getHeadingFromLastPos() {
@@ -650,8 +581,8 @@ public class MainNode extends AbstractNodeMain {
                     currentCellSize, EXPLORATION_TARGET_PER_CELL);
         }
 
-        explorationVertices = getExplorationPath(lastEstimatedPose, vertices);
-        removeVerticesInMeetingRooms(explorationVertices);
+        explorationVertices = MeetingUtil.getExplorationPath(lastEstimatedPose, vertices);
+        MeetingUtil.removeVerticesInMeetingRooms(explorationVertices, meetingRooms);
         currentPhase = Phase.EXPLORING;
 
         MarkerArray markers = explorationMarkerPub.newMessage();
@@ -663,27 +594,6 @@ public class MainNode extends AbstractNodeMain {
         Printer.println("coverage: number of waypoints: " + explorationVertices.size() + ", values:" + explorationVertices);
         goToNextExplorationVertex();
         Printer.println("Exploration initialised and markers published", "CYANF");
-    }
-
-    public ArrayList<Vertex> getExplorationPath(Pose startPose, ArrayList<Vertex> vertices) {
-        ArrayList<Vertex> explorePath = new ArrayList<Vertex>(vertices.size());
-        Point curPoint = startPose.getPosition();
-
-        while (vertices.size() > 0) {
-            int minIndex = -1;
-            double minDist = Double.MAX_VALUE;
-            for (int i = 0; i < vertices.size(); i++) {
-                double thisDist = PRMUtil.getEuclideanDistance(curPoint, vertices.get(i).getLocation());
-                if (thisDist < minDist) {
-                    minIndex = i;
-                    minDist = thisDist;
-                }
-            }
-            Vertex curVertex = vertices.remove(minIndex);
-            curPoint = curVertex.getLocation();
-            explorePath.add(curVertex);
-        }
-        return explorePath;
     }
 
     /*
@@ -702,27 +612,6 @@ public class MainNode extends AbstractNodeMain {
         setPRMGoal(goalPose);
     }
 
-    /**
-     * Removes exploration vertices which exist within the meeting room as meeting room does not need to be explored
-     * counter used to tell us how many have been removed
-     */
-    public void removeVerticesInMeetingRooms(ArrayList<Vertex> vertices) {
-        int removedCounter = 0;
-        for (int i = vertices.size() - 1; i >= 0; i--) {
-            // if vertex is within meeting room, then remove the vertex so it is not explored   
-            Vertex nextVertex = vertices.get(i);
-            for (int j = 0; j < meetingRooms.length; j++) {
-                if (meetingRooms[j].contains(nextVertex.getLocation().getX(), nextVertex.getLocation().getY())) {
-                    vertices.remove(i);
-                    removedCounter++;
-                    // A vertex can only be in a single meeting room (assuming 
-                    // non-overlapping rooms), so don't bother checking other ones
-                    break;
-                }
-            }
-        }
-        Printer.println("removed " + removedCounter + " vertices found inside meeting rooms", "CYANF");
-    }
 
     /**
      * Change current phase to prm to meeting room
@@ -744,52 +633,14 @@ public class MainNode extends AbstractNodeMain {
      */
     private RectangleWithDepth findPerson(RectangleWithDepth previousRect) {
         float[] cameraDataCopy = Arrays.copyOf(lastCameraData, lastCameraData.length);
-        RectangleWithDepth[] rectangles = convert(cameraDataCopy);
+        RectangleWithDepth[] rectangles = MeetingUtil.convert(cameraDataCopy);
         if (previousRect == null) {
-            return getClosestRectangle(rectangles);
+            return MeetingUtil.getClosestRectangle(rectangles);
         } else {
             // find the rectangle that is the closest match to the one that we
             // received as a parameter
-            return getMostSimilarRectangle(rectangles, previousRect);
+            return MeetingUtil.getMostSimilarRectangle(rectangles, previousRect, MAX_RECTANGLE_DEPTH_DISPARITY, messageFactory);
         }
-    }
-
-    /*
-     * Checks the disparity between two rectangles is below the value specified
-     * in the parameter file.
-     */
-    public boolean rectangleOverlapValid(RectangleWithDepth lastRect, RectangleWithDepth curRect) {
-        Point lastCentre = getRectCentre(lastRect);
-        Point curCentre = getRectCentre(curRect);
-
-        double xDisparity = Math.abs(curCentre.getX() - lastCentre.getX());
-        double yDisparity = Math.abs(curCentre.getY() - lastCentre.getY());
-
-        boolean xValid = xDisparity <= (MAX_RECTANGLE_CENTRE_DISPARITY * curRect.width);
-        boolean yValid = yDisparity <= (MAX_RECTANGLE_CENTRE_DISPARITY * curRect.height);
-
-        return xValid && yValid;
-    }
-
-    public Point getRectCentre(RectangleWithDepth rect) {
-        Point centre = messageFactory.newFromType(Point._TYPE);
-        double lastX = rect.x + rect.width / 2;
-        double lastY = rect.y + rect.height / 2;
-        centre.setX(lastX);
-        centre.setY(lastY);
-        return centre;
-    }
-
-    /*
-     * Checks whether the centre point of curRect is within the rectangle lastRect.
-     */
-    public boolean checkPointCentreInRectangle(RectangleWithDepth lastRect, RectangleWithDepth curRect) {
-        Point centre = getRectCentre(curRect);
-
-        boolean xInRect = centre.getX() > lastRect.x && centre.getX() < lastRect.x + lastRect.width;
-        boolean yInRect = centre.getY() > lastRect.y && centre.getY() < lastRect.y + lastRect.height;
-
-        return xInRect && yInRect;
     }
 
     /*
@@ -797,11 +648,13 @@ public class MainNode extends AbstractNodeMain {
      * distance of the centre of the image.
      */
     public boolean isFaceCentred(RectangleWithDepth personDetection) {
-        Point centre = getRectCentre(personDetection);
-
-        return Math.abs(centre.getX() - (CAMERA_DIMENSIONS.width / 2)) < FACE_CENTRED_THRESHOLD * CAMERA_DIMENSIONS.width;
+        return Math.abs(personDetection.getCenterX() - (CAMERA_DIMENSIONS.width / 2)) < FACE_CENTRED_THRESHOLD * CAMERA_DIMENSIONS.width;
     }
 
+    /*
+     * Rotates the robot towards the centre of a given rectangle. This rectangle
+     * is assumed to be the location of a person's face.
+     */
     public void rotateTowardsPerson(RectangleWithDepth lastRectangle) {
         double areaCentreX = lastRectangle.getCenterX();
         double distFromCentreX = areaCentreX - (CAMERA_DIMENSIONS.width / 2);
@@ -818,97 +671,11 @@ public class MainNode extends AbstractNodeMain {
         }
     }
 
-    private RectangleWithDepth[] convert(float[] data) {
-        int numberOfRectangles = (int) (data.length / 5.0);
-        RectangleWithDepth[] result = new RectangleWithDepth[numberOfRectangles];
-        for (int i = 0; i < numberOfRectangles; i++) {
-            int index = i * 5;
-            result[i] = new RectangleWithDepth(
-                    data[index],
-                    data[index + 1],
-                    data[index + 2],
-                    data[index + 3],
-                    data[index + 4]);
-        }
-        return result;
-    }
-
     /*
-     * Find the rectangle in the array that has the smallest depth.
+     * Publishes a goal to the PRM topic.
      */
-    private RectangleWithDepth getClosestRectangle(RectangleWithDepth[] rectangles) {
-        RectangleWithDepth closestRect = null;
-        for (RectangleWithDepth rect : rectangles) {
-            if (closestRect == null || rect.getDepth() < closestRect.getDepth()) {
-                closestRect = rect;
-            }
-        }
-        return closestRect;
-    }
-
-    /*
-     * Finds the rectangle in the array that is most similar to the rectangle
-     * given.
-     */
-    private RectangleWithDepth getMostSimilarRectangle(RectangleWithDepth[] rectangles,
-            RectangleWithDepth testRect) {
-        RectangleWithDepth mostSimilar = null;
-        double similarDist = Double.MAX_VALUE;
-        for (RectangleWithDepth rect : rectangles) {
-            Point thisCentre = getRectCentre(rect);
-            Point testCentre = getRectCentre(testRect);
-
-            double msgDepth = rect.depth;
-            double testDepth = testRect.depth;
-            double thisDist = PRMUtil.getEuclideanDistance(testCentre, thisCentre);
-
-            if (thisDist < similarDist && Math.abs(msgDepth - testDepth) <= MAX_RECTANGLE_DEPTH_DISPARITY) {
-                mostSimilar = rect;
-                similarDist = thisDist;
-            }
-        }
-        return mostSimilar;
-    }
-
-    /*
-     * Calculates the position of a detected visual feature which is directly
-     * in front of the robot.
-     */
-    private PoseStamped getObjectLocation(Pose estimatedPoseCopy, double depth) {
-        PoseStamped personLocation = messageFactory.newFromType(PoseStamped._TYPE);
-        double heading = StaticMethods.getHeading(estimatedPoseCopy.getOrientation());
-        personLocation.getPose().getPosition().setX(
-                estimatedPoseCopy.getPosition().getX()
-                + (depth * Math.cos(heading)));
-        personLocation.getPose().getPosition().setY(
-                estimatedPoseCopy.getPosition().getY()
-                + (depth * Math.sin(heading)));
-        return personLocation;
-    }
-
-    private boolean personLost() {
-        return false;
-    }
-
-    private boolean personAcceptsInvite() {
-        return false;
-    }
-
     private void setPRMGoal(PoseStamped targetLocation) {
         goal.publish(targetLocation);
-    }
-
-    /*
-    public void updateMeetingRoomLocation(Point location) {
-    meetingRoomLocation.getPose().setPosition(location);
-    }
-     */
-    public void onNewCameraRectanglePoints(float[] data) {
-        lastCameraData = data;
-    }
-
-    public void onNewEstimatedPose(Pose estimatedPose) {
-        lastEstimatedPose = estimatedPose;
     }
 
     @Override
