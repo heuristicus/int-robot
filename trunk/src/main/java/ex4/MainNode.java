@@ -424,7 +424,6 @@ public class MainNode extends AbstractNodeMain {
 
                 if (exploredMap != null && explorationVertices != null) {
                     Time time = message.getHeader().getStamp();
-                    ArrayList<ArrayList<Integer>> clone;
 //                   plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
                     // Appears to require subtraction 0.6 to get the stage base pose to correspond
                     // with correct position in rviz
@@ -433,8 +432,7 @@ public class MainNode extends AbstractNodeMain {
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
                             FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap);
                     exploredMapPub.publish(exploredMap);
-clone = (ArrayList<ArrayList<Integer>>)rayIndexes.clone();
-                    updateHeatData(clone, heatMapData);
+                    updateHeatData(rayIndexes, heatMapData);
                     normaliseHeatMap(heatMap, heatMapData);
                     heatMapPub.publish(heatMap);
                 }
@@ -538,9 +536,6 @@ clone = (ArrayList<ArrayList<Integer>>)rayIndexes.clone();
 
         for (int i = 0; i < heatMapGrid.getData().array().length; i++) {
             int value =  (int)((heatDataArray[i] / maxHeatValue) * 100.0);
-            if(value >100){
-                Printer.println("*****************************VALUE OVER 100!!!!!" + value, "REDB");
-            }
             heatMapGrid.getData().array()[i] = (byte) value;
         }
     }

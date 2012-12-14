@@ -836,7 +836,7 @@ public class PRMUtil {
         double currentRayAngle = firstRayAngle;
         double rayAngleIncrement = Math.toRadians(angle_step) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
 
-        System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
+//        System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
         // Map data
         long map_width = map.getInfo().getWidth();
         long map_height = map.getInfo().getHeight();
@@ -847,7 +847,6 @@ public class PRMUtil {
             // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
             double grad_x = Math.sin(currentRayAngle);
             double grad_y = Math.cos(currentRayAngle);
-
 //            double grad_x = Math.sin(Math.toRadians(i));
 //            double grad_y = Math.cos(Math.toRadians(i));
 
@@ -858,8 +857,9 @@ public class PRMUtil {
             double x_max_offset = range_max * grad_x / map_resolution;
             double y_max_offset = range_max * grad_y / map_resolution;
 
-            double x = x_orig;
-            double y = y_orig;
+            // This should really be dynamic - based on range_min
+            double x = x_orig + grad_x * 10;
+            double y = y_orig + grad_y * 10;
             boolean occupied = false; // Have we found an occupied cell yet?
 
             // Stop travelling away from the robot when we reach max range of
