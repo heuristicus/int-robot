@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.ros.message.MessageFactory;
+import pf.AbstractLocaliser;
 
 public class MeetingUtil {
 
@@ -257,15 +258,33 @@ public class MeetingUtil {
         return personLocation;
     }
 
+    /*
+     * Gets a pose from stage's base_pose_ground_truth topic and normalises it to
+     * match with the expected position on the rviz map. For some unknown reason
+     * it is necessary to do this. The following operations are performed:
+     * x = -y - 0.6
+     * y = x - 0.6
+     * theta = -theta
+     */
+    public static Pose normaliseStagePose(Pose stagePose, MessageFactory factory){
+        Pose norm = factory.newFromType(Pose._TYPE);
+        norm.getPosition().setX(-stagePose.getPosition().getY() - 0.6);
+        norm.getPosition().setY(stagePose.getPosition().getX() - 0.6);
+        AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), -AbstractLocaliser.getHeading(stagePose.getOrientation()));
+        return norm;
+    }
+
       /*
      * fov_angle is the kinect vision fov in degrees, heading is the robot heading
      * in radians. range_min is the minimum range at which things can be detected
      * range_max is the maximum detection range. The projected fov will be drawn
      * onto the map provided. An arraylist of integers is returned which contains
-     * the indices that each ray traced went through.
+     * the indices that each ray traced went through. Will not place any points
+     * within the rooms in the polygon array provided.
      */
     public static ArrayList<ArrayList<Integer>> projectFOV(double x, double y, double bearing, int fovAngle,
-            double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify) {
+            double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify,
+            Polygon2D[] rooms) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
         ArrayList<ArrayList<Integer>> fovRays = new ArrayList<ArrayList<Integer>>();
@@ -274,6 +293,7 @@ public class MeetingUtil {
         // we must first convert to 0 deg = north / clockwise by subtracting PI/2
 //        bearing -= Math.PI / 2;
         bearing *= -1;
+        double freeBefore = countFreePixels(mapToModify, rooms);
 
         double fovRad = Math.toRadians(fovAngle);
 
@@ -330,7 +350,7 @@ public class MeetingUtil {
                         // If we're on the map, but the map has no data, or there is an obstacle...
                         occupied = true;
                     } else {
-                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY)) {
+                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) || isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
                             // Don't draw anything if the current range is smaller than the
                             // minimum range.
                             continue;
@@ -347,7 +367,36 @@ public class MeetingUtil {
             currentRayAngle = GeneralUtil.normaliseAngle(currentRayAngle + rayAngleIncrement);
             fovRays.add(ray);
         }
+
+        double freeAfter = countFreePixels(mapToModify, rooms);
+
+        Printer.println("coverage: Free before: " + freeBefore + ", free after: " + freeAfter + ", Pose: " + x + ", " + y + ", " + bearing);
         return fovRays;
+    }
+
+    /*
+     * Calculates how many free pixels there are in the given map.
+     */
+    public static double countFreePixels(OccupancyGrid map, Polygon2D[] rooms){
+        final int mapHeight = map.getInfo().getHeight();
+        final int mapWidth = map.getInfo().getWidth();
+        final float mapRes = map.getInfo().getResolution();
+        int index;
+        int pixel;
+        int freePixels = 0;
+        
+        for (int y = 0; y < mapHeight; y++) {
+            for (int x = 0; x < mapWidth; x++) {
+                index = GeneralUtil.getMapIndex(y, x, mapWidth, mapHeight); // X and y flipped. Go figure
+                pixel = map.getData().getByte(index);
+                if (pixel != 100 && pixel != -1) {
+                    if (!isPointInMeetingRooms(rooms, y * mapRes, x * mapRes)) { // X and y flipped. Go figure
+                        freePixels++;
+                    }
+                }
+            }
+        }
+        return freePixels;
     }
 
 }

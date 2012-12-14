@@ -76,7 +76,7 @@ public class MapViewerJPanel extends JPanel {
                     if (index > 0 && index < heatDataCopy.length) {
                         int heatValue = heatDataCopy[index];
                         if (heatValue > 0) {
-                            System.out.println("Heat value: " + heatValue);
+//                            System.out.println("Heat value: " + heatValue);
                             g.setColor(getHeatColor(heatValue, maxHeatValue));
                             drawPixel(g, x, y);
                         }

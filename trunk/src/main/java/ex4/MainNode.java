@@ -200,8 +200,8 @@ public class MainNode extends AbstractNodeMain {
                         } else {
                             // Exploration path done. Let's go again, but increase
                             // the granularity
-                            System.exit(0);
-//                            exploreWithMoreGranularity();
+//                            System.exit(0);
+                            exploreWithMoreGranularity();
                         }
                     } else if (currentPhase == Phase.PRMTOPERSON) {
                         //Ask person if they want to go to meeting room, if yes prm to room else if no turn and continue exploring
@@ -431,7 +431,7 @@ public class MainNode extends AbstractNodeMain {
                     ArrayList<ArrayList<Integer>> rayIndexes = MeetingUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
-                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap);
+                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap, meetingRooms);
                     exploredMapPub.publish(exploredMap);
                     MeetingUtil.updateHeatData(rayIndexes, heatMapData);
                     MeetingUtil.normaliseHeatMap(heatMap, heatMapData);
@@ -496,10 +496,18 @@ public class MainNode extends AbstractNodeMain {
         if (EXPLORATION_SAMPLING.equals("cell")) {
             if (currentCellSize > MINIMUM_EXPLORATION_CELL_SIZE) {
                 currentCellSize -= CELL_SIZE_REDUCTION_STEP;
+                System.out.println("Cell size set to " + currentCellSize);
+            } else {
+                Printer.println("Minimum cell size reached.");
+                System.exit(0);
             }
         } else if (EXPLORATION_SAMPLING.equals("grid")) {
             if (currentGridStep > MINIMUM_EXPLORATION_GRID_STEP) {
                 currentGridStep -= GRID_SIZE_REDUCTION_STEP;
+                System.out.println("Grid size set to " + currentGridStep);
+            } else {
+                Printer.println("Minimum grid size reached.");
+                System.exit(0);
             }
         }
         initialiseExploration();
@@ -653,7 +661,7 @@ public class MainNode extends AbstractNodeMain {
 
     /*
      * Rotates the robot towards the centre of a given rectangle. This rectangle
-     * is assumed to be the location of a person's face.
+     * is assumed to be the location of a person.
      */
     public void rotateTowardsPerson(RectangleWithDepth lastRectangle) {
         double areaCentreX = lastRectangle.getCenterX();

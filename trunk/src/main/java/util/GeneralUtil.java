@@ -217,13 +217,13 @@ public class GeneralUtil {
     public static double normaliseAngle(double angleRad) {
         double res;
         if (angleRad < -Math.PI) {
-            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
+//            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
             res = Math.PI + (angleRad % -Math.PI);
-            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (Math.PI % angleRad));
+//            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (Math.PI % angleRad));
         } else if (angleRad > Math.PI) {
-            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
+//            System.out.println("Normalising " + angleRad + " (" + Math.toDegrees(angleRad) + ")");
             res = -Math.PI + (angleRad % Math.PI);
-            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (-Math.PI % angleRad));
+//            System.out.println("normalised to:" + Math.toDegrees(res) + "pi%theta: " + (-Math.PI % angleRad));
         } else {
             res = angleRad;
         }
