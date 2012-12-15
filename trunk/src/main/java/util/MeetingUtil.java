@@ -9,6 +9,7 @@ import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseStamped;
 import java.util.ArrayList;
+import java.util.HashSet;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.ros.message.MessageFactory;
@@ -234,11 +235,15 @@ public class MeetingUtil {
      * Updates data inside a heatmap given list of lists of integers which come
      * from raytraced FOV lines.
      */
-    public static void updateHeatData(ArrayList<ArrayList<Integer>> coveredIndexes, double[] heatDataArray){
-        for(ArrayList<Integer> ray : coveredIndexes){
-            for(Integer index: ray){
-                heatDataArray[index]++;
-            }
+    public static void updateHeatDataRay(ArrayList<ArrayList<Integer>> coveredIndices, double[] heatData){
+        for(ArrayList<Integer> ray : coveredIndices){
+            updateHeatData(ray, heatData);
+        }
+    }
+
+    public static void updateHeatData(ArrayList<Integer> coveredIndices, double[] heatData){
+        for (Integer i : coveredIndices) {
+            heatData[i]++;
         }
     }
 
@@ -274,7 +279,7 @@ public class MeetingUtil {
         return norm;
     }
 
-      /*
+    /*
      * fov_angle is the kinect vision fov in degrees, heading is the robot heading
      * in radians. range_min is the minimum range at which things can be detected
      * range_max is the maximum detection range. The projected fov will be drawn
@@ -372,6 +377,110 @@ public class MeetingUtil {
 
         Printer.println("coverage: Free before: " + freeBefore + ", free after: " + freeAfter + ", Pose: " + x + ", " + y + ", " + bearing);
         return fovRays;
+    }
+
+
+    /*
+     * Same as the projectFOV function, but does not return the indices that each
+     * ray traces through. Instead, returns a single array of indices with no
+     * duplicates for all of the traced rays.
+     */
+    public static ArrayList<Integer> simple_projectFOV(double x, double y, double bearing, int fovAngle,
+            double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify,
+            Polygon2D[] rooms) {
+        ChannelBuffer data = map.getData();
+        ChannelBuffer modData = mapToModify.getData();
+        ArrayList<Integer> traceIndices = new ArrayList<Integer>();
+        // Store indices in a hashset so we can check if they've been seen before
+        // more efficiently.
+        HashSet<Integer> traced = new HashSet<Integer>();
+        // As the ROS angle system has 0 deg = east and increases anti-clockwise
+        // but the Quaternion trigonometry and particle raytracing assume 0 deg = north / clockwise,
+        // we must first convert to 0 deg = north / clockwise by subtracting PI/2
+//        bearing -= Math.PI / 2;
+        bearing *= -1;
+        double freeBefore = countFreePixels(mapToModify, rooms);
+
+        double fovRad = Math.toRadians(fovAngle);
+
+        double firstRayAngle = GeneralUtil.normaliseAngle(bearing - fovRad / 2);
+        double lastRayAngle = GeneralUtil.normaliseAngle(bearing + fovRad / 2);
+        double currentRayAngle = firstRayAngle;
+        double rayAngleIncrement = Math.toRadians(angleStep) * GeneralUtil.angleDirection(firstRayAngle, lastRayAngle);
+
+//        System.out.println("Start: " + Math.toDegrees(firstRayAngle) + " End: " + Math.toDegrees(lastRayAngle));
+        // Map data
+        long mapWidth = map.getInfo().getWidth();
+        long mapHeight = map.getInfo().getHeight();
+        float mapRes = map.getInfo().getResolution(); // in m per pixel
+
+        for (int i = 0; i < fovAngle / angleStep; i++) {
+            // Find gradient of the line of sight in x,y plane, assuming 0 deg = north
+            double gradX = Math.sin(currentRayAngle);
+            double gradY = Math.cos(currentRayAngle);
+
+//            double grad_x = Math.sin(Math.toRadians(i));
+//            double grad_y = Math.cos(Math.toRadians(i));
+
+            // Particle position
+            double startX = x / mapRes;
+            double startY = y / mapRes;
+
+            // Min and max range positions relative to the current position
+            double maxX = maxRange * gradX / mapRes;
+            double maxY = maxRange * gradY / mapRes;
+
+            double minX = minRange * gradX / mapRes;
+            double minY = minRange * gradY / mapRes;
+
+            double curX = startX;
+            double curY = startY;
+            boolean occupied = false; // Have we found an occupied cell yet?
+
+            // Stop travelling away from the robot when we reach max range of
+            // laser or an occupied cell
+            while (Math.abs(curX - startX) < Math.abs(maxX)
+                    && Math.abs(curY - startY) < Math.abs(maxY)
+                    && !occupied) {
+                curX += gradX;
+                curY += gradY;
+
+                int index = GeneralUtil.getMapIndex((int) Math.round(curX), (int) Math.round(curY), (int) mapWidth, (int) mapHeight);
+
+                if (index > 0 && index < data.capacity()) {
+                    // If we are on the map to begin with...
+                    Byte cellData = data.getByte(index);
+
+                    if (cellData.byteValue() < 0 || cellData.byteValue() > 65) {
+                        // If we're on the map, but the map has no data, or there is an obstacle...
+                        occupied = true;
+                    } else {
+                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) || isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
+                            // Don't draw anything if the current range is smaller than the
+                            // minimum range.
+                            continue;
+                        } else {
+                            occupied = false;
+                            // We only add to the array if the index has not been
+                            // seen before.
+                            if (!traced.contains(index)){
+                                traceIndices.add(index);
+                                traced.add(index);
+                                modData.setByte(index, 100);
+                            }
+                        }
+                    }
+                } else {
+                    occupied = true;
+                }
+            }
+            currentRayAngle = GeneralUtil.normaliseAngle(currentRayAngle + rayAngleIncrement);
+        }
+
+        double freeAfter = countFreePixels(mapToModify, rooms);
+
+        Printer.println("coverage: Free before: " + freeBefore + ", free after: " + freeAfter + ", Pose: " + x + ", " + y + ", " + bearing);
+        return traceIndices;
     }
 
     /*

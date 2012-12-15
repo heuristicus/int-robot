@@ -428,7 +428,11 @@ public class MainNode extends AbstractNodeMain {
 //                   plotFieldOfViewOnMap(exploredMap, lastRealPos, time);
                     // Appears to require subtraction 0.6 to get the stage base pose to correspond
                     // with correct position in rviz
-                    ArrayList<ArrayList<Integer>> rayIndexes = MeetingUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
+//                    ArrayList<ArrayList<Integer>> rayIndexes = MeetingUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
+//                            lastRealPos.getPosition().getX() - 0.6,
+//                            AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
+//                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap, meetingRooms);
+                    ArrayList<Integer> rayIndexes = MeetingUtil.simple_projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
                             FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap, meetingRooms);
