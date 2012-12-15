@@ -84,7 +84,26 @@ Released   : 20081009
 	    <h3>Monte Carlo Localisation</h3>
 	    <p>Localisation in robotics is the problem of estimating a
 	    robots position in a given map given some laser
-	    readings. <b><u>STILL NEED TO EXPLAIN LOCALISATION HERE</u></b>. For further information on Monte Carlo
+	    readings. For the final task we decided to use Adaptive
+	    Monte Carlo Localisation (AMCL) which is provided within
+	    ROS. The difference between MCL and AMCL is, AMCL has a
+	    dynamic set of particles, for example if AMCL is more
+	    certain about its position it will reduce the number of
+	    total particles, however it is uncertain about its
+	    position it will generate more particles in random places.
+	    On the other hand, MCL has a constant number of
+	    particles. Both localisation methods use particle filters
+	    which is the assignment of particles in available
+	    positions on a given map. The particles are then
+	    continually given probabilities as the robot recieved
+	    laser data. The probability represents the liklihood of
+	    the robot being in that particles position on the real
+	    world map. Particles with low probabilities are removed
+	    and replaced nearer to particles with higher probabilities
+	    with some noise. In the final task localisation will help
+	    your robot keep track of its location allowing other
+	    tasks, such as PRM and exploring to be completed
+	    successfully. For further information on Monte Carlo
 	    localisation, we recommend the following research paper: <a
 	    href=
 	    "http://www.ri.cmu.edu/pub_files/pub1/dellaert_frank_1999_2/dellaert_frank_1999_2.pdf">Monte
@@ -98,11 +117,47 @@ Released   : 20081009
 	    THE PRM PROCESS</u></b></p>
 </br>
 	    <h3>People Detection</h3>
-	    <p><b><u>TALK ABOUT HOW WE DETECTED PEOPLE WHEN USING KINECT AND
-	    DEPTH INFORMATION ALSO NEED TO TALK ABOUT OUR FINITE STATE
-	    MACHINE IMPLEMENTATION</u></b></p>
-	    
+	    <p>People detection is a large part of the final task and
+	    will take up a considerable amount of time to be
+	    perfected. There are a variety of ways to approach this
+	    problem. We decided to take an innovative approach to this
+	    problem and use face detection with the Xbox Kinect. This
+	    was used in combination with the open source project
+	    openCV. In order to be successful with openCV you must be
+	    familiar with python or c++ as the openCV bridge which is
+	    required to pass images between ROS and openCV is
+	    currently only programmed in c++ or python. We
+	    chose to use the Kinect because it would be something
+	    different and experimental and also it allowed us to
+	    capture depth information. Depth information was used to
+	    identify the distance of the person detected and therefore
+	    our PRM knew where to plot a target goal. Depth
+	    information was also useful for helping us build a model
+	    for excluding false positives which were repeatedly being
+	    picked up by our face detection software. The model which
+	    we designed was based on the idea that, at different
+	    distances from the camera, faces will be a different
+	    size. The software which we had for face detection drew a
+	    square around faces it would detect. Our model would
+	    check the size of the square and the distance the face is
+            at, if they differed from the model, they were
+	    rejected. In order to further advance our people detection
+	    we could have possibly used different cascades for.</p>
+</br>
+	    <h3>System Implementation</h3>
+	    <p>For our overall implementation we decided to use a
+	    finite state machine. For further information on
+	    Finite-state machines, please see <a
+	    href="http://en.wikipedia.org/wiki/Finite-state_machine">
+	    here</a>. We chose to use a FSM implementation because we
+	    decided the goals of the task would be performed
+	    sequentially of which only one task can be done at a
+	    time. For example the robot could either only be exploring
+	    or guiding a person to a meeting room, it could not be
+	    doing both at once.</p>
+</br>
         </div>
+	
     </div>
 </div>
 <!-- Please leave this in place after all of your content - thanks :) -->
