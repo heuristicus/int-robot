@@ -110,11 +110,34 @@ Released   : 20081009
 	    Carlo Localization for Mobile Robots</a>.</p>
 </br>
 	    <h3>Probabilistic Road Maps</h3>
-	    <p>Probabilisic road maps are a solution to the robot path
-	    finding problem, where a robot is given a start location
-	    and a target location and is required to calculate and
-	    navigate along a path to the target location. <b><u>TALK ABOUT
-	    THE PRM PROCESS</u></b></p>
+	    <p>The definition of PRM according to wikipedias page on
+	    PRM is as follows, the probabilistic roadmap  planner is a
+	    motion planning algorithm in robotics, which solves the
+	    problem of determining a path between a starting
+	    configuration of the robot and a goal configuration while
+	    avoiding collisions. The general idea of PRM is to
+	    generate random points into the map given to the robot and
+	    check these points for validity, i.e. not in walls or too
+	    close to walls etc. These points are then connected
+	    ensuring connections do not intersect objects and walls
+	    and other conditions you may wish to apply. Once points
+	    have been connected a start and target position can be
+	    provided and from there a route planning algorithm can be
+	    applied to find a path using the connections made. For
+	    further information, we recommend a read through Robotics
+	    Modelling, Planning and Control by Bruno Sicilliano,
+	    Lorenzo Sciavicco, Luigi Villiani and Giuseppe Oriolo. In
+	    order to avoid unknown objects, we decided when we found
+	    an object we would plot it on the map as an object and
+	    make PRM plan a route around this object. We also
+	    implemented a method by which more nodes were added around
+	    and near the object to try and ensure a path was found. We
+	    made extensive use of PRM for our system to do all of the
+	    navigation. For example when exploring we used PRM to go to nodes
+	    which we had generated on the map for exploring. Another
+	    example is when a person was detected we again used PRM to navigate to them.
+	    Finally when guiding a person to a room, we again used PRM to
+	    successfully complete this task.</p>
 </br>
 	    <h3>People Detection</h3>
 	    <p>People detection is a large part of the final task and
