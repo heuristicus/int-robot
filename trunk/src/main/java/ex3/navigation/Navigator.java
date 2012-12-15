@@ -164,6 +164,9 @@ public class Navigator extends AbstractNodeMain {
                 // This is probably not how we should do things - odometry is published even
                 // when the robot is not moving which could cause all sorts of weird problems.
                 if (active && route != null) {
+                    if (obstacleWithinSafeDistance){
+                        System.out.println("active: " + active + "route: " + route);
+                    }
                     distanceToWaypoint = PRMUtil.getEuclideanDistance(lastEstimate.getPosition(), wayPoint.getPosition());
                     if (distanceToWaypoint <= POINT_REACHED_THRESHOLD) {
                         if (nextWayPoint() == false) { // we have reached the goal.
@@ -217,6 +220,9 @@ public class Navigator extends AbstractNodeMain {
                     }
 //                    movement.publish(PIDcontrol());
                 }
+                if (obstacleWithinSafeDistance){
+                    System.out.println("exiting odom callback");
+                }
             }
         });
 
@@ -225,7 +231,7 @@ public class Navigator extends AbstractNodeMain {
                 @Override
                 public void onNewMessage(LaserScan scan) {
                     // If obstacle is too close and we are moving forward, stop
-                    if (!turnOnSpot && checkObstacleWithinSafeDistance(scan)) {
+                    if (!obstacleWithinSafeDistance && !turnOnSpot && checkObstacleWithinSafeDistance(scan)) {
                         Printer.println("Setting obstacleWithinSafeDistance = true", "REDF");
                         obstacleWithinSafeDistance = true;
                     }
@@ -303,6 +309,7 @@ public class Navigator extends AbstractNodeMain {
         active = false;
         route = null;
         goalPoint = null;
+//        obstacleWithinSafeDistance = false;
         Printer.println("Cleared "+obstacleMarkers.size()+" obstacle markers", "REDF");
         obstacleMarkers.clear();
         // When we reach the goal, we get rid of all obstacles on the map.
@@ -553,10 +560,17 @@ public class Navigator extends AbstractNodeMain {
      * and in these cases it is important not to lose the original inflated map.
      */
     public void initRoute() {
-        nextWayPoint();
-        goalPoint = route.getPoses().get(route.getPoses().size() - 1);
-        active = true;
-
+        // catch any issues with the received array
+        if (nextWayPoint()) {
+            goalPoint = route.getPoses().get(route.getPoses().size() - 1);
+            active = true;
+        } else {
+            System.out.println("Initroute received empty array!");
+            System.out.println("SOMETHING WENT WRONG! CHECK IT OUT! DO NOT IGNORE THIS!");
+            std_msgs.Int32 info = prmInfoPub.newMessage();
+            info.setData(PRM.GOAL_REACHED); // pretend that we reached the goal
+            prmInfoPub.publish(info);
+        }
 //        if (pid != null){
 //            pid.activate();
 //        }

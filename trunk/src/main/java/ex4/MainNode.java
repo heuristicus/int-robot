@@ -3,7 +3,6 @@ package ex4;
 import ex3.PRM;
 import util.PRMUtil;
 import ex3.Vertex;
-import geometry_msgs.Point;
 import geometry_msgs.Pose;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
@@ -321,7 +320,8 @@ public class MainNode extends AbstractNodeMain {
                         RectangleWithDepth newFaceRect = findPerson(lastFaceRectangle);
                         // Check whether the rectangle received is close to the
                         // one we received in the previous message.
-                        if (newFaceRect != null && (lastFaceRectangle == null || MeetingUtil.rectangleOverlapValid(lastFaceRectangle, newFaceRect, MAX_RECTANGLE_CENTRE_DISPARITY))) {
+                        if (newFaceRect != null && (lastFaceRectangle == null ||
+                                MeetingUtil.rectangleOverlapValid(lastFaceRectangle, newFaceRect, MAX_RECTANGLE_CENTRE_DISPARITY))) {
                             faceCheckCount++;
                             lastFaceRectangle = newFaceRect;
                             Printer.println("Face matches last seen. FaceCheckCount=" + faceCheckCount, "CYANF");
@@ -431,11 +431,13 @@ public class MainNode extends AbstractNodeMain {
 //                    ArrayList<ArrayList<Integer>> rayIndexes = MeetingUtil.projectFOV(-lastRealPos.getPosition().getY() - 0.6,
 //                            lastRealPos.getPosition().getX() - 0.6,
 //                            AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
-//                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap, meetingRooms);
+//                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP,
+//                            originalMap, exploredMap, meetingRooms, time);
                     ArrayList<Integer> rayIndexes = MeetingUtil.simple_projectFOV(-lastRealPos.getPosition().getY() - 0.6,
                             lastRealPos.getPosition().getX() - 0.6,
                             AbstractLocaliser.getHeading(lastRealPos.getOrientation()),
-                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, originalMap, exploredMap, meetingRooms);
+                            FOV_ANGLE, FOV_MIN_DIST, FOV_DISTANCE, FOV_ANGLE_STEP, 
+                            originalMap, exploredMap, meetingRooms, time);
                     exploredMapPub.publish(exploredMap);
                     MeetingUtil.updateHeatData(rayIndexes, heatMapData);
                     MeetingUtil.normaliseHeatMap(heatMap, heatMapData);
@@ -489,7 +491,8 @@ public class MainNode extends AbstractNodeMain {
         if (explorationStartTime == 0) {
             explorationStartTime = now;
         } //System.currentTimeMillis(); }
-        Printer.println("coverage: FREE AFTER:" + freeAfter + "," + (now - explorationStartTime) + " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
+        Printer.println("coverage: FREE AFTER:" + freeAfter + "," + (now - explorationStartTime) +
+                " POSE: " + -pose.getPosition().getY() + "," + pose.getPosition().getX() + "," + orientation);
     }
 
     public double getHeadingFromLastPos() {

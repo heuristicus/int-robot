@@ -4,25 +4,56 @@
  */
 package ex4.viewer;
 
-import ex4.Printer;
+import geometry_msgs.Point;
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import javax.swing.JButton;
 import javax.swing.JPanel;
 
 /**
  *
  * @author robot
  */
-public class MapViewerJPanel extends JPanel {
+public class MapViewerJPanel extends JPanel implements ActionListener {
 
     private int mapHeight, mapWidth;
+    private float mapRes;
     private byte[] mapData;
     private byte[] heatMapData;
+    private ArrayList<Point> pathData;
+    boolean path = true;
+    boolean heat = true;
 
     public MapViewerJPanel(int mapHeight, int mapWidth) {
         this.mapHeight = mapHeight;
         this.mapWidth = mapWidth;
         this.setSize(mapWidth, mapHeight);
+        this.pathData = new ArrayList<Point>();
+    }
+
+    public MapViewerJPanel(int mapHeight, int mapWidth, float mapRes){
+        this.mapRes = mapRes;
+        this.mapHeight = mapHeight;
+        this.mapWidth = mapWidth;
+        this.setSize(mapWidth, mapHeight);
+        this.pathData = new ArrayList<Point>();
+    }
+
+    public void listenTo(JButton b){
+        b.addActionListener(this);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if ("Heatmap".equals(e.getActionCommand())){
+            heat = !heat;
+        } else if ("Path".equals(e.getActionCommand())){
+            path = !path;
+        }
+        repaint();
     }
 
     public void setMap(byte[] mapData) {
@@ -31,6 +62,10 @@ public class MapViewerJPanel extends JPanel {
 
     public void setHeatMap(byte[] heatMapData) {
         this.heatMapData = heatMapData;
+    }
+
+    public void addPathPoint(Point p){
+        pathData.add(p);
     }
 
     @Override
@@ -53,34 +88,45 @@ public class MapViewerJPanel extends JPanel {
                             //occupied
                             g.setColor(Color.BLACK);
                         }
-                        drawPixel(g, x, y);
+                        drawPixel(g, x, y, 100);
                     }
                 }
             }
         }
 
-        //paint heat map
-        if (heatMapData != null) {
-            byte[] heatDataCopy = (byte[]) heatMapData.clone();
-            //get max heat value
-            double maxHeatValue = 0;
-            for (double heatValue : heatDataCopy) {
-                if (heatValue > maxHeatValue) {
-                    maxHeatValue = heatValue;
+        if (heat) {
+            //paint heat map
+            if (heatMapData != null) {
+                byte[] heatDataCopy = (byte[]) heatMapData.clone();
+                //get max heat value
+                double maxHeatValue = 0;
+                for (double heatValue : heatDataCopy) {
+                    if (heatValue > maxHeatValue) {
+                        maxHeatValue = heatValue;
+                    }
                 }
-            }
 
-            for (int x = 0; x < mapWidth; x++) {
-                for (int y = 0; y < mapHeight; y++) {
-                    int index = getMapIndex(x, y);
-                    if (index > 0 && index < heatDataCopy.length) {
-                        int heatValue = heatDataCopy[index];
-                        if (heatValue > 0) {
+                for (int x = 0; x < mapWidth; x++) {
+                    for (int y = 0; y < mapHeight; y++) {
+                        int index = getMapIndex(x, y);
+                        if (index > 0 && index < heatDataCopy.length) {
+                            int heatValue = heatDataCopy[index];
+                            if (heatValue > 0) {
 //                            System.out.println("Heat value: " + heatValue);
-                            g.setColor(getHeatColor(heatValue, maxHeatValue));
-                            drawPixel(g, x, y);
+                                g.setColor(getHeatColor(heatValue, maxHeatValue));
+                                drawPixel(g, x, y, 100);
+                            }
                         }
                     }
+                }
+            }
+        }
+
+        if (path) {
+            if (pathData != null) {
+                for (Point p : pathData) {
+                    g.setColor(Color.black);
+                    drawPixel(g, (int) (p.getX() / mapRes), (int) (p.getY() / mapRes), 0);
                 }
             }
         }
@@ -94,8 +140,7 @@ public class MapViewerJPanel extends JPanel {
         }
     }
 
-    private void drawPixel(Graphics g, int x, int y) {
-        int offset = 100;
+    private void drawPixel(Graphics g, int x, int y, int offset) {
         //mapHeight - y: flip map
         if (x <= offset) {
             g.drawLine(mapWidth - offset + x, mapHeight - y, mapWidth - offset + x, mapHeight - y);
@@ -114,4 +159,7 @@ public class MapViewerJPanel extends JPanel {
         //    int colour = (int)((value / maxValue) * 255.0);
         //    return new Color(colour, 0, 0);
     }
+
+
+
 }

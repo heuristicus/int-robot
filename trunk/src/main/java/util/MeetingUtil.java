@@ -13,6 +13,7 @@ import java.util.HashSet;
 import nav_msgs.OccupancyGrid;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.ros.message.MessageFactory;
+import org.ros.message.Time;
 import pf.AbstractLocaliser;
 
 public class MeetingUtil {
@@ -289,7 +290,7 @@ public class MeetingUtil {
      */
     public static ArrayList<ArrayList<Integer>> projectFOV(double x, double y, double bearing, int fovAngle,
             double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify,
-            Polygon2D[] rooms) {
+            Polygon2D[] rooms, Time t) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
         ArrayList<ArrayList<Integer>> fovRays = new ArrayList<ArrayList<Integer>>();
@@ -355,7 +356,8 @@ public class MeetingUtil {
                         // If we're on the map, but the map has no data, or there is an obstacle...
                         occupied = true;
                     } else {
-                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) || isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
+                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) ||
+                                isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
                             // Don't draw anything if the current range is smaller than the
                             // minimum range.
                             continue;
@@ -375,7 +377,8 @@ public class MeetingUtil {
 
         double freeAfter = countFreePixels(mapToModify, rooms);
 
-        Printer.println("coverage: Free before: " + freeBefore + ", free after: " + freeAfter + ", Pose: " + x + ", " + y + ", " + bearing);
+        
+        System.out.println("coverage: " + freeAfter + "," +t.toString() + ", " + x + ", " + y + ", " + bearing);
         return fovRays;
     }
 
@@ -387,7 +390,7 @@ public class MeetingUtil {
      */
     public static ArrayList<Integer> simple_projectFOV(double x, double y, double bearing, int fovAngle,
             double minRange, double maxRange, double angleStep, OccupancyGrid map, OccupancyGrid mapToModify,
-            Polygon2D[] rooms) {
+            Polygon2D[] rooms, Time t) {
         ChannelBuffer data = map.getData();
         ChannelBuffer modData = mapToModify.getData();
         ArrayList<Integer> traceIndices = new ArrayList<Integer>();
@@ -455,7 +458,8 @@ public class MeetingUtil {
                         // If we're on the map, but the map has no data, or there is an obstacle...
                         occupied = true;
                     } else {
-                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) || isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
+                        if (Math.abs(curX - startX) < Math.abs(minX) && Math.abs(curY - startY) < Math.abs(minY) ||
+                                isPointInMeetingRooms(rooms, (float)curX * mapRes, (float)curY * mapRes)) {
                             // Don't draw anything if the current range is smaller than the
                             // minimum range.
                             continue;
@@ -479,7 +483,7 @@ public class MeetingUtil {
 
         double freeAfter = countFreePixels(mapToModify, rooms);
 
-        Printer.println("coverage: Free before: " + freeBefore + ", free after: " + freeAfter + ", Pose: " + x + ", " + y + ", " + bearing);
+        System.out.println("coverage:" + freeAfter + "," + t.toString() + ","+ x + "," + y + "," + bearing);
         return traceIndices;
     }
 
