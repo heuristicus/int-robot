@@ -10,6 +10,7 @@ import java.awt.Graphics;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 
@@ -124,9 +125,13 @@ public class MapViewerJPanel extends JPanel implements ActionListener {
 
         if (path) {
             if (pathData != null) {
-                for (Point p : pathData) {
-                    g.setColor(Color.black);
-                    drawPixel(g, (int) (p.getX() / mapRes), (int) (p.getY() / mapRes), 0);
+                try{
+                    for (Point p : pathData) {
+                        g.setColor(Color.black);
+                        drawPixel(g, (int) (p.getX() / mapRes), (int) (p.getY() / mapRes), 0);
+                    }
+                } catch (ConcurrentModificationException e){
+                    // ignore concurrent modifications - we don't really care
                 }
             }
         }
