@@ -5,6 +5,7 @@ import util.PRMUtil;
 import ex3.Vertex;
 import ex3.search.Dijkstra;
 import geometry_msgs.Point;
+import geometry_msgs.PoseArray;
 import geometry_msgs.PoseStamped;
 import geometry_msgs.PoseWithCovarianceStamped;
 import java.io.FileNotFoundException;
@@ -26,7 +27,7 @@ import org.ros.node.NodeMainExecutor;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 import pf.AbstractLocaliser;
-import visualization_msgs.MarkerArray;
+import std_msgs.Int32;
 
 public class BatchExperimenter {
 
@@ -59,12 +60,38 @@ public class BatchExperimenter {
         goalPub = node.newPublisher("goal", PoseStamped._TYPE);
 //        goalPub.setLatchMode(true);
 
-        Subscriber<MarkerArray> routeSub = connectedNode.newSubscriber("pathMarkers", MarkerArray._TYPE);
-        routeSub.addMessageListener(new MessageListener<MarkerArray>() {
+//        Subscriber<MarkerArray> markerSub = connectedNode.newSubscriber("pathMarkers", MarkerArray._TYPE);
+//        markerSub.addMessageListener(new MessageListener<MarkerArray>() {
+//            @Override
+//            public void onNewMessage(MarkerArray t) {
+//                System.out.println("Path markers message received. Processing...");
+//                experimentDone(true);
+//            }
+//        });
+//
+//        Subscriber<PoseArray> routeSub = connectedNode.newSubscriber("route", PoseArray._TYPE);
+//        routeSub.addMessageListener(new MessageListener<PoseArray>() {
+//            @Override
+//            public void onNewMessage(PoseArray t) {
+//                System.out.println("Path received from PRM. Processing...");
+//                experimentDone(true);
+//            }
+//        });
+
+        Subscriber<std_msgs.Int32> prmInfo = connectedNode.newSubscriber("goalInfo", std_msgs.Int32._TYPE);
+        prmInfo.addMessageListener(new MessageListener<Int32>() {
             @Override
-            public void onNewMessage(MarkerArray t) {
-                System.out.println("Path markers message received. Processing...");
-                experimentDone(true);
+            public void onNewMessage(Int32 t) {
+                if (t.getData() == PRM.NO_PATH) {
+                    System.out.println("PRM could not find a path.");
+                    experimentDone(true);
+                } else if (t.getData() == PRM.PATH_FOUND){
+                    System.out.println("PRM found path.");
+                    experimentDone(true);
+                } else {
+                    System.out.println("Received " + t.getData() + " from goalInfo topic, but don't know what to do with it.");
+                }
+
             }
         });
 
@@ -98,6 +125,7 @@ public class BatchExperimenter {
         expMinorNums = new int[minorNum - 1];
         Arrays.fill(expMinorNums, 0);
         System.out.println("VauesArray populated for expNum: "+expNumber);
+        logger.logLine("Experiment " + expNumber + ":");
         return true;
     }
 
@@ -204,23 +232,38 @@ public class BatchExperimenter {
         }
     }
 
+    /*
+     * Processes a path from the PRM and logs relevant data.
+     */
     public static void processPath(){
         ArrayList<Vertex> routeToGoal = prm.getRoute();
-        double length = PRMUtil.getPathLength(routeToGoal);
         ArrayList<Vertex> flatRouteToGoal = prm.getFlatRoute();
-        double flatLength = PRMUtil.getPathLength(flatRouteToGoal);
 
-        System.out.println("Experiment: Path of length " + length + " found and recorded.");
-        System.out.println("Moreover, regeneration attempts: "+prm.getRegenerationsForLastSearch());
-        logger.logLine("RUNPARAMS:"+RunParams.getAllPropertiesString());
-        logger.logLine("PathOfLength:"+length);
-        logger.logLine("PointsInPath:"+routeToGoal.size());
-        logger.logLine("FlatPathOfLength:" + flatLength);
-        logger.logLine("PointsInFlattenedPath:" + flatRouteToGoal.size());
-        logger.logLine("RegenerationAttempts:"+prm.getRegenerationsForLastSearch());
+        if (routeToGoal == null){
+            System.out.println("PRM could not find a route to the goal point.");
+            logger.logLine("RUNPARAMS:" + RunParams.getAllPropertiesString());
+            logger.logLine("RESULT WAS NULL!");
+        } else {
+            double length = PRMUtil.getPathLength(routeToGoal);
+            double flatLength = PRMUtil.getPathLength(flatRouteToGoal);
+
+            System.out.println("Experiment: Path of length " + length + " found and recorded.");
+            System.out.println("Moreover, regeneration attempts: " + prm.getRegenerationsForLastSearch());
+            logger.logLine("RUNPARAMS:" + RunParams.getAllPropertiesString());
+            logger.logLine("PathOfLength:" + length);
+            logger.logLine("PointsInPath:" + routeToGoal.size());
+            logger.logLine("FlatPathOfLength:" + flatLength);
+            logger.logLine("PointsInFlattenedPath:" + flatRouteToGoal.size());
+            logger.logLine("RegenerationAttempts:" + prm.getRegenerationsForLastSearch());
+        }
         moveToNextExperiment();
     }
 
+    /*
+     * Moves the experimenter on to the next experiment. This increments the
+     * experiment number and initialises required values. Exits if there are no
+     * more experiments left.
+     */
     public static void moveToNextExperiment() {
         exec.shutdownNodeMain(prm);
         prm = null; // Allow garbage collection
@@ -239,30 +282,38 @@ public class BatchExperimenter {
         runNextExperiment();
     }
 
+    /*
+     * Gets the start pose that should be used in this experiment from the parameter file.
+     */
     public static PoseWithCovarianceStamped getStartPose(PoseWithCovarianceStamped pose, MessageFactory factory, int expNum) {
         AbstractLocaliser.setFactory(factory);
-        pose.getPose().getPose().setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), 2.321)); //approximate
+        pose.getPose().getPose().setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(),
+                RunParams.getDouble("EXPERIMENT_"+expNum+"_START_THETA"))); //approximate
         Point pt = factory.newFromType(Point._TYPE);
         double x = RunParams.getDouble("EXPERIMENT_"+expNum+"_STARTX");
         double y = RunParams.getDouble("EXPERIMENT_"+expNum+"_STARTY");
         pt.setX(x);
         pt.setY(y);
         pose.getPose().getPose().setPosition(pt);
-        System.out.println("Heading: "+AbstractLocaliser.getHeading(pose.getPose().getPose().getOrientation())
+        System.out.println("Start Heading: "+AbstractLocaliser.getHeading(pose.getPose().getPose().getOrientation())
                 + "   x " + pose.getPose().getPose().getPosition().getX()
                 + "   y " + pose.getPose().getPose().getPosition().getY());
         return pose;
     }
 
+    /*
+     * Gets the goal pose to be used with this experiment from the parameter file.
+     */
     public static PoseStamped getGoalPose(PoseStamped pose, MessageFactory factory, int expNum) {
-        pose.getPose().setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), 2.321)); //approximate
+        pose.getPose().setOrientation(AbstractLocaliser.rotateQuaternion(AbstractLocaliser.createQuaternion(), 
+                RunParams.getDouble("EXPERIMENT_"+expNum+"_GOAL_THETA"))); //approximate
         Point pt = factory.newFromType(Point._TYPE);
         double x = RunParams.getDouble("EXPERIMENT_" + expNum + "_GOALX");
         double y = RunParams.getDouble("EXPERIMENT_"+expNum+"_GOALY");
         pt.setX(x);
         pt.setY(y);
         pose.getPose().setPosition(pt);
-        System.out.println("Heading: "+AbstractLocaliser.getHeading(pose.getPose().getOrientation())
+        System.out.println("Goal Heading: "+AbstractLocaliser.getHeading(pose.getPose().getOrientation())
                 + "   x " + pose.getPose().getPosition().getX()
                 + "   y " + pose.getPose().getPosition().getY());
         return pose;

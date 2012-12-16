@@ -44,7 +44,7 @@ public class Launcher extends AbstractNodeMain {
         PRM prm = new PRM(new Dijkstra(), false);
         exec.execute(prm, conf);
         exec.execute(new Navigator(prm), conf);
-        
+
         exec.execute(new MainNode(), conf);
 
         // Not currently working

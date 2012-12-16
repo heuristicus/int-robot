@@ -119,6 +119,7 @@ public class PRM extends AbstractNodeMain {
                     Printer.println("GoalPosition in free space", "REDF");
                 } else {
                     Printer.println("Cannot move to specified location. In a wall or outside the map.", "REDF");
+                    Printer.println("Offending position: x: " + t.getPose().getPosition().getX() + ", y: " + t.getPose().getPosition().getY(), "REDF");
                     Printer.println("Publishing 'no path' back to MainNode", "REDF");
                     std_msgs.Int32 info = prmInfo.newMessage();
                     info.setData(NO_PATH); // we could not find a route - send a message to the info topic
@@ -151,6 +152,7 @@ public class PRM extends AbstractNodeMain {
     public void generateRoute() {
         regenerationAttempts = 0;
         route = null; // Start with no path
+        flatRoute = null;
         // Try to find a path or regenerate graph until able to
         while (route == null && regenerationAttempts < MAX_REGENERATION_ATTEMPTS) {
             System.out.println("Finding route attempt: " + ++regenerationAttempts);
