@@ -1,8 +1,11 @@
 \documentclass[conference]{IEEEtran}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{amsmath}
 
-\title{Robot Assignment}
+\newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
+
+\title{WRITE SOMETHING CLEVER}
 \author{951926 \and 1001231 \and 1024072 \and 1028907}
 \date{\today}
 
@@ -10,19 +13,35 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present our solution to the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. We provide some background information about the areas of robotics that are relevant to the problem, with brief reference to literature. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
+  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. We provide some background information about the areas of robotics that are relevant to the problem, with brief reference to literature. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 \end{abstract}
 \section{Background}
+Stuff about the task we are supposed to do goes here
 \subsection{Robot Motion}
 holonomic robots, PID control, reactive control
 \subsection{Localisation}
 \begin{itemize}
-\item odometry issues
-\item beliefs, prior and posterior $\overline{bel}$
 \item sensor model, update
 \item motion model
 \end{itemize}
-The aim of localisation is to obtain an estimate of the position of the robot at any given time. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. It is possible to mitigate the effect of these errors on estimates of the robot's position by using Bayesian techniques. 
+The aim of localisation is to obtain an estimate of the robot's pose at any given time. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. Many advanced localisation techniques are based on the Bayes filter, which uses a belief distribution $bel(x_t)$ to represent the state $x_t$. The calculation of $bel(x_t)$ at time $t$ is dependent on $bel(x_{t-1})$ at time $t-1$, the last action $u_t$, and the last measurement $z_t$. In the first step, called the prediction step, the prior belief $\overline{bel}(x_t)$ is calculated. This step merges two probability distributions; the prior belief over the previous state $x_{t-1}$, and the probability of transitioning from that state to the posterior state $x_t$ given that the action $u_t$ was taken. This step does not take into account any measurement taken in the posterior state, predicting based solely on the knowledge of the action taken. In the second step, the measurement update, the posterior belief is calculated by multiplying the prior belief with the probability of being in the posterior state given that the measurement $z_t$ was observed. The result of this multiplication is generally not a probability, and therefore requires normalisation using some constant $\alpha$. As there are usually multiple posterior states, $x_t$ is usually a state vector rather than a single state, and so the two steps will be applied multiple times in order to update the belief for each state being considered. The filter is recursive, requiring some idea of the initial belief $bel(x_0)$ at time $t=0$. The initial belief is either a distribution centred on $x_0$, in the case where the initial position is known, or a uniform distribution over the space otherwise.
+\begin{algorithm}
+  \caption{Bayes filter\cite{thrun}}
+  \label{alg:bayesfilter}
+  \begin{algorithmic}[1]
+        \State \textbf{Algorithm Bayes\_filter}\textnormal{($bel(x_{t-1}), u_t, z_t$)}
+        \For{\textnormal{all} $x_t$}
+        \State $\overline{bel}(x_t)=\int P(x_t\mid u_t, x_{t-1})bel(x_{t-1})dx_{t-1}$
+        \State $bel(x_t)=\alpha P(x_t \mid z_t)\overline{bel}(x_t)$
+        \EndFor
+        \State \Return $bel(x_t)$
+  \end{algorithmic}
+\end{algorithm}
+As the Bayes filter is not restricted to finite state spaces, it is not possible to implement it for anything other than very simple problems. There are two families of algorithms for localisation, known as \emph{recursive state estimators}, with various properties that permit the use of the Bayes filter in more complex estimation tasks.
+\subsubsection{Gaussian Filters}
+The basic principle of the family of Gaussian filters is the use of multivariate normal distributions, which can be formulated from a mean $\mu$ and covariance $\Sigma$, to represent belief. As a result, the assumption that the system is a linear Gaussian system is made; the initial belief must be a Gaussian, and both the state transition function and measurement probability must be linear functions. Although Gaussian filters can be extended to non-linear systems, they perform best when the system meets the assumptions made. One of the main advantages of such filters is the computational complexity, which is polynomial with respect to the dimensionality of the state space. The main disadvantage is that Gaussians are unimodal and therefore cannot represent situations in which there are multiple hypotheses; a situation that is often encountered in robotics. Examples include the Kalman filter and the information filter, which are derived from two different ways of representing Gaussians. Both of these filters can be extended to non-linear systems by using a Taylor expansion to produce linear approximations of non-linear functions. Mixtures of Gaussians can also be used to extend the Kalman filter to encompass situations in which multiple hypotheses are required, but each extension increases the complexity of the algorithm. This extensibility is one of the reasons for the popularity of the Kalman filter in state estimation problems. With some extension, the information filter is particularly suited to multi-robot systems where information from multiple sources must be integrated, but issues with complexity have led the Kalman filter to become the more popular of the two for the majority of problems.
+\subsubsection{Nonparametric Filters}
+In contrast to Gaussian filters, nonparametric filters \\
 \begin{algorithm}
   \caption{Basic Monte Carlo Localisation\cite{thrun}}
   \label{alg:basicMCL}
@@ -50,7 +69,7 @@ Bayes filter, Kalman filter, particle filter (MCL), small section about mapping-
     \State \textbf{Algorithm generate\_PRM}\textnormal{($map$)}
     \State $V = $\textbf{ sample\_vertices}\textnormal{($map$)}
     \For{$v_c\in V$}
-    \While{\textnormal{$c(v_c)<C$}}
+    \While{\textbf{connections}\textnormal{$(v_c)<C$}}
     \State $v_t =$\textbf{ get\_closest}\textnormal{($V$)}
     % phi is connectedInNeighbourhood, gamma is connectedInFreeSpace
     \If{$d(v_c,v_t)<D_n$}
@@ -74,7 +93,7 @@ Bayes filter, Kalman filter, particle filter (MCL), small section about mapping-
     \State $B \gets $\textnormal{newpath($i+1$)}
     \State $C \gets $\textnormal{newpath($i+2$)}
     \If{freely\_connected(map,$A,C$)}
-    \State $P\setminusB$
+    \State $P\setminus B$
     \EndIf
     \EndFor
     \EndFor
@@ -98,7 +117,7 @@ Redo experiment for sampling methods. short, medium, long path length. Display i
 
 Redid sampling experiments - now have comparison for neighbourhood, threshold and nearestN strategies on 4 different paths, including trying to get into the corridor. 5,10,20,30 maxconn for each strategy, inflation radius of 5 so that you can just about get into the corridor. random vertices:25,50,100,200,400,800, grid step 0.5,1,2,4, cell size 1,2,4,6, target per cell 2,5
 
-\textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new_prmlogs contains data.
+\textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new\_prmlogs contains data.
 
 
 \subsection{Vision}
