@@ -13,10 +13,11 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic road mapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 2DX platform modified with a tripod-mounted Kinect. In the first section, we provide some background information about the areas of robotics that are relevant to the problem. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
+  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic road mapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 2DX platform modified with a tripod-mounted Kinect.
 \end{abstract}
+\section{Introduction}
+Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic road map to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 \section{Background}
-Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic road map to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In this section we present some background information about techniques that are often used to solve these problems.
 \subsection{Localisation}
 The aim of localisation is to obtain an estimate of the position of a mobile robot using sensor data \cite{localisation}. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. An important point to note is that localisation can be performed with a prepared map, or generating a map in real-time. The much more complex latter problem is called simultaneous localisation and mapping, which we will not discuss here. See \cite{slam} for an introduction to the SLAM problem.
 
@@ -53,9 +54,9 @@ In contrast to Gaussian filters, nonparametric filters discretise the probabilit
     \EndFor
     \For{$m=1$ to $M$}
     \State \textnormal{draw $i$ with probability $\propto w_t^{[m]}$}
-    \State \textnormal{add $x_t^{[i]}$ to $\bar{\mathcal{X}}_t$}
+    \State \textnormal{add $x_t^{[i]}$ to $\mathcal{X}_t$}
     \EndFor
-    \State \textbf{return} $\bar{\mathcal{X}}_t$
+    \State \textbf{return} $\mathcal{X}_t$
   \end{algorithmic}
 \end{algorithm}
 
@@ -65,13 +66,13 @@ One of the reasons that these filters are so efficient stems from the assumption
 \subsubsection{Sensor \& Motion Models}
 To actually use any of these filters to solve a localisation problem, it is necessary to model the sensors and motion of the robot. These models include some parameters representing the uncertainty attached to performing a specific action or receiving a certain measurement from a sensor. The motion model is used in the prediction step to determine the state transition probability $P(x_t\mid x_{t-1}, u_t)$; the probability of going from state $x_{t-1}$ to $x_t$ given that the action $u_t$ was performed. The sensor model is used to calculate $P(z_t\mid x_t,map)$, which represents the likelihood of the measurement $z_t$ being received in the state $x_t$ on a given map. The model incorporates knowledge about the noise parameters of the operating environment and the sensor being used in the form of probability densities. For example, a range sensor might include densities for correct measurements, measurements of unexpected obstacles, sensor failures and random measurements \cite{thrun}. 
 
-Integrating the sensor and motion models into the particle filter results in an algorithm known as Monte Carlo localisation, otherwise known as MCL, the most basic version of which is shown in Algorithm \ref{alg:basicMCL}, in which $\mathcal{X}_{t-1}$ represents the particles from the previous time step, $M$ the total number of particles, $x_t^{[m]}$ the state of the $m$th particle with the action $u_t$ applied to it via the motion model, $w_t^{[m]}$ the importance weight of the $m$th particle, and $\bar{\mathcal{X}}_t$ the resampled set of particles. We use an adaptive implementation of MCL provided by the ROS system.
+Integrating the sensor and motion models into the particle filter results in an algorithm known as Monte Carlo localisation (MCL). The most basic version of MCL is shown in Algorithm \ref{alg:basicMCL}, in which $\mathcal{X}_{t-1}$ represents the particles from the previous time step, $M$ the total number of particles, $x_t^{[m]}$ the state of the $m$th particle with the action $u_t$ applied to it via the motion model, $w_t^{[m]}$ the importance weight of the $m$th particle, and $\bar{\mathcal{X}}_t$ the resampled set of particles. We use an adaptive implementation of MCL provided by the ROS system.
 
 \subsection{Route Planning}
 
 
 \subsubsection{Probabilistic Roadmaps}
-A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for robots in static workspaces\cite{prm} which solves the problem of determining a path between start and goal configurations while avoiding collisions with obstacles in the workspace. The roadmap algorithm consists of two phases; the learning phase and the query phase.
+A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for robots in static workspaces \cite{prm} which solves the problem of determining a path between start and goal configurations while avoiding collisions with obstacles in the workspace. The roadmap algorithm consists of two phases; the learning phase and the query phase.
 
 In the first step of the learning phase, the construction step, a graph $G$ with vertices $V$ and edges $E$ is constructed. Free configurations are repeatedly sampled from the workspace and added to $V$. A free configuration is one where the robot does not intersect with walls or other obstacles in the workspace. Once a specified number of configurations have been sampled, the vertices in $V$ are connected. Attempts to connect two vertices $v$ and $n$ are only made if they are within a neighbourhood specified by a maximum distance $D$, and a connection is only made if the path between the two nodes is also valid, i.e. there is no configuration on the path where the robot intersects with walls or obstacles. If a connection is made, the edge from $v$ to $n$ is added to $E$. The second step of the learning phase is the expansion step, which is intended to improve the connectivity of the graph. This step can be skipped if a sampling algorithm which takes into account difficult (narrow) areas of the workspace is used in the construction step.
 \begin{algorithm}
@@ -79,18 +80,20 @@ In the first step of the learning phase, the construction step, a graph $G$ with
   \label{alg:prm}
   \begin{algorithmic}[1]
     \State \textbf{Algorithm generate\_PRM}\textnormal{($map$)}
-    \State $V = $\textbf{ sample\_vertices}\textnormal{($map$)}
+    \State $V \leftarrow $\textbf{ sample\_vertices}\textnormal{($map$)}
     \For{$v\in V$}
+    \State $a \leftarrow 0$
     % a is number of attempts, A is max attempts
-    \While{$a<A \wedge$ \textbf{nconns}$(v)<C$}
-    \State $n =$\textbf{ get\_closest}\textnormal{($V, v$)}
-    % phi is connectedInNeighbourhood, gamma is connectedInFreeSpace
+    \While{$a<A \wedge \textbf{nconns} (v)<C$}
+    \State $n \leftarrow$\textbf{ get\_closest}\textnormal{($V, v$)}
     \If{\textbf{dist}$(v,n)<D$}
     \If{$\neg\textbf{neighbour}(v,n)\wedge\textbf{vpath}(map,v,n)$}
-    \State \textbf{connect}\textnormal{($v, n$)}
+    \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
-    \Else
+    \ElsIf{$\neg \textbf{connected}(v,n) \wedge \textbf{vpath}(map,v,n)$}
+    \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
+    \State $a \leftarrow a + 1$
     \EndWhile
     \EndFor
   \end{algorithmic}
@@ -98,34 +101,34 @@ In the first step of the learning phase, the construction step, a graph $G$ with
 Once the graph has been constructed, the query phase is entered. In this phase, the roadmap is used to find paths between start and goal configurations $s$ and $g$. In order to do this, $s$ and $g$ must first be connected to the graph using the same connection strategy used in the construction step. A graph search algorithm such as A* can then be used to find the shortest path between the two newly added vertices.
 
 There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
+
+\subsubsection{Rapidly Exploring Random Trees}
+An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
 \begin{algorithm}
   \caption{Path Smoothing}
   \label{alg:pathsmooth}
   \begin{algorithmic}[1]
     \State \textbf{Algorithm smooth\_path}\textnormal{($P, I, map$)}
-    \For {$i := 0$ \textbf{to} $I$}
-    \For {$j := 0$ \textbf{to} $\left|P\right|-2$}
-    \State $a \gets $\textnormal{newpath($i$)}
-    \State $b \gets $\textnormal{newpath($i+1$)}
-    \State $c \gets $\textnormal{newpath($i+2$)}
-    \If{\textbf{freepath}$(map,a,c$)}
+    \For {$i = 0$ \textbf{to} $I$}
+    \For {$j = 0$ \textbf{to} $\left|P\right|-2$}
+    \State $a \gets P_i$
+    \State $b \gets P_{i+1}$
+    \State $c \gets P_{i+2}$
+    \If{\textbf{vpath}$(map,a,c$)}
     \State \textbf{remove}($P,b$)
     \EndIf
     \EndFor
     \EndFor
-    \State \textbf{return}\textnormal{ newpath}
+    \State \textbf{return}\textnormal{ $P$}
   \end{algorithmic}
 \end{algorithm}
-\subsubsection{Rapidly Exploring Random Trees}
-An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
-
 \subsection{Exploration}
-frontier based techniques, exploration for AUVs
+The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to gain the most possible new information \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time span, although the distributed nature of the task produces further challenges.
 \subsection{Robot Vision}
 \section{Design}
 \subsection{System Structure}
 MENTION ALGORITHM COMPLEXITY!
-brief ROS description, callback based system, finite state automaton
+brief ROS description, callback based system, finite state automaton, talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
 \subsection{Platform}
 Stuff about the pioneer---available sensors, some data about its size, specifications, our additions to it. Kinect specs. Include a picture of the robot with the kinect on it. 
 \section{Experimentation}
@@ -144,7 +147,7 @@ Coverage experiments info: cell and grid done for cell size and grid spacing of 
 \section{Discussion}
 \subsection{Performance}
 \subsection{Potential Improvements}
-the path generated to do exploration could be improved by using heuristic techniques
+the path generated to do exploration could be improved by using heuristic techniques. multiple robots
 \subsection{Conclusions}
 \bibliographystyle{ieeetr}
 \bibliography{report}
