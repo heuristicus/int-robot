@@ -68,35 +68,26 @@ To actually use any of these filters to solve a localisation problem, it is nece
 Integrating the sensor and motion models into the particle filter results in an algorithm known as Monte Carlo localisation, otherwise known as MCL, the most basic version of which is shown in Algorithm \ref{alg:basicMCL}, in which $\mathcal{X}_{t-1}$ represents the particles from the previous time step, $M$ the total number of particles, $x_t^{[m]}$ the state of the $m$th particle with the action $u_t$ applied to it via the motion model, $w_t^{[m]}$ the importance weight of the $m$th particle, and $\bar{\mathcal{X}}_t$ the resampled set of particles. We use an adaptive implementation of MCL provided by the ROS system.
 
 \subsection{Route Planning}
-\subsubsection{Probabilistic Road Mapping}\cite{prm}
-The probabilistic roadmap planner is a motion planning algorithm in robotics, which solves the problem of determining a path between a starting configuration of the robot and a goal configuration while avoiding collisions.
-The general idea is to place random points into the configuration space of the robot and check them whether they are in a free space and not colliding with objects etc. Then a planner is used to connect these points to other nearby neighbours (within distance). Once they have been connected, the start and goal configurations are added in and a path planner is applied to determine a path between start and goal node. There are a variety of path planners available to use, such as Dijkstra's, A* search etc.
 
-There are two phases to PRM: Construction phase and Query Phase. In the construction phase, a graph is built. While building the graph it is ensured that nodes are connected legally, i.e. illegal lines (lines through objects) are ignored. There are multiple ways in which neighbours can be connected, i.e. via the use of k nearest neighbours or neighbours a certain distance from each other. The next stage is the query phase in which the start and end nodes are added to the graph and some form of search algorithm is used to find a path between the two nodes.
 
-The textbook Robotics Modelling, Planning and control give a good explanation of PRM. We will explain in summary what is explained in this book below.
+\subsubsection{Probabilistic Roadmaps}
+A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for robots in static workspaces\cite{prm} which solves the problem of determining a path between start and goal configurations while avoiding collisions with obstacles in the workspace. The roadmap algorithm consists of two phases; the learning phase and the query phase.
 
-In the beginning of PRM, you generate a random sample qrand of the configuration space using a uniform probability distribution in C. Then qrand is tested for collisions with objects within the configuration space. If no qrand is placed in legal places, they are then joined to one another, if and only if the edges joining them do not cause a collision with an object on the map. This is done via the use of an algorithm. Edges are joined by checking for near configurations where near is defined by a Euclidean distance in C.  The generation of a free local path between qrand and a near configuration qnear is delegated to a procedure known as local planner. A common choice according to the textbook is to throw a rectilinear path in C between qrand and qnear and test it for collision, for example by sampling the segments and checking them for collision. If the local path causes a collision, it is disregarded and therefore there is no direct path between the two points.
-The PRM incremental generation procedure stops when a maximum number of iterations have been reached. When this point is reached, one checks to see if it is possible to solve the initial problem of finding a path between qs and qg via the use of the connected free paths.
-If a solution is not found, the PRM can be improved by performing more iterations of the incremental generation procedure.
-
-The main advantage of PRM according to the textbook is the speed of PRM. It can find solutions to motion planning problems in a very quick time. Another advantage is its simplicity to implement.
-A disadvantage of PRM is that it is probabilistically complete, i.e. the probability of finding a solution to the problem when one exists tends to 1 as the execution time tends to infinity. To avoid reaching infinity, it is usual practice to incorporate a maximum number of iterations.
-\subsubsection{Rapidly Exploring Random Trees}\cite{rrt}
-
+In the first step of the learning phase, the construction step, a graph $G$ with vertices $V$ and edges $E$ is constructed. Free configurations are repeatedly sampled from the workspace and added to $V$. A free configuration is one where the robot does not intersect with walls or other obstacles in the workspace. Once a specified number of configurations have been sampled, the vertices in $V$ are connected. Attempts to connect two vertices $v$ and $n$ are only made if they are within a neighbourhood specified by a maximum distance $D$, and a connection is only made if the path between the two nodes is also valid, i.e. there is no configuration on the path where the robot intersects with walls or obstacles. If a connection is made, the edge from $v$ to $n$ is added to $E$. The second step of the learning phase is the expansion step, which is intended to improve the connectivity of the graph. This step can be skipped if a sampling algorithm which takes into account difficult (narrow) areas of the workspace is used in the construction step.
 \begin{algorithm}
   \caption{Probabilistic Road Map Generation}
   \label{alg:prm}
   \begin{algorithmic}[1]
     \State \textbf{Algorithm generate\_PRM}\textnormal{($map$)}
     \State $V = $\textbf{ sample\_vertices}\textnormal{($map$)}
-    \For{$v_c\in V$}
-    \While{\textbf{connections}\textnormal{$(v_c)<C$}}
-    \State $v_t =$\textbf{ get\_closest}\textnormal{($V$)}
+    \For{$v\in V$}
+    % a is number of attempts, A is max attempts
+    \While{$a<A \wedge$ \textbf{nconns}$(v)<C$}
+    \State $n =$\textbf{ get\_closest}\textnormal{($V, v$)}
     % phi is connectedInNeighbourhood, gamma is connectedInFreeSpace
-    \If{$d(v_c,v_t)<D_n$}
-    \If{$\neg \phi (v_c,v_t) \wedge \gamma (v_c,v_t)$}
-    \State \textbf{connect}\textnormal{($v_c, v_t$)}
+    \If{\textbf{dist}$(v,n)<D$}
+    \If{$\neg\textbf{neighbour}(v,n)\wedge\textbf{vpath}(map,v,n)$}
+    \State \textbf{connect}\textnormal{($v, n$)}
     \EndIf
     \Else
     \EndIf
@@ -104,27 +95,32 @@ A disadvantage of PRM is that it is probabilistically complete, i.e. the probabi
     \EndFor
   \end{algorithmic}
 \end{algorithm}
+Once the graph has been constructed, the query phase is entered. In this phase, the roadmap is used to find paths between start and goal configurations $s$ and $g$. In order to do this, $s$ and $g$ must first be connected to the graph using the same connection strategy used in the construction step. A graph search algorithm such as A* can then be used to find the shortest path between the two newly added vertices.
+
+There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
 \begin{algorithm}
-  \caption{Path Flattening}
-  \label{alg:pathflat}
+  \caption{Path Smoothing}
+  \label{alg:pathsmooth}
   \begin{algorithmic}[1]
-    \State \textbf{Algorithm flatten\_path}\textnormal{($P, I, map$)}
+    \State \textbf{Algorithm smooth\_path}\textnormal{($P, I, map$)}
     \For {$i := 0$ \textbf{to} $I$}
     \For {$j := 0$ \textbf{to} $\left|P\right|-2$}
-    \State $A \gets $\textnormal{newpath($i$)}
-    \State $B \gets $\textnormal{newpath($i+1$)}
-    \State $C \gets $\textnormal{newpath($i+2$)}
-    \If{freely\_connected(map,$A,C$)}
-    \State \textbf{remove}($P,B$)
+    \State $a \gets $\textnormal{newpath($i$)}
+    \State $b \gets $\textnormal{newpath($i+1$)}
+    \State $c \gets $\textnormal{newpath($i+2$)}
+    \If{\textbf{freepath}$(map,a,c$)}
+    \State \textbf{remove}($P,b$)
     \EndIf
     \EndFor
     \EndFor
     \State \textbf{return}\textnormal{ newpath}
   \end{algorithmic}
 \end{algorithm}
-PRM (sampling methods, graph search), RRT
+\subsubsection{Rapidly Exploring Random Trees}
+An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
+
 \subsection{Exploration}
-frontier based techniques
+frontier based techniques, exploration for AUVs
 \subsection{Robot Vision}
 \section{Design}
 \subsection{System Structure}
