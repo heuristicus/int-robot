@@ -5,7 +5,7 @@
 
 \newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
 
-\title{WRITE SOMETHING CLEVER}
+\title{An Autonomous Meeting Assistant}
 \author{951926 \and 1001231 \and 1024072 \and 1028907}
 \date{\today}
 
@@ -13,11 +13,12 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic road mapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 2DX platform modified with a tripod-mounted Kinect.
+  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic road mapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
 \end{abstract}
 \section{Introduction}
 Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic road map to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 \section{Background}
+\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 \subsection{Localisation}
 The aim of localisation is to obtain an estimate of the position of a mobile robot using sensor data \cite{localisation}. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. An important point to note is that localisation can be performed with a prepared map, or generating a map in real-time. The much more complex latter problem is called simultaneous localisation and mapping, which we will not discuss here. See \cite{slam} for an introduction to the SLAM problem.
 
@@ -69,8 +70,6 @@ To actually use any of these filters to solve a localisation problem, it is nece
 Integrating the sensor and motion models into the particle filter results in an algorithm known as Monte Carlo localisation (MCL). The most basic version of MCL is shown in Algorithm \ref{alg:basicMCL}, in which $\mathcal{X}_{t-1}$ represents the particles from the previous time step, $M$ the total number of particles, $x_t^{[m]}$ the state of the $m$th particle with the action $u_t$ applied to it via the motion model, $w_t^{[m]}$ the importance weight of the $m$th particle, and $\bar{\mathcal{X}}_t$ the resampled set of particles. We use an adaptive implementation of MCL provided by the ROS system.
 
 \subsection{Route Planning}
-
-
 \subsubsection{Probabilistic Roadmaps}
 A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for robots in static workspaces \cite{prm} which solves the problem of determining a path between start and goal configurations while avoiding collisions with obstacles in the workspace. The roadmap algorithm consists of two phases; the learning phase and the query phase.
 
@@ -123,15 +122,34 @@ An RRT is a randomised data structure and algorithm that is also used to solve p
   \end{algorithmic}
 \end{algorithm}
 \subsection{Exploration}
-The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to gain the most possible new information \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time span, although the distributed nature of the task produces further challenges.
+The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to gain the most possible new information \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time span, but requires the implementation of algorithms that can make good use of these increased capabilities.
 \subsection{Robot Vision}
 \section{Design}
+\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
+\subsection{Hardware \& Software}
+
+\subsubsection{Robot Operating System}
+The Robot Operating System (ROS) is an open source software framework developed by Willow Garage and the robotics community that provides libraries and tools for use in robot applications. The system comes with a series of \emph{stacks}; user contributed packages which can be used to perform SLAM, localisation and various other tasks that the user may not want to implement themselves, which means that development can be focused on solving the problem at hand. ROS code can be written in a variety of languages, including C++, Python and Java, and can be run on a large number of platforms, with support for humanoid robots, arms, quadrotors and many mobile robots.
+
+The system uses a graph structure and uses data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used for another task with little or no modification required. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to that topic. All of the activity of the system is monitored by a master node which provides information about the state of the whole system, including node status and the currently active topics.
+
+\subsubsection{Robotics Platform}
+For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forwards-mounted and two side-mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}.\cite{hokuyo, kinect}
+
 \subsection{System Structure}
-MENTION ALGORITHM COMPLEXITY!
-brief ROS description, callback based system, finite state automaton, talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
-\subsection{Platform}
-Stuff about the pioneer---available sensors, some data about its size, specifications, our additions to it. Kinect specs. Include a picture of the robot with the kinect on it. 
+Our implementation attempts to make the most of this system structure, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state automaton. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
+
+\textbf{MENTION ALGORITHM COMPLEXITY?}
+talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
+\subsubsection{Localisation Node}
+We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation rather than our own implementations, we reduced the likelihood of bugs causing problems with the localisation. This was very important, as to move safely through the space it is necessary to have an accurate position estimate. \textbf{do we need justification here?}We had to tweak some parameters in the algorithm that we had deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively.
+\subsubsection{PRM Node}
+
+\subsubsection{Navigation Node}
+\subsubsection{Vision Node}
+\subsubsection{Control Node}
 \section{Experimentation}
+\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 \subsection{PRM}
 inflated map - show inflated map superimposed onto the original map
 Redo experiment for sampling methods. short, medium, long path length. Display image of map with one of the routes displayed and show the difference between the sampling methods. Find the optimum route by sampling a massive number of vertices on to the space and then finding a route using that---the flattened path is then the most optimal route, and we compare the other routes to this route for each experiment.
