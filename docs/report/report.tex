@@ -3,7 +3,9 @@
 \usepackage{algpseudocode}
 \usepackage{amsmath}
 \usepackage{graphicx}
+\usepackage[center]{caption}
 
+\setlength{\belowcaptionskip}{-10pt}
 \newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
 
 \title{An Autonomous Meeting Assistant}
@@ -148,7 +150,7 @@ Our implementation attempts to make the most of this system structure, with sepa
 \textbf{MENTION ALGORITHM COMPLEXITY?}
 talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
 \subsubsection{Localisation Node}
-We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. \textbf{do we need justification here?}We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the performance of AMCL algorithms can be found in Figure \ref{fig:local}.
+We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. \textbf{DO WE NEED JUSTIFICATION HERE?}We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the performance of AMCL algorithms can be found in Figure \ref{fig:local}.
 \subsubsection{PRM Node}
 \begin{itemize}
 \item map inflation
@@ -162,21 +164,21 @@ We independently developed two localisation nodes which implemented augmented Mo
 \section{Experimentation}
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 \subsection{MCL Tracking Error}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{tracking_stdev}
+  \caption{Path used for tracking error experiment.\textbf{GET THE RIGHT IMAGE!}}
+  \label{fig:locpath}
+\end{figure}
 \subsubsection{Aim}
 The aim of this experiment is to compare the tracking error of three different MCL implementations; the built in ROS AMCL and two of our own implementations.
 \subsubsection{Method}
 As each MCL implementation has many different variables, we will use the set of variables that resulted in the best performance in past experiments. To provide accurate results, we require a ground truth, which will be obtained from the Stage simulator. We will run the experiment three times for each implementation and record the tracking error every second while the robot moves, until it reaches the end of its path. The tracking error is defined as the Euclidean distance between the ground truth and the estimated pose provided by the localisation at each point at which a measurement is taken. The robot will start from the same initial position and follow the same path, seen in Figure \ref{fig:locpath}, in each experiment.
 \subsubsection{Results}
 Figure \ref{fig:local} shows the tracking errors for each implementation, with error bars representing the standard deviation over three runs. Apart from two anomalous points at 13 and 25 seconds at which all implementations experience an increase in tracking error, the deviation of AMCL is significantly lower than the other two implementations. The average deviation over the three runs for AMCL is 0.019m, compared to averages of 0.071m and 0.085m for Penny and Leslie respectively. It is clear that to obtain accurate position estimates we should make use of ROS AMCL.
-
 \begin{figure}
   \includegraphics[width=\columnwidth]{tracking_stdev}
-  \caption{Comparison of Tracking error of ROS AMCL and two independently developed AMCL algorithms}
+  \caption{Comparison of Tracking error of ROS AMCL and two independently developed MCL algorithms}
   \label{fig:local}
-\end{figure}
-\begin{figure}
-  \caption{Path used for tracking error experiment.}
-  \label{fig:locpath}
 \end{figure}
 \subsection{PRM}
 inflated map - show inflated map superimposed onto the original map
