@@ -16,10 +16,10 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic road mapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
+  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic roadmapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
 \end{abstract}
 \section{Introduction}
-Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic road map to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these sorts of problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
+Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic roadmap to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these sorts of problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 \section{Background}
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 
@@ -79,7 +79,7 @@ A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for ro
 
 In the first step of the learning phase, the construction step, a graph $G$ with vertices $V$ and edges $E$ is constructed. Free configurations are repeatedly sampled from the workspace and added to $V$. A free configuration is one where the robot does not intersect with walls or other obstacles in the workspace. Once a specified number of configurations have been sampled, the vertices in $V$ are connected. Attempts to connect two vertices $v$ and $n$ are only made if they are within a neighbourhood specified by a maximum distance $D$, and a connection is only made if the path between the two nodes is also valid, i.e. there is no configuration on the path where the robot intersects with walls or obstacles. If a connection is made, the edge from $v$ to $n$ is added to $E$. The second step of the learning phase is the expansion step, which is intended to improve the connectivity of the graph. This step can be skipped if a sampling algorithm which takes into account difficult (narrow) areas of the workspace is used in the construction step.
 \begin{algorithm}
-  \caption{Probabilistic Road Map Generation}
+  \caption{Probabilistic Roadmap Generation}
   \label{alg:prm}
   \begin{algorithmic}[1]
     \State \textbf{Algorithm generate\_PRM}\textnormal{($map$)}
@@ -138,6 +138,12 @@ The Robot Operating System (ROS) is an open source software framework developed 
 The system uses a graph structure and uses data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used for another task with little or no modification required. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to that topic. All of the activity of the system is monitored by a master node which provides information about the state of the whole system, including node status and the currently active topics.
 
 \subsubsection{Robotics Platform}
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{robotmulti}
+  \caption{The Pioneer 3-DX fitted with tripod mounted Kinect and Hokuyo laser rangefinder.}
+  \label{fig:robotpic}
+\end{figure}
 For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forwards-mounted and two side-mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}. 
 
 The Hokuyo laser \cite{hokuyo}.
@@ -145,7 +151,7 @@ The Hokuyo laser \cite{hokuyo}.
 The Microsoft Kinect \cite{kinect}.
 
 \subsection{System Structure}
-Our implementation attempts to make the most of this system structure, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state automaton. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
+Our implementation attempts to make the most of this system structure, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state machine. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
 
 \textbf{MENTION ALGORITHM COMPLEXITY?}
 talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
@@ -158,6 +164,12 @@ We independently developed two localisation nodes which implemented augmented Mo
 \item connection strategy
 \item path flattening
 \end{itemize}
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{inflated-map}
+  \caption{Example of an inflated map used for PRM. Black pixels are obstacles. Grey pixels inside the map show the inflation applied to the obstacles.}
+  \label{fig:inflatedmap}
+\end{figure}
 \subsubsection{Navigation Node}
 \subsubsection{Vision Node}
 \subsubsection{Control Node}
@@ -165,8 +177,8 @@ We independently developed two localisation nodes which implemented augmented Mo
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 \subsection{MCL Tracking Error}
 \begin{figure}
-  \includegraphics[width=\columnwidth]{tracking_stdev}
-  \caption{Path used for tracking error experiment.\textbf{GET THE RIGHT IMAGE!}}
+  \includegraphics[width=\columnwidth]{localisation-experiment-path}
+  \caption{Path used for tracking error experiment.}
   \label{fig:locpath}
 \end{figure}
 \subsubsection{Aim}
@@ -188,11 +200,11 @@ Redid sampling experiments - now have comparison for neighbourhood, threshold an
 
 \textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new\_prmlogs contains data.
 
-
 \subsection{Vision}
 \subsection{Exploration}
 Coverage experiments info: cell and grid done for cell size and grid spacing of 10,8,6,4,2,1, with cell repeated three times for each. The fov max distance was 3.5, angle 57, minimum distance 0.3. Started at 2.80,18.97,40 in stage. Max move speed 0.7m/s, max rotation speed 0.4 rad/sec. Ran until the end of the exploration path was reached.
 \subsection{Whole System !RENAME THIS!}
+medium failures: 2 times, once found one person, other time didn't find anyone. both failures due to AMCL issues. Short failures 4, due to AMCL. Long failures, 3 AMCL failures.
 \section{Discussion}
 \subsection{Performance}
 \subsection{Potential Improvements}
