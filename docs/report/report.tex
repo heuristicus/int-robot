@@ -3,10 +3,15 @@
 \usepackage{algpseudocode}
 \usepackage{amsmath}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,automata}
+
 \usepackage[center]{caption}
 
 \setlength{\belowcaptionskip}{-10pt}
 \newcommand{\BigO}[1]{\ensuremath{\operatorname{O}\left(#1\right)}}
+\tikzstyle{cloud} = [draw, ellipse, node distance=1.5cm,
+    minimum height=2em]
 
 \title{An Autonomous Meeting Assistant}
 \author{951926 \and 1001231 \and 1024072 \and 1028907}
@@ -20,6 +25,7 @@
 \end{abstract}
 \section{Introduction}
 Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic roadmap to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these sorts of problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
+
 \section{Background}
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 
@@ -43,6 +49,12 @@ Many advanced localisation techniques are based on the Bayes filter, which uses 
 As the Bayes filter is not restricted to finite state spaces, it is not possible to implement it for anything other than very simple problems. There are two families of algorithms for localisation, known as \emph{recursive state estimators}, with various properties that permit the use of the Bayes filter in more complex estimation tasks \cite{thrun}.
 \subsubsection{Gaussian Filters}
 The basic principle of the family of Gaussian filters is the use of multivariate normal distributions, which can be formulated from a mean $\mu$ and covariance $\Sigma$, to represent belief. As a result, the assumption that the system is a linear Gaussian system is made; the initial belief must be a Gaussian, and both the state transition function and measurement probability must be linear functions. Although Gaussian filters can be extended to non-linear systems, they perform best when the system meets the assumptions made. One of the main advantages of such filters is the computational complexity, which is polynomial with respect to the dimensionality of the state space. The main disadvantage is that Gaussians are unimodal and therefore cannot represent situations in which there are multiple hypotheses; a situation that is often encountered in robotics. Examples include the Kalman filter and the information filter, which are derived from two different ways of representing Gaussians. Both of these filters can be extended to non-linear systems by using a Taylor expansion to produce linear approximations of non-linear functions. Mixtures of Gaussians can also be used to extend the Kalman filter to encompass situations in which multiple hypotheses are required, but each extension increases the complexity of the algorithm. This extensibility is one of the reasons for the popularity of the Kalman filter in state estimation problems. With some extension, the information filter is particularly suited to multi-robot systems where information from multiple sources must be integrated, but issues with complexity have resulted in the Kalman filter becoming the more popular of the two for the majority of problems \cite{thrun}.
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{robotmulti}
+  \caption{The Pioneer 3-DX fitted with tripod mounted Kinect and Hokuyo laser rangefinder.}
+  \label{fig:robotpic}
+\end{figure}
 \subsubsection{Nonparametric Filters}
 In contrast to Gaussian filters, nonparametric filters discretise the probability distribution and do not require assumptions of linearity and Gaussian belief distributions. Instead, the state is approximated by a finite number of values which are taken from the belief state at any given time. The number of these values can be varied, and nonparametric filters converge to the correct state as the number tends towards infinity. Because this family of filters does not impose restrictions on the posterior density, they are useful for problems such as global localisation, which require the state to be represented in a complex form. Global localisation is the problem of determining the position of the robot without knowing its initial position, resulting in global uncertainty and the need for a multimodal belief distribution. Although as a result nonparametric filters are more computationally expensive than Gaussian filters, it is possible to vary the number of values used to represent the belief to suit the problem using \emph{adaptive} techniques. Examples of these types of filters are the histogram and particle filters. The histogram filter decomposes a continuous space into some finite number of regions, each of which is assigned a probability based on the belief. Extensions include using dynamic decomposition techniques to use more coarse representations in regions with lower probability, and the use of \emph{selective updating}, which updates only the parts of the space which are deemed important. Particle filters approximate the belief by drawing a number of hypotheses called \emph{particles} randomly from the belief distribution. The most important part of the particle filter is the resampling step, which selects particles from the initial set proportional to an importance factor. This has the effect of concentrating particles in areas of high likelihood, reducing computational power spent in areas which are not relevant. Improving the sampling method and adapting the number of particles based on time and uncertainty lead to more effective and error-resistant particle filters. A property which is particularly useful to us is that particle filters are very easy to implement \cite{thrun}.
 
@@ -103,10 +115,7 @@ In the first step of the learning phase, the construction step, a graph $G$ with
 \end{algorithm}
 Once the graph has been constructed, the query phase is entered. In this phase, the roadmap is used to find paths between start and goal configurations $s$ and $g$. In order to do this, $s$ and $g$ must first be connected to the graph using the same connection strategy used in the construction step. A graph search algorithm such as A* can then be used to find the shortest path between the two newly added vertices.
 
-There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
-
-\subsubsection{Rapidly Exploring Random Trees}
-An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
+There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. As an example, our implementation of Dijkstra's algorithm took 964 milliseconds to find a path between two points on opposite sides of a map with a roadmap populated with 5000 vertices. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
 \begin{algorithm}
   \caption{Path Smoothing}
   \label{alg:pathsmooth}
@@ -125,8 +134,11 @@ An RRT is a randomised data structure and algorithm that is also used to solve p
     \State \textbf{return}\textnormal{ $P$}
   \end{algorithmic}
 \end{algorithm}
+\subsubsection{Rapidly Exploring Random Trees}
+An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
+
 \subsection{Exploration}
-The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to gain the most possible new information \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time, but requires the implementation of algorithms that can make good use of these increased capabilities.
+The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to maximise its information gain \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time, but requires the implementation of algorithms that can make good use of these increased capabilities.
 \subsection{Robot Vision}
 \section{Design}
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
@@ -135,28 +147,22 @@ The problem of exploration revolves around taking actions to maximise informatio
 \subsubsection{Robot Operating System}
 The Robot Operating System (ROS) is an open source software framework developed by Willow Garage and the robotics community that provides libraries and tools for use in robot applications. The system comes with a series of \emph{stacks}; user contributed packages which can be used to perform SLAM, localisation and various other tasks that the user may not want to implement themselves, which means that development can be focused on solving the problem at hand. ROS code can be written in a variety of languages, including C++, Python and Java, and can be run on a large number of platforms, with support for humanoid robots, arms, quadrotors and many mobile robots.
 
-The system uses a graph structure and uses data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used for another task with little or no modification required. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to that topic. All of the activity of the system is monitored by a master node which provides information about the state of the whole system, including node status and the currently active topics.
+The system has a graph-like structure and makes use of data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used in the system for another task with little or no modification. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to the topic on which it is published. A  master node provides information about the state of the whole system, including node status and the currently active topics.
 
 \subsubsection{Robotics Platform}
-\begin{figure}
-  \centering
-  \includegraphics[width=\columnwidth]{robotmulti}
-  \caption{The Pioneer 3-DX fitted with tripod mounted Kinect and Hokuyo laser rangefinder.}
-  \label{fig:robotpic}
-\end{figure}
-For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forwards-mounted and two side-mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}. 
 
-The Hokuyo laser \cite{hokuyo}.
+For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forward mounted and two side mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}. 
+
+The Hokuyo laser is mounted on the front of the robot. It has a scan area of $240^o$ with a maximum radius of four metres.\cite{hokuyo}.
 
 The Microsoft Kinect \cite{kinect}.
 
 \subsection{System Structure}
 Our implementation attempts to make the most of this system structure, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state machine. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
 
-\textbf{MENTION ALGORITHM COMPLEXITY?}
 talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
 \subsubsection{Localisation Node}
-We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. \textbf{DO WE NEED JUSTIFICATION HERE?}We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the performance of AMCL algorithms can be found in Figure \ref{fig:local}.
+We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the performance of AMCL algorithms can be found in Figure \ref{fig:local}.
 \subsubsection{PRM Node}
 \begin{itemize}
 \item map inflation
@@ -173,6 +179,23 @@ We independently developed two localisation nodes which implemented augmented Mo
 \subsubsection{Navigation Node}
 \subsubsection{Vision Node}
 \subsubsection{Control Node}
+\begin{figure}
+  \centering
+  \begin{tikzpicture}
+    \node [cloud] (init) {Initialisation};
+    \node [cloud,below of=init] (findroom) {Find empty room};
+    \node [cloud,below of=findroom] (findp) {Find person};
+    \node [cloud,below of=findp] (return) {Return to room};
+    \node [cloud,below of=return] (comp) {Complete};
+    \draw [->] (init)--(findroom);
+    \draw [->] (findroom)--(findp);
+    \draw [->] (findp)--(return);
+    \draw [->] (return) to [out = 360, in = 0, looseness = 2] (findp);
+    \draw [->] (return)--(comp);
+  \end{tikzpicture}
+  \caption{Simplified version of finite state machine used in the control node.}
+  \label{fig:fsm}
+\end{figure}
 \section{Experimentation}
 \textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
 \subsection{MCL Tracking Error}
@@ -201,8 +224,28 @@ Redid sampling experiments - now have comparison for neighbourhood, threshold an
 \textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new\_prmlogs contains data.
 
 \subsection{Vision}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{haar_ROC}
+  \caption{ROC analysis of frontal\_face haar cascades.}
+  \label{fig:haar}
+\end{figure}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{kinect_ROC}
+  \caption{ROC analysis of frontal\_face\_alt cascade with assumption and sensor models applied.}
+  \label{fig:haar}
+\end{figure}
 \subsection{Exploration}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{4-1_1_heatmap}
+  \caption{Heat map of the best cell based strategy run looping 4m, 2m then 1m cell sizes. Red areas are those which were often in the robot's field of view, while blue areas were not.}
+  \label{fig:heatmap}
+\end{figure}
 Coverage experiments info: cell and grid done for cell size and grid spacing of 10,8,6,4,2,1, with cell repeated three times for each. The fov max distance was 3.5, angle 57, minimum distance 0.3. Started at 2.80,18.97,40 in stage. Max move speed 0.7m/s, max rotation speed 0.4 rad/sec. Ran until the end of the exploration path was reached.
+\begin{figure}
+  \includegraphics[width=\columnwidth]{coverage_time}
+  \caption{Comparison of the best grid and cell based exploration strategies.}
+  \label{fig:coverage}
+\end{figure}
 \subsection{Whole System !RENAME THIS!}
 medium failures: 2 times, once found one person, other time didn't find anyone. both failures due to AMCL issues. Short failures 4, due to AMCL. Long failures, 3 AMCL failures.
 \section{Discussion}
