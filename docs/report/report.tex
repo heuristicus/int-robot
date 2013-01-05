@@ -4,6 +4,8 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{multirow}
 \usetikzlibrary{shapes,arrows,automata}
 
 \usepackage[center]{caption}
@@ -21,7 +23,7 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available. To complete the task, we use probabilistic roadmapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
+  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available, all within a 15 minute time limit. To complete the task, we use probabilistic roadmapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
 \end{abstract}
 \section{Introduction}
 Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic roadmap to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these sorts of problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
@@ -49,12 +51,7 @@ Many advanced localisation techniques are based on the Bayes filter, which uses 
 As the Bayes filter is not restricted to finite state spaces, it is not possible to implement it for anything other than very simple problems. There are two families of algorithms for localisation, known as \emph{recursive state estimators}, with various properties that permit the use of the Bayes filter in more complex estimation tasks \cite{thrun}.
 \subsubsection{Gaussian Filters}
 The basic principle of the family of Gaussian filters is the use of multivariate normal distributions, which can be formulated from a mean $\mu$ and covariance $\Sigma$, to represent belief. As a result, the assumption that the system is a linear Gaussian system is made; the initial belief must be a Gaussian, and both the state transition function and measurement probability must be linear functions. Although Gaussian filters can be extended to non-linear systems, they perform best when the system meets the assumptions made. One of the main advantages of such filters is the computational complexity, which is polynomial with respect to the dimensionality of the state space. The main disadvantage is that Gaussians are unimodal and therefore cannot represent situations in which there are multiple hypotheses; a situation that is often encountered in robotics. Examples include the Kalman filter and the information filter, which are derived from two different ways of representing Gaussians. Both of these filters can be extended to non-linear systems by using a Taylor expansion to produce linear approximations of non-linear functions. Mixtures of Gaussians can also be used to extend the Kalman filter to encompass situations in which multiple hypotheses are required, but each extension increases the complexity of the algorithm. This extensibility is one of the reasons for the popularity of the Kalman filter in state estimation problems. With some extension, the information filter is particularly suited to multi-robot systems where information from multiple sources must be integrated, but issues with complexity have resulted in the Kalman filter becoming the more popular of the two for the majority of problems \cite{thrun}.
-\begin{figure}
-  \centering
-  \includegraphics[width=\columnwidth]{robotmulti}
-  \caption{The Pioneer 3-DX fitted with tripod mounted Kinect and Hokuyo laser rangefinder.}
-  \label{fig:robotpic}
-\end{figure}
+
 \subsubsection{Nonparametric Filters}
 In contrast to Gaussian filters, nonparametric filters discretise the probability distribution and do not require assumptions of linearity and Gaussian belief distributions. Instead, the state is approximated by a finite number of values which are taken from the belief state at any given time. The number of these values can be varied, and nonparametric filters converge to the correct state as the number tends towards infinity. Because this family of filters does not impose restrictions on the posterior density, they are useful for problems such as global localisation, which require the state to be represented in a complex form. Global localisation is the problem of determining the position of the robot without knowing its initial position, resulting in global uncertainty and the need for a multimodal belief distribution. Although as a result nonparametric filters are more computationally expensive than Gaussian filters, it is possible to vary the number of values used to represent the belief to suit the problem using \emph{adaptive} techniques. Examples of these types of filters are the histogram and particle filters. The histogram filter decomposes a continuous space into some finite number of regions, each of which is assigned a probability based on the belief. Extensions include using dynamic decomposition techniques to use more coarse representations in regions with lower probability, and the use of \emph{selective updating}, which updates only the parts of the space which are deemed important. Particle filters approximate the belief by drawing a number of hypotheses called \emph{particles} randomly from the belief distribution. The most important part of the particle filter is the resampling step, which selects particles from the initial set proportional to an importance factor. This has the effect of concentrating particles in areas of high likelihood, reducing computational power spent in areas which are not relevant. Improving the sampling method and adapting the number of particles based on time and uncertainty lead to more effective and error-resistant particle filters. A property which is particularly useful to us is that particle filters are very easy to implement \cite{thrun}.
 
@@ -84,12 +81,52 @@ One of the reasons that these filters are so efficient stems from the assumption
 To actually use any of these filters to solve a localisation problem, it is necessary to model the sensors and motion of the robot. These models include some parameters representing the uncertainty attached to performing a specific action or receiving a certain measurement from a sensor. The motion model is used in the prediction step to determine the state transition probability $P(x_t\mid x_{t-1}, u_t)$; the probability of going from state $x_{t-1}$ to $x_t$ given that the action $u_t$ was performed. The sensor model is used to calculate $P(z_t\mid x_t,map)$, which represents the likelihood of the measurement $z_t$ being received in the state $x_t$ on a given map. The model incorporates knowledge about the noise parameters of the operating environment and the sensor being used in the form of probability densities. For example, a range sensor might include densities for correct measurements, measurements of unexpected obstacles, sensor failures and random measurements \cite{thrun}. 
 
 Integrating the sensor and motion models into the particle filter results in an algorithm known as Monte Carlo localisation (MCL). The most basic version of MCL is shown in Algorithm \ref{alg:basicMCL}, in which $\mathcal{X}_{t-1}$ represents the particles from the previous time step, $M$ the total number of particles, $x_t^{[m]}$ the state of the $m$th particle with the action $u_t$ applied to it via the motion model, $w_t^{[m]}$ the importance weight of the $m$th particle, and $\bar{\mathcal{X}}_t$ the resampled set of particles. We use an adaptive implementation of MCL provided by the ROS system.
-
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{robotmulti}
+  \caption{The Pioneer 3-DX fitted with tripod mounted Kinect and Hokuyo laser rangefinder.}
+  \label{fig:robotpic}
+\end{figure}
 \subsection{Route Planning}
 \subsubsection{Probabilistic Roadmaps}
 A probabilistic roadmap (PRM) is a  multi-query motion planning algorithm for robots in static workspaces \cite{prm} which solves the problem of determining a path between start and goal configurations while avoiding collisions with obstacles in the workspace. The roadmap algorithm consists of two phases; the learning phase and the query phase.
 
 In the first step of the learning phase, the construction step, a graph $G$ with vertices $V$ and edges $E$ is constructed. Free configurations are repeatedly sampled from the workspace and added to $V$. A free configuration is one where the robot does not intersect with walls or other obstacles in the workspace. Once a specified number of configurations have been sampled, the vertices in $V$ are connected. Attempts to connect two vertices $v$ and $n$ are only made if they are within a neighbourhood specified by a maximum distance $D$, and a connection is only made if the path between the two nodes is also valid, i.e. there is no configuration on the path where the robot intersects with walls or obstacles. If a connection is made, the edge from $v$ to $n$ is added to $E$. The second step of the learning phase is the expansion step, which is intended to improve the connectivity of the graph. This step can be skipped if a sampling algorithm which takes into account difficult (narrow) areas of the workspace is used in the construction step.
+
+Once the graph has been constructed, the query phase is entered. In this phase, the roadmap is used to find paths between start and goal configurations $s$ and $g$. In order to do this, $s$ and $g$ must first be connected to the graph using the same connection strategy used in the construction step. A graph search algorithm such as A* can then be used to find the shortest path between the two newly added vertices.
+
+There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. As an example, our implementation of Dijkstra's algorithm took 964 milliseconds to find a path between two points on opposite sides of a map with a roadmap populated with 5000 vertices. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
+
+\subsubsection{Rapidly Exploring Random Trees}
+An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
+
+\subsection{Exploration}
+The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to maximise its information gain \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time, but requires the implementation of algorithms that can make good use of these increased capabilities.
+\subsection{Robot Vision}
+\section{Design}
+In this section we explain in detail the techniques, algorithms and hardware that we used to solve the task.
+\subsection{Hardware \& Software}
+\subsubsection{Robotics Platform}
+
+For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forward mounted and two side mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}. 
+
+The Hokuyo laser is mounted on the front of the robot. It has a scan area of $240^\circ$ with a maximum radius of 4m and an angular resolution of $0.351^\circ$. A scan is completed by the laser every 100ms. The laser is accurate to $\pm 20$mm at distances between 20 and 1000mm, and $\pm 1$\% of the measurement distance at 1000-4000mm \cite{hokuyo}.
+
+The Microsoft Kinect is a video device which produces images much like a normal device, but has the additional ability to return a depth value for each pixel in the image. As such, the device is similar to a 3-D camera. The Kinect camera has a $57^\circ$ horizontal and $43^\circ$ vertical field of view with a nominal depth of 3.5m. Images from the camera have a resolution of 640x480 \cite{kinect}. Interfacing the Kinect with the ROS framework is achieved by using the OpenNI SDK, an open source framework for 3D sensing development.
+
+Figure \ref{fig:robotpic} shows the assembled hardware.
+\subsubsection{Robot Operating System}
+The Robot Operating System (ROS) is an open source software framework developed by Willow Garage and the robotics community that provides libraries and tools for use in robot applications. The system comes with a series of \emph{stacks}; user contributed packages which can be used to perform SLAM, localisation and various other tasks that the user may not want to implement themselves, which means that development can be focused on solving the problem at hand. ROS code can be written in a variety of languages, including C++, Python and Java, and can be run on a large number of platforms, with support for humanoid robots, arms, quadrotors and many mobile robots.
+
+The system has a graph-like structure and makes use of data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used in the system for another task with little or no modification. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to the topic on which it is published. A  master node provides information about the state of the whole system, including node status and the currently active topics.
+
+\subsection{System Structure}
+Our implementation attempts to make the most of the ROS system, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state machine. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
+
+\subsubsection{Localisation Node}
+We independently developed two localisation nodes which implemented Monte Carlo localisation (MCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the tracking error of the three localisation algorithms can be found in Figure \ref{fig:local}.
+
+\subsubsection{PRM Node}
 \begin{algorithm}
   \caption{Probabilistic Roadmap Generation}
   \label{alg:prm}
@@ -101,11 +138,11 @@ In the first step of the learning phase, the construction step, a graph $G$ with
     % a is number of attempts, A is max attempts
     \While{$a<A \wedge \textbf{nconns} (v)<C$}
     \State $n \leftarrow$\textbf{ get\_closest}\textnormal{($V, v$)}
-    \If{\textbf{dist}$(v,n)<D$}
+    \If{\textbf{dist}$(v,n)<R_n$}
     \If{$\neg\textbf{neighbour}(v,n)\wedge\textbf{vpath}(map,v,n)$}
     \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
-    \ElsIf{$\neg \textbf{connected}(v,n) \wedge \textbf{vpath}(map,v,n)$}
+    \ElsIf{$\textbf{vpath}(map,v,n)$}
     \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
     \State $a \leftarrow a + 1$
@@ -113,9 +150,19 @@ In the first step of the learning phase, the construction step, a graph $G$ with
     \EndFor
   \end{algorithmic}
 \end{algorithm}
-Once the graph has been constructed, the query phase is entered. In this phase, the roadmap is used to find paths between start and goal configurations $s$ and $g$. In order to do this, $s$ and $g$ must first be connected to the graph using the same connection strategy used in the construction step. A graph search algorithm such as A* can then be used to find the shortest path between the two newly added vertices.
+The PRM node is used to find paths to navigate from one point on the map to another. Whenever a goal point is received by the node, it finds the shortest path from the robot's current position to the goal position by using Dijkstra's algorithm to search the road map generated when the node is initialised. We will now walk through Algorithm \ref{alg:prm}, used for generating the roadmap. In line 2, points are sampled from the map using cell sampling. Cell sampling is a uniform sampling technique in which the map is split into a number of equally sized square \emph{cells}, and a certain number of points are randomly sampled from within each cell. This sampling technique, although simple, provides very good coverage of the space, and is particularly good at sampling points in narrow corridors, as each cell is required to contain a specified number of points. We now iterate over the sampled points, hereafter called vertices, attempting to make connections between them. We connect the target vertex $v$ to candidate vertices $n$ in the graph in order of proximity to $v$. As some vertices may be unconnectable, we specify a maximum number of attempts $A$ that should be made to connect a vertex to the graph. We also specify $C$, the maximum number of connections that a vertex can have. If the number of connection attempts $a$ exceeds $A$, or the number of connections the target vertex has exceeds $C$, the algorithm will move on to the next vertex. When connecting vertices, the algorithm starts by selecting the vertex in the graph which is the shortest Euclidean distance from $v$. In line 7, a check is made to see if the candidate vertex is within the neighbourhood of the target vertex. Vertices within a Euclidean distance $R_n$ of $v$ are considered to be within its neighbourhood. If the candidate vertex is within the neighbourhood, $v$ and $n$ are connected only if they are not already connected by a path that is contained entirely inside the neighbourhood, and there is a straight line between the two vertices which does not pass through any obstacles. If the candidate vertex is not in the neighbourhood of the target, then a connection is made so long as there is a free path between the the two. These checks are performed in lines 8 and 11. The benefit of this is that vertices are not connected multiple times to other vertices in close proximity, but connect to vertices further away which means that shortcuts can be made between neighbourhoods. A vertex is guaranteed to be connected to the closest accessible vertex in its neighbourhood.
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{inflated-map}
+  \caption{Example of an inflated map used for PRM. Black pixels are obstacles. Grey pixels inside the map show the inflation applied to the obstacles.}
+  \label{fig:inflatedmap}
+\end{figure}
+When checking the validity of points and lines on the map, it is necessary to take into account the size of the robot. This can be done by checking a radius around each point for obstacles, but for the purposes of efficiency, we have taken a slightly different approach. Instead of checking the area around points, we increase the size of obstacles by the required safe distance from obstacles. In our case, this is slightly above half of the longest dimension of the robot. After applying this size increase, we receive an \emph{inflated} map, an example of which can be seen in Figure \ref{fig:inflatedmap}, which we use when generating the graph and for path planning.
 
-There are a number of ways in which the basic PRM algorithm can be improved. Most of these relate to the construction of the graph, as the graph is the part of the algorithm which most influences subsequent performance---if vertex placement is bad, then even if the graph search algorithm is good, it is possible that a path will not be found. The sampling method is particularly important, and many different techniques have been proposed to improve the coverage of the PRM. Roughly speaking, the techniques can be separated into uniform and advanced techniques. Uniform techniques include random sampling, sampling points on a grid, and splitting the workspace into cells and sampling some number of points from each of those subspaces. Uniform methods provide a simple but effective way of sampling, but may experience a drop in performance for more difficult workspaces, for example those with narrow corridors. In these cases, using advanced techniques such as medial axis sampling, which generates points at the midpoints between obstacles, can be effective \cite{sampling}. The strategy used to connect vertices can also affect the structure of the graph, which in turn affects the query phase. Improvements to the query phase can be made by using different graph search algorithms, but unless the graph is extremely dense the query time is negligible. As an example, our implementation of Dijkstra's algorithm took 964 milliseconds to find a path between two points on opposite sides of a map with a roadmap populated with 5000 vertices. Path smoothing can also be used on the path found by the graph search algorithm to improve it further; our version is found in Algorithm \ref{alg:pathsmooth}. In some cases, a path may not be found with the graph being used, and although expensive, re-generating the graph can sometimes remedy this problem.
+When querying the PRM, a the robot's current position and the goal location are added to the graph and connected in the same way as other vertices. Dijkstra's algorithm is then run with the newly added vertices as parameters, and the shortest path between the vertices is returned. While using the raw path is viable, it can be further improved by smoothing. As seen in Algorithm \ref{alg:pathsmooth}, redundant intermediate vertices are removed from the path. The benefit of this is twofold; the path length becomes closer to the optimum, and the number of vertices in the path are reduced. The fewer vertices there are in the path, the less the robot must rotate during travel, and this results in a faster travel time from start to goal.
+
+When a path has been found, a message is sent to a topic announcing that a path to the goal was found. In cases where a path cannot be found with the current graph that the PRM holds, the graph will be regenerated and searched again a number of times. If a path still cannot be found after the specified number of regenerations has occurred, the PRM will publish a message informing listening nodes of this fact so that they can handle the consequences.
+
 \begin{algorithm}
   \caption{Path Smoothing}
   \label{alg:pathsmooth}
@@ -134,50 +181,15 @@ There are a number of ways in which the basic PRM algorithm can be improved. Mos
     \State \textbf{return}\textnormal{ $P$}
   \end{algorithmic}
 \end{algorithm}
-\subsubsection{Rapidly Exploring Random Trees}
-An RRT is a randomised data structure and algorithm that is also used to solve path planning problems. RRTs are designed to handle nonholonomic constraints and high degrees of freedom \cite{rrt}. Instead of sampling points and then attempting to connect them as in PRMs, RRTs are biased towards moving into unexplored areas of the state space by sampling points and being ``pulled'' towards them \cite{rrtprog}. There are several planners for RRTs, including a bidirectional planner where the tree grows from the start and goal vertices and uses an aggressive heuristic to connect the trees. In contrast to the multi-query PRM, an RRT is a single query algorithm; it is rerun every time a query is made. The properties of RRTs make them particularly suited to problems involving robot arms and robots with nonholonomic kinematics. As our platform can be considered holonomic, we mention RRTs for completeness.
 
-\subsection{Exploration}
-The problem of exploration revolves around taking actions to maximise information gain, given your current knowledge of the world. What is meant by information gain depends on the problem being solved. In many cases this is discovering the locations of walls and obstacles, but can also extend to more complex objectives such as determining the locations of specific objects, rooms, or people. The most basic form of exploration is the random walk, which ensures that any finite sequence of actions will be executed eventually \cite{thrunexploration}. ``Eventually'' is not good enough, however, and many improved exploration techniques have been proposed. Greedy techniques move the robot from its current location to the closest location that has not yet been explored \cite{greedy}. Frontier-based exploration moves to boundaries between open space and uncharted territory in order to maximise its information gain \cite{frontier}. Distributed approaches using coordinated multi-robot systems have become an active area of research, and novel techniques drawing on economics concepts have been proposed \cite{multiexp, marketexp}. As with many solutions using distributed computing, the use of multiple ``processors'' allows the task to be completed in a shorter time, but requires the implementation of algorithms that can make good use of these increased capabilities.
-\subsection{Robot Vision}
-\section{Design}
-\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
-\subsection{Hardware \& Software}
-
-\subsubsection{Robot Operating System}
-The Robot Operating System (ROS) is an open source software framework developed by Willow Garage and the robotics community that provides libraries and tools for use in robot applications. The system comes with a series of \emph{stacks}; user contributed packages which can be used to perform SLAM, localisation and various other tasks that the user may not want to implement themselves, which means that development can be focused on solving the problem at hand. ROS code can be written in a variety of languages, including C++, Python and Java, and can be run on a large number of platforms, with support for humanoid robots, arms, quadrotors and many mobile robots.
-
-The system has a graph-like structure and makes use of data streams for communication between nodes, and as a result is robust to node failures. The use of data streams for communication allows for a high degree of modularity---a node written for one task can be used in the system for another task with little or no modification. Each node can have an arbitrary number of \emph{publishers} for sending messages to \emph{topics} and \emph{subscribers} for receiving them. One of the major strengths of the system is that when a message is sent, it does not have to be sent to a specific node; once it is published, the message is available to any node which is subscribed to the topic on which it is published. A  master node provides information about the state of the whole system, including node status and the currently active topics.
-
-\subsubsection{Robotics Platform}
-
-For the task, we were required to use a Pioneer 3-DX fitted with a Hokuyo URG-04LX laser rangefinder. The Pioneer is 455cm long, 381cm wide and 237cm high, and weighs 9kg, making it a relatively compact platform. It is fitted with six forward mounted and two side mounted sonar sensors. The robot is powered by three batteries which provide a run time of 8-10 hours, assuming no accessories are attached. The robot is equipped with a differential drive system which has a 0cm turn radius, making it essentially holonomic. The maximum translation and rotation speeds are 1.2m/s and 300$^\circ$/s respectively \cite{pioneer}. 
-
-The Hokuyo laser is mounted on the front of the robot. It has a scan area of $240^o$ with a maximum radius of four metres.\cite{hokuyo}.
-
-The Microsoft Kinect \cite{kinect}.
-
-\subsection{System Structure}
-Our implementation attempts to make the most of this system structure, with separate nodes for each subsystem. The actions of the system are controlled by the control node which is based on a finite state machine. This node then hands off to other nodes when tasks need to be executed. The navigation node uses data from the localisation and PRM nodes to move between points in the map. Vision processing is done in a node written in C++ for speed, and the resulting data is used by the control node to make decisions about which actions to take.
-
-talk about implementation specifics - what algorithms we used, the sampling methods, localisation methods etc.
-\subsubsection{Localisation Node}
-We independently developed two localisation nodes which implemented augmented Monte Carlo localisation (AMCL), but which were not sufficiently error free that we were confident in using them for the combined task. Instead, we made the decision to use the ROS implementation of AMCL which comes with the software installation. By using a tried and tested implementation, we reduce the likelihood of bugs causing problems with the localisation. This is very important, as to move safely through the space it is necessary to have an accurate position estimate. We had to tweak some parameters in the algorithm that we deemed necessary in the testing of our own algorithms while running in tandem with some of the other nodes that were to make up the final system. The AMCL defaults for filter updates are 0.2 metres for translation and 0.52 radians for rotation. We decreased both of these to 0.1 metres and 0.1 radians respectively in order to receive filter updates more often. A comparison of the performance of AMCL algorithms can be found in Figure \ref{fig:local}.
-\subsubsection{PRM Node}
-\begin{itemize}
-\item map inflation
-\item sampling method
-\item connection strategy
-\item path flattening
-\end{itemize}
-\begin{figure}
-  \centering
-  \includegraphics[width=\columnwidth]{inflated-map}
-  \caption{Example of an inflated map used for PRM. Black pixels are obstacles. Grey pixels inside the map show the inflation applied to the obstacles.}
-  \label{fig:inflatedmap}
-\end{figure}
 \subsubsection{Navigation Node}
 \subsubsection{Vision Node}
+For face detection capabilities, we decided to make use of camera data from the Kinect. Face detection in ROS necessitates the use of OpenCV or some other vision library. We decided to use OpenCV as it is written in part by the ROS developers, which should lead to easier integration. Communication between ROS and OpenCV requires the cv\_bridge stack, which is not compatible with Java, only C++ and Python. We decided that C++ was a better candidate than Python, as face detection is very computationally expensive, and C++ is known to be a very fast language.
+
+talk about haar cascades here!
+A Haar cascade is a learned classifier which works with digital image features called Haar-like features. Haar cascades are usually trained on multiple sets of training data. The OpenCV package contains a range of cascade classifiers which can be used to perform a variety of detections. Some cascades are specialised to different forms of detection, for example the haarcascade\_eye cascade would uniquely detect eyes on an image.
+
+navigation to person using kinect depth data
 \subsubsection{Control Node}
 \begin{figure}
   \centering
@@ -215,39 +227,95 @@ Figure \ref{fig:local} shows the tracking errors for each implementation, with e
   \caption{Comparison of Tracking error of ROS AMCL and two independently developed MCL algorithms}
   \label{fig:local}
 \end{figure}
-\subsection{PRM}
-inflated map - show inflated map superimposed onto the original map
+\subsection{PRM connection strategies}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{optimumpaths}
+  \caption{Optimum paths used for comparison of connection strategies and sampling methods.}
+  \label{fig:optimum}
+\end{figure}
+\subsubsection{Aim}
+\subsubsection{Method}
+\subsubsection{Results}
+\subsection{PRM sampling methods}
+\subsubsection{Aim}
+\subsubsection{Method}
+\subsubsection{Results}
 Redo experiment for sampling methods. short, medium, long path length. Display image of map with one of the routes displayed and show the difference between the sampling methods. Find the optimum route by sampling a massive number of vertices on to the space and then finding a route using that---the flattened path is then the most optimal route, and we compare the other routes to this route for each experiment.
 
 Redid sampling experiments - now have comparison for neighbourhood, threshold and nearestN strategies on 4 different paths, including trying to get into the corridor. 5,10,20,30 maxconn for each strategy, inflation radius of 5 so that you can just about get into the corridor. random vertices:25,50,100,200,400,800, grid step 0.5,1,2,4, cell size 1,2,4,6, target per cell 2,5
 
 \textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new\_prmlogs contains data.
 
-\subsection{Vision}
+\subsection{Haar cascade efficacy}
 \begin{figure}
   \includegraphics[width=\columnwidth]{haar_ROC}
   \caption{ROC analysis of frontal\_face haar cascades.}
   \label{fig:haar}
 \end{figure}
+\subsubsection{Aim}
+The aim of this experiment is to find the Haar cascade most suited to perform face detection with the Kinect. We wish to find the cascade which has the highest specificity and sensitivity; all actual faces should be classified as faces, and anything which is not a face should be ignored.
+
+\subsubsection{Method}
+To test the different Haar cascades we captured a set of images using the Kinect camera which all included faces, some of which were in different surroundings and some of which include a face at different angles. Once all images had been generated, we passed them into our face detection node which uses the cascades to perform face detection on still images. Firstly, we changed the cascade from within the code to use one of the following: frontalface\_default, frontalface\_alt, frontalface\_alt2 and frontalface\_alt\_tree. We then passed in the images we had generated and saved the output of the face detection. The face detection node drew rectangles around areas it believed were faces which allowed us to perform manual analysis and present the data in an understandable manner. In order to generate the data, we looked at the image output from the program for each cascade and analysed the number of faces that were correctly detected (true positives), the number of non faces not detected (true negatives), the number of falsely detected faces (false positives) and finally, the number of faces which were completely missed (false negatives). Once we had all these values for each image, we averaged the sensitivity for each Haar cascade to find their final value.
+
+\subsubsection{Results}
+Form our results of the above experimentation it was obvious all cascades did not perform well on profile faces (I.e faces at an near 90 degree angle). This was expected as the cascades we used were specifically trained on frontal face images and therefore the detection was failing. As soon as enough information could be gathered from the image regarding the face, the default and alt cascades both detected the face and performed consistently. However, the other two detectors required the face to be at less of an angle in order to be detected. On the images which had different surroundings we found that again the default cascade performed rather well as did the alt 2 cascade. Overall the best performing cascade from averaged sensitivity was the default cascade which had a value of 0.758. Sensitivity is the ability of the cascade to detect and classify faces correctly. From the results this cascade did consistently find most or all images, however it would also consistently wrongly classify non face objects as faces, which can be seen from the 1-specificity value which was 0.76. What this value shows is that the number of false positives was rather high, i.e. it was detecting faces when there were no faces to detect. 
+
+\subsubsection{Conclusion}
+In conclusion, from the data gathered from the experiment we can see that the Haar cascade which performed above other cascades in detecting faces was the frontalface\_default. We saw that this cascade tended to classify non face objects as faces (false positives), however it did, with a good degree of consistency, classify actual faces as faces (true positives). As we decided to use the Kinect as a camera, we were aware it is possible to extract depth information for the object in view. Given the large number of false positives produced by the face detection with all cascades, we decided to use the depth information to identify false positives, by using knowledge of the size of human faces. To do so, we developed a model which helps prune non-face objects which are picked up by the cascade. We believe it to be more sensible to gather more correctly detected faces alongside non-face objects (false positives) which we can prune out, as opposed to a lower number of correctly detected faces (true negatives) and a very small number of detected faces (false positives). The frontalface\_alt which also performed well was not chosen because its performance in sensitivity, a value of 0.744 was lower than that of frontalface\_default which shows that it was not as good as detecting faces as the frontalface\_default cascade was. However the 1-specificity value of frontalface\_alt, 0.122, was the best performing amongst all cascades and showed this cascades ability to oly detect true faces. In summary we chose to use the frontalface\_default cascade as it performed well at detecting true faces, and even though its false positive rate was rather high, we  built a model to prune non face objects. 
+\subsection{Kinect depth model}
+\subsubsection{Aim}
+\subsubsection{Method}
+\subsubsection{Results}
 \begin{figure}
   \includegraphics[width=\columnwidth]{kinect_ROC}
-  \caption{ROC analysis of frontal\_face\_alt cascade with assumption and sensor models applied.}
+  \caption{ROC analysis of frontal\_face\_alt cascade with assumption and depth models applied.}
   \label{fig:haar}
 \end{figure}
-\subsection{Exploration}
 \begin{figure}
-  \includegraphics[width=\columnwidth]{4-1_1_heatmap}
-  \caption{Heat map of the best cell based strategy run looping 4m, 2m then 1m cell sizes. Red areas are those which were often in the robot's field of view, while blue areas were not.}
-  \label{fig:heatmap}
+  \includegraphics[width=\columnwidth]{centre_model}
+  \caption{Depth model for the centre of the field of view.}
+  \label{fig:haar}
 \end{figure}
-Coverage experiments info: cell and grid done for cell size and grid spacing of 10,8,6,4,2,1, with cell repeated three times for each. The fov max distance was 3.5, angle 57, minimum distance 0.3. Started at 2.80,18.97,40 in stage. Max move speed 0.7m/s, max rotation speed 0.4 rad/sec. Ran until the end of the exploration path was reached.
+\subsection{Exploration coverage}
+\subsubsection{Aim}
+\subsubsection{Method}
+The robot's maximum movement speed and rotation speed were set to 0.7m/s and 0.4rad/sec respectively. The amount of the map that can be explored in a fixed amount of time varies greatly depending on the movement speed of the robot. The maximum distance of the FOV was set to 3.5m, and the minimum to 0.3, the maximum and minimum effective ranges of our face detector.
+\subsubsection{Results}
 \begin{figure}
-  \includegraphics[width=\columnwidth]{coverage_time}
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \cline{1-3}
+\multirow{2}{*}{Strategy}& \multicolumn{2}{ c| }{Sampling method} \\ \cline{2-3}
+& \multicolumn{1}{c|}{Cell} & \multicolumn{1}{c|}{Grid} \\ \cline{1-3}
+\multicolumn{1}{ |l| }{2m$\rightarrow$1m} & 91.3 & \textbf{89.4}      \\ \cline{1-3}
+\multicolumn{1}{ |l| }{4m$\rightarrow$2m$\rightarrow$1m} & \textbf{94.0} & 86.4  \\ \cline{1-3}
+\multicolumn{1}{ |l| }{6m$\rightarrow$4m$\rightarrow$2m} & 93.5 & 83.5  \\ \cline{1-3}
+\multicolumn{1}{ |l| }{8m$\rightarrow$6m$\rightarrow$4m} & 93.7 & 82.8 \\ \cline{1-3}
+  \end{tabular}
+  \caption{Percentage coverage after eight minutes of exploration with different strategies and sampling methods.}
+  \label{fig:covtbl}
+\end{figure}
+\begin{figure}
+  \includegraphics[width=\columnwidth]{percent_coverage_time}
   \caption{Comparison of the best grid and cell based exploration strategies.}
   \label{fig:coverage}
 \end{figure}
-\subsection{Whole System !RENAME THIS!}
+
+\begin{figure}
+  \includegraphics[width=\columnwidth]{4-1_1_heatmap}
+  \caption{Heat map showing coverage over an 8 minute run using the best cell based strategy. The colour gradient goes from red (high) to blue (low)}
+  \label{fig:heatmap}
+\end{figure}
+\subsection{Meeting room availability confirmation}
+\subsubsection{Aim}
+\subsubsection{Method}
+\subsubsection{Results}
 medium failures: 2 times, once found one person, other time didn't find anyone. both failures due to AMCL issues. Short failures 4, due to AMCL. Long failures, 3 AMCL failures.
+\subsection{Gathering meeting attendees}
+\subsubsection{Aim}
+\subsubsection{Method}
+\subsubsection{Results}
 \section{Discussion}
 \subsection{Performance}
 \subsection{Potential Improvements}
