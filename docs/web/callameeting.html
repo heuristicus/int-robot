@@ -45,8 +45,8 @@ Released   : 20081009
     guide people to the meeting. At a lower level, this assignment can
     be further broken down into sub goals. The first part of the task
     is to explore and find an empty meeting room. So the robot was
-    required to explore the open space and then ensure it is
-    empty. Once an empty room had been found and identified, the next
+    required to explore the open space, find a meeting room and then ensure it was
+    empty, otherwise continue searching for a free meeting room. Once an empty room had been found and identified, the next
     task for the robot was to begin exploring the map to find people
     to invite and guide to the meeting room it has identified as
     empty. To identify people, face detection can be used or laser
@@ -65,10 +65,10 @@ Released   : 20081009
 	      <li>How to explore to find people and meeting rooms ?</li>
 	      <li>How to validate if meeting room is empty ?</li>
 	      <li>How to detect people ?</li>
-	      <li>How get to a person who has been detected ?</li>
+	      <li>How to get to a person who has been detected ?</li>
 	      <li>How to take people who have accepted the invite back
           to the meeting room?</li>
-	      <li>How to ensure robot knows its location at all times</li>
+	      <li>How to ensure the robot knows its location at all times</li>
 	    </ul>
 	    </p><br />
                 </div>
@@ -95,7 +95,7 @@ Released   : 20081009
 	    particles. Both localisation methods use particle filters
 	    which is the assignment of particles in available
 	    positions on a given map. The particles are then
-	    continually given probabilities as the robot received
+	    continually given probabilities as the robot receives
 	    laser data. The probability represents the likelihood of
 	    the robot being in that particles position on the real
 	    world map. Particles with low probabilities are removed
@@ -110,8 +110,7 @@ Released   : 20081009
 	    Carlo Localization for Mobile Robots</a>.</p>
 </br>
 	    <h3>Probabilistic Road Maps</h3>
-	    <p>The definition of PRM according to the wikipedia page on
-	    PRM is as follows, the probabilistic roadmap  planner is a
+	    <p>The definition of PRM according to wikipedia is as follows, the probabilistic roadmap  planner is a
 	    motion planning algorithm in robotics, which solves the
 	    problem of determining a path between a starting
 	    configuration of the robot and a goal configuration while
@@ -165,7 +164,7 @@ Released   : 20081009
 	    check the size of the square and the distance the face is
             at, if they differed from the model, they were
 	    rejected. In order to further advance our people detection
-	    we could have possibly used different cascades for.</p>
+	    we could have possibly used different Haar cascades.</p>
 </br>
 	    <h3>System Implementation</h3>
 	    <p>For our overall implementation we decided to use a
@@ -177,7 +176,7 @@ Released   : 20081009
 	    sequentially of which only one task can be done at a
 	    time. For example the robot could either only be exploring
 	    or guiding a person to a meeting room, it could not be
-	    doing both at once.</p>
+	    doing both at once. Below we have included our finite state machine diagram to show the logical process of our program.</p>
 </br>
         </div>
 	
