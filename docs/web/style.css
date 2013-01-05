@@ -84,6 +84,22 @@ background-image:url('Images/mainImage.jpg');
 background-repeat:no-repeat;
 }
 
+#FSMpicture .picture
+{
+text-align:center;
+margin-top:0px;
+margin-bottom:0px;
+display:block;
+padding:0px;
+
+width:600px;
+height:400px;
+
+
+background-image:url('Images/mainImage.jpg');
+background-repeat:no-repeat;
+}
+
 #headerTitle
 {
 position:relative;
