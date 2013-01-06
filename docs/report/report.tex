@@ -23,13 +23,13 @@
 \maketitle
 
 \begin{abstract}
-  In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available, all within a 15 minute time limit. To complete the task, we use probabilistic roadmapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
+In this report, we present a system which performs the 1996 AAAI Mobile Robotics Competition task ``Call a meeting''\cite{AAAIcomp}. The robot was tasked with bringing a certain number of people to a meeting room previously determined as available, all within a 15 minute time limit. To complete the task, we use probabilistic roadmapping, Monte Carlo localisation and a face detection module using the ROS framework, running on a Pioneer 3-DX platform modified with a tripod-mounted Kinect.
 \end{abstract}
 \section{Introduction}
 Solutions to complex tasks often require the use of multiple techniques to solve different sub-problems, and this task is no exception. We were required to implement a localisation algorithm to determine the position of the robot, a probabilistic roadmap to allow paths to be planned through the space, a navigation algorithm for path planning, a method of exploring the space, and some way of detecting people. We then had to implement a system which would combine all of these separate modules into a single system that would complete the task. In the next section we present some background information about techniques that are often used to solve these sorts of problems. We then provide a detailed description of our system and evaluate its performance. Finally, we discuss the experimental results and suggest areas for improvement.
 
 \section{Background}
-\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
+In this section, we discuss briefly the areas of robotics that are relevant to solving the task that has been set. We mention some specific algorithms and techniques that we might consider using, as well as describing briefly the benefits and drawbacks of some of the techniques.
 
 \subsection{Localisation}
 The aim of localisation is to obtain an estimate of the position of a mobile robot using sensor data \cite{localisation}. While it is possible to use odometry data to do so, this data is inherently noisy and prone to error. In particular, odometry errors can arise from changes in the surface being traversed and the robot's weight, among others. An important point to note is that localisation can be performed with a prepared map, or generating a map in real-time. The much more complex latter problem is called simultaneous localisation and mapping, which we will not discuss here. See \cite{slam} for an introduction to the SLAM problem.
@@ -157,9 +157,9 @@ The PRM node is used to find paths to navigate from one point on the map to anot
   \caption{Example of an inflated map used for PRM. Black pixels are obstacles. Grey pixels inside the map show the inflation applied to the obstacles.}
   \label{fig:inflatedmap}
 \end{figure}
-When checking the validity of points and lines on the map, it is necessary to take into account the size of the robot. This can be done by checking a radius around each point for obstacles, but for the purposes of efficiency, we have taken a slightly different approach. Instead of checking the area around points, we increase the size of obstacles by the required safe distance from obstacles. In our case, this is slightly above half of the longest dimension of the robot. After applying this size increase, we receive an \emph{inflated} map, an example of which can be seen in Figure \ref{fig:inflatedmap}, which we use when generating the graph and for path planning.
+When checking the validity of points and lines on the map, it is necessary to take into account the size of the robot. This can be done by checking a radius around each point for obstacles, but for the purposes of efficiency, we have taken a slightly different approach. Instead of checking the area around points, we increase the size of obstacles by the required safe distance from obstacles. In our case, this is slightly above half of the longest dimension of the robot. After applying this size increase, we receive an ``inflated'' map, an example of which can be seen in Figure \ref{fig:inflatedmap}, which we use when generating the graph and for path planning.
 
-When querying the PRM, a the robot's current position and the goal location are added to the graph and connected in the same way as other vertices. Dijkstra's algorithm is then run with the newly added vertices as parameters, and the shortest path between the vertices is returned. While using the raw path is viable, it can be further improved by smoothing. As seen in Algorithm \ref{alg:pathsmooth}, redundant intermediate vertices are removed from the path. The benefit of this is twofold; the path length becomes closer to the optimum, and the number of vertices in the path are reduced. The fewer vertices there are in the path, the less the robot must rotate during travel, and this results in a faster travel time from start to goal.
+When querying the PRM, a the robot's current position and the goal location are added to the graph and connected in the same way as other vertices. Dijkstra's algorithm is then run with the newly added vertices as parameters, and the shortest path between the vertices is returned. While using the raw path is viable, it can be further improved by smoothing. As seen in Algorithm \ref{alg:pathsmooth}, redundant intermediate vertices are removed from the path in an iterative fashion. $I$ is the number of smoothing passes executed, and $P$ is a vector of waypoints along the path. $P_n$ represents the $n$th waypoint in the path. The intermediate waypoint $b$ is removed only if there is a valid path between waypoints $a$ and $c$. The algorithm terminates either when the requested number of iterations has completed or if the path cannot be smoothed further. The benefit of smoothing is twofold; the path length becomes closer to the optimum, and the number of vertices in the path are reduced. The fewer vertices there are in the path, the less the robot must rotate during travel, and this results in a faster travel time from start to goal.
 
 When a path has been found, a message is sent to a topic announcing that a path to the goal was found. In cases where a path cannot be found with the current graph that the PRM holds, the graph will be regenerated and searched again a number of times. If a path still cannot be found after the specified number of regenerations has occurred, the PRM will publish a message informing listening nodes of this fact so that they can handle the consequences.
 
@@ -177,19 +177,61 @@ When a path has been found, a message is sent to a topic announcing that a path 
     \State \textbf{remove}($P,b$)
     \EndIf
     \EndFor
+    \If{path not modified}
+    \State break
+    \EndIf
     \EndFor
     \State \textbf{return}\textnormal{ $P$}
   \end{algorithmic}
 \end{algorithm}
 
 \subsubsection{Navigation Node}
+The navigation node moves the robot along paths provided by the PRM.
+obstacle detection
 \subsubsection{Vision Node}
 For face detection capabilities, we decided to make use of camera data from the Kinect. Face detection in ROS necessitates the use of OpenCV or some other vision library. We decided to use OpenCV as it is written in part by the ROS developers, which should lead to easier integration. Communication between ROS and OpenCV requires the cv\_bridge stack, which is not compatible with Java, only C++ and Python. We decided that C++ was a better candidate than Python, as face detection is very computationally expensive, and C++ is known to be a very fast language.
 
 talk about haar cascades here!
 A Haar cascade is a learned classifier which works with digital image features called Haar-like features. Haar cascades are usually trained on multiple sets of training data. The OpenCV package contains a range of cascade classifiers which can be used to perform a variety of detections. Some cascades are specialised to different forms of detection, for example the haarcascade\_eye cascade would uniquely detect eyes on an image.
 
-navigation to person using kinect depth data
+\begin{algorithm}
+  \caption{Face detection}
+  \label{alg:facedetect}
+  \begin{algorithmic}[1]
+    \State \textbf{Algorithm detect\_face}\textnormal{(image)}
+    \State face\_rects$\leftarrow$\textbf{haarDetect}(image, haar\_cascade)
+    \For{face in face\_rects}
+    \If{$\neg$\textbf{validFace}(face, depth)}
+    \State \textbf{remove}(face\_rects, face)
+    \EndIf
+    \EndFor
+    \State \textbf{publish} face\_rects
+  \end{algorithmic}
+\end{algorithm}
+Algorithm \ref{alg:facedetect} shows the face detection algorithm used. In line 1, a Haar feature detector is run on the image received from the Kinect video feed, from which a series of rectangles representing possible faces are received. Non-faces are removed from the array in line 4. If valid faces remain after the array has been checked, they are published to the network. Face validity is determined by Algorithm \ref{alg:faceprune}. In line 2, depth values from a smaller rectangle of 20\% width and height of the original rectangle, in the centre of the original rectangle are retrieved. We use the median depth of this smaller area as the actual depth of the potential face. If the median of the area exceeds a threshold of 3.5m as per the effective range of the face detection algorithm, the face is rejected. Otherwise, in lines 7--10, the expected depth and actual depth are compared. $\alpha$ is a tolerance applied to the value expected by the model, set to 15\%. If the actual depth is within this tolerance range, the face is considered valid.
+
+\begin{algorithm}
+  \caption{Face validity check}
+  \label{alg:faceprune}
+  \begin{algorithmic}[1]
+    \State \textbf{Algorithm validFace}\textnormal{(face\_rect, depth)}
+    \State depth\_pixels$\leftarrow$\textbf{getCentreRegion}(face\_rect)
+    \State median$\leftarrow$\textbf{getMedian}(depth\_pixels)
+    \If{median$>$threshold}
+    \State \textbf{return} False
+    \Else
+    \State expected$\leftarrow$\textbf{expectedDepth}(face\_rect)
+    \State tolerance$\leftarrow \alpha \cdot$expected
+    \State diff$\leftarrow \left|\textnormal{median}-\textnormal{expected}\right|$
+    \If{diff$>$tolerance}
+    \State \textbf{return} False
+    \EndIf
+    \EndIf
+    \State \textbf{return} True
+  \end{algorithmic}
+\end{algorithm}
+
+As we had access to depth data from the Kinect, when a person was detected we could determine their approximate position and send this point to the PRM to move to them, rather than exploring in the general direction in which the person was detected. This has the additional benefit that if a person is detected over a low obstacle, the PRM will be aware of it and be able to navigate around it.
 \subsubsection{Control Node}
 \begin{figure}
   \centering
@@ -209,7 +251,7 @@ navigation to person using kinect depth data
   \label{fig:fsm}
 \end{figure}
 \section{Experimentation}
-\textbf{BRIEF INTRODUCTION TO SECTION NEEDED}
+In this section we display the results of experiments carried out to determine the best algorithms, parameters or strategies to use in various parts of our system.
 \subsection{MCL Tracking Error}
 \begin{figure}
   \includegraphics[width=\columnwidth]{localisation-experiment-path}
@@ -240,41 +282,35 @@ Figure \ref{fig:local} shows the tracking errors for each implementation, with e
 \subsubsection{Aim}
 \subsubsection{Method}
 \subsubsection{Results}
-Redo experiment for sampling methods. short, medium, long path length. Display image of map with one of the routes displayed and show the difference between the sampling methods. Find the optimum route by sampling a massive number of vertices on to the space and then finding a route using that---the flattened path is then the most optimal route, and we compare the other routes to this route for each experiment.
-
-Redid sampling experiments - now have comparison for neighbourhood, threshold and nearestN strategies on 4 different paths, including trying to get into the corridor. 5,10,20,30 maxconn for each strategy, inflation radius of 5 so that you can just about get into the corridor. random vertices:25,50,100,200,400,800, grid step 0.5,1,2,4, cell size 1,2,4,6, target per cell 2,5
-
-\textbf{REDO THIS ONCE THE ABOVE DATA IS COMPILED}Best sampling: (approximate) optimum path found for each path by using grid sampling with a step of 0.2m and 50 max connections and neighbourhood connection strategy. Screenshots available in screenshots dir. Repeated experiments five times for cell and random, once only for grid. 5,10,20,30 maxconnections. Used results from previous experiments on the sampling strategy, but compared the best parameters for each. Also checked whether the corridor which causes issues was accessible when using each strategy as a measure of its ability to populate tight spaces. Not necessarily a good evaluation, since grid may be good on this map by accident, but terrible on others. new\_prmlogs contains data.
 
 \subsection{Haar cascade efficacy}
-\begin{figure}
-  \includegraphics[width=\columnwidth]{haar_ROC}
-  \caption{ROC analysis of frontal\_face haar cascades.}
-  \label{fig:haar}
-\end{figure}
+
 \subsubsection{Aim}
 The aim of this experiment is to find the Haar cascade most suited to perform face detection with the Kinect. We wish to find the cascade which has the highest specificity and sensitivity; all actual faces should be classified as faces, and anything which is not a face should be ignored.
-
 \subsubsection{Method}
-To test the different Haar cascades we captured a set of images using the Kinect camera which all included faces, some of which were in different surroundings and some of which include a face at different angles. Once all images had been generated, we passed them into our face detection node which uses the cascades to perform face detection on still images. Firstly, we changed the cascade from within the code to use one of the following: frontalface\_default, frontalface\_alt, frontalface\_alt2 and frontalface\_alt\_tree. We then passed in the images we had generated and saved the output of the face detection. The face detection node drew rectangles around areas it believed were faces which allowed us to perform manual analysis and present the data in an understandable manner. In order to generate the data, we looked at the image output from the program for each cascade and analysed the number of faces that were correctly detected (true positives), the number of non faces not detected (true negatives), the number of falsely detected faces (false positives) and finally, the number of faces which were completely missed (false negatives). Once we had all these values for each image, we averaged the sensitivity for each Haar cascade to find their final value.
-
+To test the different Haar cascades we captured a set of images using the Kinect camera which all included faces in different surroundings and at different angles. We then processed each image using our cascade-based face detection node which works on still images, using the frontalface\_default, frontalface\_alt, frontalface\_alt2 and frontalface\_alt\_tree cascades. We manually analysed the processed images, which contain rectangles indicating the areas detected as faces. In order to generate the data, we looked at the image output from the program for each cascade and analysed the number of faces that were correctly detected (true positives), the number of non faces not detected (true negatives), the number of falsely detected faces (false positives) and finally, the number of faces which were completely missed (false negatives). Once we had all these values for each image, we averaged the sensitivity for each Haar cascade to find their final value.
 \subsubsection{Results}
-From our results of the above experimentation it was obvious all cascades did not perform well on profile faces (i.e faces at a near 90 degree angle). This was expected as the cascades we used were specifically trained on frontal face images and therefore the detection was failing. As soon as enough information could be gathered from the image regarding the face, the default and alt cascades both detected the face and performed consistently. However, the other two detectors required the face to be at less of an angle in order to be detected. On the images which had different surroundings we found that again the alt and default cascades performed rather well. Overall reading from the ROC graph it is obvious the best performer was the alt cascade. Although its sensitivity value, 0.744, was a little lower than the result for default, 0.758, the alt cascade performed a lot more effectively detecting true negatives (i.e. correctly identifying no faces exist). This result pushed the 1-specificity reading for the alt cascade towards the left, highlighting it as the best candidate amongst all cascades tested. Although the default cascade performed better in the sensitivity reading, it also performed worst in the 1-specificty reading, showing it wrongly classified non faces as faces frequently. Although the alt cascade is the best performer amongst the tested cascades, it still classifies areas with no face as a face and therefore our pruning model was required to ensure only true faces were detected.
-
+From our results of the above experimentation it was obvious all cascades did not perform well on profile faces (i.e faces at a near 90 degree angle). This was expected as the cascades we used were specifically trained on frontal face images and therefore the detection was failing. As soon as enough information could be gathered from the image regarding the face, the default and alt cascades both detected the face and performed consistently. However, the other two detectors required the face to be at less of an angle in order to be detected. On the images which had different surroundings we found that again the alt and default cascades performed rather well. As is obvious in the ROC graph in Figure \ref{fig:haar} the best performer was the alt cascade. Although its sensitivity value of 0.744 was a little lower than the default value of 0.758, the alt cascade performed a lot more effectively detecting true negatives (i.e. correctly identifying no faces exist). This result pushed the 1-specificity reading for the alt cascade towards the left, highlighting it as the best candidate amongst all cascades tested. Although the default cascade performed better in the sensitivity reading, it also performed worst in the 1-specificity reading, showing it wrongly classified non faces as faces frequently.
+\begin{figure}
+  \includegraphics[width=\columnwidth]{haar_ROC}
+  \caption{ROC graph of frontalface haar cascade results.}
+  \label{fig:haar}
+\end{figure}
 \subsubsection{Conclusion}
-In conclusion, from the data gathered from the experiment we can see that the Haar cascade which performed above other cascades in detecting faces was the frontalface\_alt. We saw that this cascade, with a good degree of consistency, classified actual faces as faces (true positives). As we decided to use the Kinect as a camera, we were aware it is possible to extract depth information for the object in view. Given that this cascade still detected false positives we decided to use the depth information to identify false positives, by using knowledge of the size of human faces. To do so, we developed a model which helps prune non-face objects which are picked up by the cascade. This would allow us to improve the performance of this cascade by reducing the number of false positives. 
+In conclusion, from the data gathered from the experiment we can see that the Haar cascade which performed above other cascades in detecting faces was the frontalface\_alt. We saw that this cascade, with a good degree of consistency, classified actual faces as faces (true positives). As we decided to use the Kinect as a camera, we were aware it is possible to extract depth information for the object in view. Given that this cascade still detected false positives we decided to use the depth information to identify false positives, by using knowledge of the size of human faces. To do so, we developed a model which helps prune non-face objects which are picked up by the cascade. This would allow us to improve the performance of this cascade by reducing the number of false positives.
+
 \subsection{Kinect depth model}
 \subsubsection{Aim}
 \subsubsection{Method}
 \subsubsection{Results}
 \begin{figure}
   \includegraphics[width=\columnwidth]{kinect_ROC}
-  \caption{ROC analysis of frontal\_face\_alt cascade with assumption and depth models applied.}
+  \caption{ROC graph of frontal\_face\_alt cascade with the assumption of subjects facing the camera and depth models applied.}
   \label{fig:haar}
 \end{figure}
 \begin{figure}
   \includegraphics[width=\columnwidth]{centre_model}
-  \caption{Depth model for the centre of the field of view.}
+  \caption{Depth model for the centre of the Kinect's field of view.}
   \label{fig:haar}
 \end{figure}
 \subsection{Exploration coverage}
