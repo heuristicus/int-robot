@@ -20,3 +20,7 @@
 - experiments should have aim, method and results section only
 - prm sampling method minimum = optimum?
 - more numbers in results sections of experiments
+- capitalisation in graphs and tables - should it be Minimum Time or Minimum time
+- captions for tables and graphs etc give reasonable amount of information
+- captions for tables - is missing out "the" ok? ("graph showing the distribution of" or "graph showing distribution of")
+- missed persons data in final experiment is weird. Should be independent of distance

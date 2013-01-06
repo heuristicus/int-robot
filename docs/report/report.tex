@@ -195,7 +195,7 @@ When a path has been found, a message is sent to a topic announcing that a path 
 The navigation node moves the robot along paths provided by the PRM, and uses the estimated pose provided by the localisation node as the robot's current position. When a path is received, the first point is removed and set as the current waypoint to navigate to. The first action taken by the navigation node is to rotate towards the point until the robot heading and the bearing of the point from the robot's current location are within 0.15 radians of each other. With this constraint, we can be sure that the robot's heading is very close to the bearing of its destination before any movement is made towards it. If the waypoint is a particularly long distance away, the error between the heading and bearing at the starting location gradually increases as the robot nears the waypoint. If the error is below the 0.15 radian threshold, then only translational movement is applied, but if the error exceeds the threshold, angular movement is also applied, and the robot moves in a smooth curved path towards the waypoint. Adjusting for the error while moving means that the robot does not have to stop to adjust, which decreases the time spent travelling to the goal. Each waypoint has a radius of 0.2 metres, within which the robot is considered to have arrived at the point. When an intermediate waypoint is reached, the next point is removed from the path and set as the destination. The path is gradually consumed in this way until the goal is reached, at which point message is published informing any listening nodes of the fact.
 
 The navigation also performs obstacle detection, by using laser data. An area of 90$^\circ$ directly in front of the robot is split into 10 sectors, from each of which a median distance reading is drawn. The median is used to reduce the effect of noise and erroneous readings. If the median of any sector is within a safe distance of 0.5 metres, a flag is raised and movement commands will no longer be sent to the motors. The position of the detected obstacle is calculated using trigonometry and placed onto a temporary map, which is passed into the PRM. The obstacle is detected as a point on the map, which is then inflated in the same way as the map used in the PRM. The PRM then prunes vertices which fall within the obstacle, as well as connections between vertices that pass through the obstacle. When this process is complete, the navigator re-sends the goal to the PRM which generates a new route, avoiding the obstacle. Obstacles are removed from the map when the robot is more than 4 metres from their location, or when it arrives at its goal. When an obstacle is removed, the graph is reconnected to ensure that the connectivity of the graph is not permanently affected.
-\subsubsection{Vision Node}
+\subsubsection{Vision Node\textbf{(NOT FINISHED YET!)}}
 For face detection capabilities, we decided to make use of camera data from the Kinect. Face detection in ROS necessitates the use of OpenCV or some other vision library. We decided to use OpenCV as it is written in part by the ROS developers, which should lead to easier integration. Communication between ROS and OpenCV requires the cv\_bridge stack, which is not compatible with Java, only C++ and Python. We decided that C++ was a better candidate than Python, as face detection is very computationally expensive, and C++ is known to be a very fast language.
 The OpenNi SDK publishes many ROS topics containing various data from the Kinect. Two of these, one containing depth and one image data from the Kinect camera, are used. These two topics are subscribed to by the C++ node that was created to allow the use of OpenCV with the Kinect image data. The output from OpenCV is then used in conjunction with the Kinect depth data against a model to determine whether or not a face has truly been detected. The C++ node publishes the location and area of the detected face along with the depth. This data is subscribed to by the control node which then uses the data accordingly.
 
@@ -305,18 +305,18 @@ The experiment produced four path length values for every combination mentioned 
   \centering
   \begin{tabular}{|c|c|c|}
     \cline{1-3}
-Sampling Method & Connection Strategy & \textbf{Best Score}      \\ \cline{1-3}
-Cell & Neighbourhood & \textbf{\textcolor{red}{1.03909}}         \\ \cline{1-3}
-Cell & NearestN  & 1.09907                                       \\ \cline{1-3}
-Cell & Threshold & 1.12969                                       \\ \cline{1-3}
-Grid & Neighbourhood & \textbf{1.03693}                          \\ \cline{1-3}
-Grid & NearestN & 1.14463                                        \\ \cline{1-3}
-Grid & Threshold & 1.05153                                       \\ \cline{1-3}
-Random & Neighbourhood & \textbf{1.02578}                        \\ \cline{1-3}
-Random & NearestN & 1.05171                                      \\ \cline{1-3}
-Random & Threshold & 1.06639                                     \\ \cline{1-3}
-  \end{tabular}
-  \caption{Best scores for each combination of sampling method and connection strategy}
+    Sampling Method & Connection Strategy & Best Score      \\ \cline{1-3}
+    \multirow{3}{*}{Cell} & Neighbourhood & \textbf{\textcolor{red}{1.03909}}         \\ \cline{2-3}
+    & NearestN  & 1.09907                                     \\ \cline{2-3}
+    & Threshold & 1.12969                                       \\ \cline{1-3}
+    \multirow{3}{*}{Grid} & Neighbourhood & \textbf{1.03693}                          \\ \cline{2-3}
+    & NearestN & 1.14463                                        \\ \cline{2-3}
+    & Threshold & 1.05153                                       \\ \cline{1-3}
+    \multirow{3}{*}{Random} & Neighbourhood & \textbf{1.02578}                        \\ \cline{2-3}
+    & NearestN & 1.05171                                      \\ \cline{2-3}
+    & Threshold & 1.06639                                     \\ \cline{1-3}
+ \end{tabular}
+  \caption{\textbf{maybe a little unclear?}Best scores for each combination of sampling method and connection strategy}
   \label{fig:sampleconntable}
 \end{figure}
 
@@ -344,12 +344,12 @@ In conclusion, from the data gathered from the experiment we can see that the Ha
 \subsubsection{Results}
 \begin{figure}
   \includegraphics[width=\columnwidth]{kinect_ROC}
-  \caption{ROC graph of frontal\_face\_alt cascade with the assumption of subjects facing the camera and depth models applied.}
+  \caption{\textbf{SOUNDS WEIRD}ROC graph of frontal\_face\_alt cascade with the assumption of subjects facing the camera and depth models applied.}
   \label{fig:cascade_with_model}
 \end{figure}
 \begin{figure}
   \includegraphics[width=\columnwidth]{centre_model}
-  \caption{Depth model for the centre of the Kinect's field of view.}
+  \caption{\textbf{MORE DETAIL}Depth model for the centre of the Kinect's field of view.}
   \label{fig:model}
 \end{figure}
 \subsection{Exploration coverage}
@@ -373,7 +373,7 @@ The robot's maximum movement speed and rotation speed were set to 0.7m/s and 0.4
 \end{figure}
 \begin{figure}
   \includegraphics[width=\columnwidth]{percent_coverage_time}
-  \caption{Comparison of the best grid and cell based exploration strategies.}
+  \caption{\textbf{REWRITE}Comparison of the best grid and cell based exploration strategies. The heatmap corresponding to the cell run is found in Figure \ref{fig:heatmap}.}
   \label{fig:coverage}
 \end{figure}
 
@@ -384,6 +384,25 @@ The robot's maximum movement speed and rotation speed were set to 0.7m/s and 0.4
 \end{figure}
 
 \subsection{Meeting room availability confirmation}
+\begin{figure}
+  \centering
+    \begin{tabular}{r|r|r|r|}
+    \cline{2-4}
+    &Short&Medium&Long\\\hline
+    \multicolumn{1}{|r|}{Average time}&4:24&9:19&11:55\\\hline
+    \multicolumn{1}{|r|}{Failed attempts}&4&5&10\\\hline
+    \multicolumn{1}{|r|}{Missed persons}&1.5&4&5.5\\\hline
+  \end{tabular}
+  % \begin{tabular}{c|c|c|c|}
+  %   \cline{2-4}
+  %   &Average Time&Missed People (Avg)&Failed Attempts\\\hline
+  %    \multicolumn{1}{|l|}{Short}&04:24&1.5&4\\\hline
+  %    \multicolumn{1}{|l|}{Medium}&09:19&4&5\\\hline
+  %    \multicolumn{1}{|l|}{Long}&11:55&5.5&10\\\hline
+  % \end{tabular}
+  \caption{THIS IS NOT A CAPTION}
+  \label{fig:fullsystem}
+\end{figure}
 \subsubsection{Aim}
 The aim of this experiment is to test how well our robot performs in finding an empty room. We wish to test the robots ability to handle different events during the meeting room availability confirmation stage.
 \subsubsection{Method}
@@ -399,10 +418,10 @@ The aim of this experiment is to test the robots ability to gather meeting atten
 In order to test the robots performance in this specific task, we generated three possible environments in which we tested an extreme case and more likely cases. In order to test the extreme case, we decided to place an attendee at a large distance from the room, and then another attendee at a large distance from the first attendee. For one of the other two cases, we placed attendees very close to the meeting room to record the robots performance in finding attendees who were very close to the door of the meeting room. For the final case, we decided to place an attendee at half the distance of the maximum distance found from the meeting room in case one, and the second person at the same distance from the other attendee. The justification for the second attendee to be placed at such distances from the first attendee was in order to be able to test the exploration. Exploration continues from the point where it found the attendee, and therefore after an attendee has been taken to the meeting room, exploration will begin from that point. In order to gather results, we ran this experiment enough times in order to be able to get 2 successful runs without human intervention, which we could then average. We recorded the average time of the experiment, the number of times it missed attendees during successful runs and finally the number of failed attempts which are classified by experiments which required human intervention. The total time which is available for the full task is 15 minutes, therefore in order to assess the robots ability to complete the full task successfully, the combined time from the previous experiment for finding a room and this experiment should total to less than 15 minutes.
 \subsubsection{Results}
 From the results table we can observe that the time taken to find the attendees was rather reasonable. If we look at the worst case scenario time of 11:55 on average, we can see that adding 2:22 to this time (longest time from the previous experiment) we are still within the 15 minute time limit. So in terms of efficiency we can deduce that the robot performed rather well as even in its worst case scenario it managed to perform the task within the time limit. However what we did notice on the experiments was the robot sometimes missed people who were in view and therefore did not PRM to them. The possible justification for this is that there were not enough frames (3 frames required to confirm face is true) for the robot to confirm the faces and therefore explaining why it missed the person. We saw this issue with all of our successful runs and the results of how often the attendees were missed on average can be seen in the results table. During the experiment we had many issues in regards to AMCL localising in an incorrect position. This continuously required us to have to repeat the experiment in order to get a full run without human intervention. The reason for AMCL to lose its position frequently could be as a result of the map in real world being slightly different to the map provided. However taking this into consideration, we believe the who system performed rather well as it correctly found empty meeting rooms and from there it managed to explore and correctly find attendees, occasionally missing some, however they were picked up soon again while the robot explored in that area. We also observed that the exploration worked rather well too as even in the most extreme cases where attendees are standing in far corners, the robot managed to identify and guide them to the meeting room.
-
 \section{Discussion}
 \subsection{Performance}
 \subsection{Potential Improvements}
+
 the path generated to do exploration could be improved by using heuristic techniques. multiple robots, if you see a person on the way back to a room, remember their approximate location.
 \subsection{Conclusions}
 \bibliographystyle{ieeetr}
