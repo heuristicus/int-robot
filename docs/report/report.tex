@@ -293,7 +293,7 @@ To find the best sampling method and connection strategy pair, we created four q
 
 We chose four start and end point pairs which would provide the most qualitatively different paths, allowing us to compare the various techniques in different environments, ensuring we choose a combination which is able to generalise well. The paths are represented in Figure \ref{fig:optimum} (with further explanation in the results below). The first pair is simply the two points which are furthest from each other on the map (i.e. that form the longest path), shown in Figure \ref{fig:optimum} in blue. Another pair was a very short path with one wall in the way, shown in purple. We created another pair which was of a medium length but required several intermediate points, shown in orange. Finally, we added a pair which starts in a corner of the map and ends inside a narrow corridor is often not able to be reached if particles are not generated within it, shown in green.
 \subsubsection{Results}
-The experiment produced four path length values for every combination mentioned above, one for each pair of start and end points. Four values cannot be compared at once, so in order to compare combinations, these four path lengths must be combined into a score which indicates how good the paths are. To create such a score, we determined the theoretical minimum path length by manually tracing lines on the map and measuring their length. These are the lines represented in \ref{fig:optimum}. The score for a combination of variables and methods is calculated as the ratio between the computed path length and the theoretical minimum lengths. E.g. if the minimum length were 10m and the computed length were 12m, the ratio in decimal form is 1.2. To achieve a combined score for all four paths, we simply average the four scores.
+The experiment produced four path length values for every combination mentioned above, one for each pair of start and end points. Sets of four values cannot be compared at once, so in order to compare combinations, these four path lengths must be combined into a score which indicates how good the paths are. To create such a score, we determined the theoretical minimum path length by manually tracing lines on the map and measuring their length. These are the lines represented in Figure \ref{fig:optimum}. The score for a combination of variables and methods is calculated as the ratio between the computed path length and the theoretical minimum lengths. E.g. if the minimum length were 10m and the computed length were 12m, the ratio as a decimal number is 1.2. To achieve a combined score for all four paths, we simply average the four scores. Figure \ref{fig:sampleconntable} shows the best scores achieved by any combination of variables which include the sampling method and connection strategy shown.
 
 \begin{figure}
   \centering
@@ -313,6 +313,8 @@ Random & Threshold & 1.06639                                     \\ \cline{1-3}
   \caption{Best scores for each combination of sampling method and connection strategy}
   \label{fig:sampleconntable}
 \end{figure}
+
+The best score (lower values are better) is attributed to random sampling with the neighbourhood connection strategy. 
 
 \subsection{Haar cascade efficacy}
 
