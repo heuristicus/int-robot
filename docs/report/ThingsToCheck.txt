@@ -1,14 +1,22 @@
 - Bookmarks in place
 
-
-- Kinect capitalised
+- Kinect capitalised (done with find+replace - check please)
 - All 'figure X' references are correct
 - Figures are in the right place
 - ROC graph/curve consistency in naming
 - ise/ize
 - Axis labels are correct
 - Axis labels have correct units
-- 'Fig. 8' type labels always have dots .
+- 'Fig. 8' type labels always have dots (they are auto generated so they always should)
 - 'Sampling method'
 - 'Connection strategy'
-- 
+- Make sure statements are consistent throughout
+- apostrophes
+- check that methods in algorithms are the same
+- Haar capitalised
+- No subjective statements
+- citations in correct place
+- section introductions
+- experiments should have aim, method and results section only
+- prm sampling method minimum = optimum?
+- more numbers in results sections of experiments
