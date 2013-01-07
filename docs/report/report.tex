@@ -367,9 +367,13 @@ When using depth model 2, we see that the performance improves greatly. This dep
 \end{figure}
 \subsection{Exploration coverage}
 \subsubsection{Aim}
+The aim of this experiment is to find the best method of placing waypoints on the map for the robot to explore with the best efficiency and coverage.
 \subsubsection{Method}
+The different methods of generating exploration way points are grid sampling and cell sampling. To test the efficiency and coverage of the robots exploration, ray tracing was used. Rays originated 0.3m (minimum FOV) in front of the robot and travelled outwards until the ray was obstructed by a wall or it reached the maximum FOV distance of 3.5m. Using ray tracing provided all the cells that were covered by the robot’s FOV. The number of free cells (excluding the areas marked as meeting rooms) was calculated to provide a value of how much of the map has been or still needs to be covered.  Each experiment will be run for 8 minutes. The robot’s maximum movement speed and rotation speed were set to 0.7m/s and 0.4rad/sec respectively. 
+
 The robot's maximum movement speed and rotation speed were set to 0.7m/s and 0.4rad/sec respectively. The amount of the map that can be explored in a fixed amount of time varies greatly depending on the movement speed of the robot. The maximum distance of the FOV was set to 3.5m, and the minimum to 0.3, the maximum and minimum effective ranges of our face detector.
 \subsubsection{Results}
+Figure \ref{fig:coverage} compares both exploration methods by showing the percentage of the map covered by the robot over the 8 minute run.  It shows that the Cell based exploration method managed to cover more of the map faster than the Grid based method. After 300 seconds, the Grid sampling method ceased to find any more uncovered areas within the map while the Cell based method continued to find more uncovered areas. The efficiency of these sampling methods can be expressed using heat maps. Figure 13 shows the heat map for the Cell based sampling method. It shows that almost all valid space was explored. It also shows that are small area (marked red) was covered more often or the robot stayed at this location for a longer period of time.
 \begin{figure}
   \centering
   \begin{tabular}{|c|c|c|}
