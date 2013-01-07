@@ -1,5 +1,6 @@
-- Bookmarks in place
 - Passive voice vs active voice. Pick one and normalise the whole thing!
+- tenses normalised - do we describe experiments in past or present tense?
+- No subjective statements!
 
 - Kinect capitalised (done with find+replace - check please)
 - All 'figure X' references are correct
@@ -8,14 +9,12 @@
 - ise/ize
 - Axis labels are correct
 - Axis labels have correct units
-- 'Fig. 8' type labels always have dots (they are auto generated so they always should)
 - 'Sampling method'
 - 'Connection strategy'
-- Make sure statements are consistent throughout
+- Make sure statements are consistent throughout (if we say we use one thing but later say we use something else, bad things will happen!)
 - apostrophes
 - check that methods in algorithms are the same
 - Haar capitalised
-- No subjective statements
 - citations in correct place
 - section introductions
 - experiments should have aim, method and results section only
