@@ -1,4 +1,5 @@
 - Bookmarks in place
+- Passive voice vs active voice. Pick one and normalise the whole thing!
 
 - Kinect capitalised (done with find+replace - check please)
 - All 'figure X' references are correct
