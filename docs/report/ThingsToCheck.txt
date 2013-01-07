@@ -1,7 +1,8 @@
 - Passive voice vs active voice. Pick one and normalise the whole thing!
 - tenses normalised - do we describe experiments in past or present tense?
 - No subjective statements!
-
+- numbers. For small numbers do we use 2 or two?
+- units m or metres. Should be the same throughout
 - Kinect capitalised (done with find+replace - check please)
 - All 'figure X' references are correct
 - Figures are in the right place
