@@ -362,9 +362,16 @@ We previously tested the Haar cascades with faces at different angles to the cam
 Since we are trying to improve detections for this cascade with our depth model, we decided to perform this experiment in the area within our 'world' where all the cascades generally performed badly (had many false positives). In this area, we used all of the cascades to find features of the scene which were falsely detected as faces. We noted these for reference as 'true negatives' which we can eliminate with our new depth model.
 To determine the sensitivity and specificity of the vision node with the new assumptions, both before and after the inclusion of both Kinect depth models (depth model 1 and depth model 2 as described in the Design section), we designed a single experiment which would produce results for all three at once.
 
-\textbf{CONTINUE}
-
+We modified our vision node to show rectangles of different colours based on whether they would be accepted by model 1 or model 2. We had a participant move within the depth of field of the camera to 100 different positions and we took readings for true and false positives and negatives. Alongside the features of the scene we noted earlier which we hoped to eliminate as true negatives, this allows us to gain three points on the ROC graph to compare.
 \subsubsection{Results}
+The resulting ROC graph is shown in Figure \ref{fig:cascade_with_model}. The point labelled 'alt (no assumption)' is the point taken from the last experiment. We collected 11 scene features which were falsely identified by the cascades as faces. This means that the 1-specificity axis of the ROC graph is of a fairly low resolution. However, with 100 true faces, the sensitivity axis is of a high resolution.
+
+We can see in the graph that sensitivity and the 1-specificity value have both increased. It appears that adding the assumption of faces being directed towards the camera increases sensitivity, while performing the experiment within an area where cascades tend to perform badly causes the 1-specificity value to increase.
+
+Using depth model 1 we see that we have decreased both the sensitivity and the 1-specificity value. The decrease in sensitivity is clearly due to the wrongful discarding of real faces done by model 1 on the left and right hand sides of the image. However, the correct discarding of false positives have also decreased the 1-specificity value. Overall, this point is better in some respects and worse in others when compared with using no model at all.
+
+When using depth model 2, we see that the performance improves greatly. This depth model discards none of the true positives given by the cascade, keeping its sensitivity identical to using no model at all. However, false positives are down to 0, making the 1-specificity value also 0. It is worth noting that, since there were only 11 'true negatives' being sought, this value being 0 may be slightly misleading and may well be higher with a larger number of true negatives. Using depth model 2 cannot improve on the sensitivity of using no model at all, but by eliminating all true negatives it is clearly the best point on the ROC graph and is certainly worth using.
+
 \begin{figure}
   \includegraphics[width=\columnwidth]{kinect_ROC}
   \caption{\textbf{SOUNDS WEIRD}ROC graph of frontal\_face\_alt cascade with the assumption of subjects facing the camera and depth models applied.}
