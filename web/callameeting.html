@@ -75,21 +75,21 @@ Released   : 20081009
 
 		<h1>Our Solution</h1>
           <div class="contentText">
-            <p>We found in order to complete this task successfully there were 3
+            <p>We found that in order to complete this task successfully there were 3
           core components which were needed. They are Monte Carlo localisation,
-          Probabilistic Road Map and people detection. We will
+          Probabilistic Roadmap and person detection. We will
           explain each one further below and how they contributed to
           enabling us to complete the assignment.</p><br />
 
-	    <h3>Monte Carlo Localisation</h3>
+	    <h3>Monte Carlo localisation</h3>
 	    <p>Localisation in robotics is the problem of estimating a
-	    robots position in a given map given some laser
+	    robot's position in a given map given some laser
 	    readings. For the final task we decided to use Adaptive
-	    Monte Carlo Localisation (AMCL) which is provided within
-	    ROS. The difference between MCL and AMCL is, AMCL has a
-	    dynamic set of particles, for example if AMCL is more
+	    Monte Carlo localisation (AMCL) which is provided within
+	    ROS. The difference between MCL and AMCL is that AMCL has a
+	    dynamic set of particles. For example, if AMCL is more
 	    certain about its position it will reduce the number of
-	    total particles, however it is uncertain about its
+	    total particles, whereas when it is uncertain about its
 	    position it will generate more particles in random places.
 	    On the other hand, MCL has a constant number of
 	    particles. Both localisation methods use particle filters
@@ -97,20 +97,20 @@ Released   : 20081009
 	    positions on a given map. The particles are then
 	    continually given probabilities as the robot receives
 	    laser data. The probability represents the likelihood of
-	    the robot being in that particles position on the real
+	    the robot being in that particle's position on the real
 	    world map. Particles with low probabilities are removed
 	    and replaced nearer to particles with higher probabilities
 	    with some noise. In the final task localisation will help
 	    your robot keep track of its location allowing other
-	    tasks, such as PRM and exploring to be completed
+	    tasks, such as PRM and exploration to be completed
 	    successfully. For further information on Monte Carlo
 	    localisation, we recommend the following research paper: <a
 	    href=
 	    "http://www.ri.cmu.edu/pub_files/pub1/dellaert_frank_1999_2/dellaert_frank_1999_2.pdf">Monte
 	    Carlo Localization for Mobile Robots</a>.</p>
 </br>
-	    <h3>Probabilistic Road Maps</h3>
-	    <p>The definition of PRM according to wikipedia is as follows, the probabilistic roadmap  planner is a
+	    <h3>Probabilistic Roadmaps</h3>
+	    <p>The definition of PRM according to Wikipedia is as follows, the probabilistic roadmap  planner is a
 	    motion planning algorithm in robotics, which solves the
 	    problem of determining a path between a starting
 	    configuration of the robot and a goal configuration while
@@ -138,17 +138,17 @@ Released   : 20081009
 	    Finally when guiding a person to a room, we again used PRM to
 	    successfully complete this task.</p>
 </br>
-	    <h3>People Detection</h3>
-	    <p>People detection is a large part of the final task and
+	    <h3>Person Detection</h3>
+	    <p>Person detection is a large part of the final task and
 	    will take up a considerable amount of time to be
 	    perfected. There are a variety of ways to approach this
 	    problem. We decided to take an innovative approach to this
 	    problem and use face detection with the Xbox Kinect. This
 	    was used in combination with the open source project
-	    openCV. In order to be successful with openCV you must be
-	    familiar with python or C++ as the openCV bridge which is
-	    required to pass images between ROS and openCV is
-	    currently only programmed in c++ or python. We
+	    OpenCV. In order to be successful with OpenCV you must be
+	    familiar with python or C++ as the OpenCV bridge which is
+	    required to pass images between ROS and OpenCV is
+	    currently only programmed in C++ or Python. We
 	    chose to use the Kinect because it would be something
 	    different and experimental and also it allowed us to
 	    capture depth information. Depth information was used to
@@ -179,7 +179,7 @@ Released   : 20081009
 	    doing both at once. Below we have included our finite state machine diagram to show the logical process of our program.</p>
 </br>
         </div>
-	      <img src="Images/FSM.bmp" alt="FSM" height="425" width="650">
+	      <center><img src="Images/FSM.bmp" alt="FSM" height="425" width="650"></center>
     </div>
 </div>
 <!-- Please leave this in place after all of your content - thanks :) -->
