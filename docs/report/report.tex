@@ -37,10 +37,10 @@ The aim of localisation is to obtain an estimate of the position of a mobile rob
 Many advanced localisation techniques are based on the Bayes filter, shown in Algorithm \ref{alg:bayesfilter}, which uses a belief distribution $bel(x_t)$ to represent the state $x_t$. The calculation of $bel(x_t)$ at time $t$ is dependent on $bel(x_{t-1})$ at time $t-1$, the last action $u_t$, and the last measurement $z_t$. In the first step, called the prediction step, the prior belief $\overline{bel}(x_t)$ is calculated. This step merges two probability distributions; the prior belief over the previous state $x_{t-1}$, and the probability of transitioning from that state to the posterior state $x_t$ given that the action $u_t$ was taken. This step does not take into account any measurement taken in the posterior state, predicting using only
 the knowledge of the action taken. In the second step, the measurement update, the posterior belief is calculated by multiplying the prior belief with the probability of being in the posterior state given that the measurement $z_t$ was observed. The result of this multiplication is generally not a probability, and therefore requires normalisation using some constant $\alpha$. As there are usually multiple posterior states, $x_t$ is usually a state vector rather than a single state, and so the two steps will be applied multiple times in order to update the belief for each state being considered. The filter is recursive, requiring some idea of the initial belief $bel(x_0)$ at time $t=0$. The initial belief is either a distribution centred on $x_0$, in the case where the initial position is known, or a uniform distribution over the space otherwise.
 \begin{algorithm}
-  \caption{Bayes filter \cite{thrun}}
+  \caption{Bayes Filter \cite{thrun}}
   \label{alg:bayesfilter}
   \begin{algorithmic}[1]
-        \State \textbf{Algorithm Bayes\_filter}\textnormal{($bel(x_{t-1}), u_t, z_t$)}
+        \State \textbf{Algorithm bayesFilter}\textnormal{($bel(x_{t-1}), u_t, z_t$)}
         \For{\textnormal{all} $x_t$}
         \State $\overline{bel}(x_t)=\int P(x_t\mid u_t, x_{t-1})bel(x_{t-1})dx_{t-1}$
         \State $bel(x_t)=\alpha P(x_t \mid z_t)\overline{bel}(x_t)$
@@ -62,8 +62,8 @@ In contrast to Gaussian filters, nonparametric filters discretise the probabilit
     \State \textbf{Algorithm MCL}\textnormal{($\mathcal{X}_{t-1}, u_t, z_t, map$)}
     \State $\bar{\mathcal{X}}_t=\mathcal{X}_t=\emptyset$
     \For{$m=1$ to $M$}
-    \State $x_t^{[m]}=\textbf{sample\_motion\_model}(u_t,x_{t-1}^{[m]})$
-    \State $w_t^{[m]}=\textbf{sensor\_model}(z_t,x_t^{[m]},map)$
+    \State $x_t^{[m]}=\textbf{sampleMotionModel}(u_t,x_{t-1}^{[m]})$
+    \State $w_t^{[m]}=\textbf{sensorModel}(z_t,x_t^{[m]},map)$
     \State $\bar{\mathcal{X}}_t=\bar{\mathcal{X}}_t+\langle x_t^{[m]},w_t^{[m]}\rangle$
     \EndFor
     \For{$m=1$ to $M$}
@@ -132,18 +132,18 @@ We independently developed two localisation nodes which implemented Monte Carlo 
   \caption{Probabilistic Roadmap Generation}
   \label{alg:prm}
   \begin{algorithmic}[1]
-    \State \textbf{Algorithm generate\_PRM}\textnormal{($map$)}
-    \State $V \leftarrow $\textbf{ sample\_vertices}\textnormal{($map$)}
+    \State \textbf{Algorithm generatePRM}\textnormal{($map$)}
+    \State $V \leftarrow $\textbf{ sampleVertices}\textnormal{($map$)}
     \For{$v\in V$}
     \State $a \leftarrow 0$
     % a is number of attempts, A is max attempts
-    \While{$a<A \wedge \textbf{nconns} (v)<C$}
-    \State $n \leftarrow$\textbf{ get\_closest}\textnormal{($V, v$)}
+    \While{$a<A \wedge \textbf{nConns} (v)<C$}
+    \State $n \leftarrow$\textbf{ getClosest}\textnormal{($V, v$)}
     \If{\textbf{dist}$(v,n)<R_n$}
-    \If{$\neg\textbf{neighbour}(v,n)\wedge\textbf{vpath}(map,v,n)$}
+    \If{$\neg\textbf{neighbour}(v,n)\wedge\textbf{vPath}(map,v,n)$}
     \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
-    \ElsIf{$\textbf{vpath}(map,v,n)$}
+    \ElsIf{$\textbf{vPath}(map,v,n)$}
     \State $E \leftarrow$\textbf{ connect}\textnormal{($v, n$)}
     \EndIf
     \State $a \leftarrow a + 1$
@@ -168,13 +168,13 @@ When a path has been found, a message is sent to a topic announcing that a path 
   \caption{Path Smoothing}
   \label{alg:pathsmooth}
   \begin{algorithmic}[1]
-    \State \textbf{Algorithm smooth\_path}\textnormal{($P, I, map$)}
+    \State \textbf{Algorithm smoothPath}\textnormal{($P, I, map$)}
     \For {$i = 0$ \textbf{to} $I$}
     \For {$j = 0$ \textbf{to} $\left|P\right|-2$}
     \State $a \gets P_i$
     \State $b \gets P_{i+1}$
     \State $c \gets P_{i+2}$
-    \If{\textbf{vpath}$(map,a,c$)}
+    \If{\textbf{vPath}$(map,a,c$)}
     \State \textbf{remove}($P,b$)
     \EndIf
     \EndFor
@@ -202,11 +202,11 @@ The OpenNI SDK publishes many ROS topics containing a variety of data from the K
 The face detection system using OpenCV worked as expected, but gave many false positives, detecting cabinets and clothing as faces, even after we tuned the parameters that were available to us. We decided to use the Kinect's depth information to decide which detections were actually faces. To do this, we considered the fact that many of the false positives were much larger or much smaller than actual human faces, and that human faces do not tend to vary much in size. Using the size of the rectangle representing the potential face in the image along with the depth of the potential face, we can determine whether the rectangle is a real face by comparing it against the expected depth and rectangle size. To obtain these values, we created a face size model by recording measurements of real faces. We had two human participants, one tall and one short, stand 0.3m from the camera and take small steps backwards until they were 3.5m away, as we recorded the measurements of depth and rectangle size. Once we had these values, we plotted them on a graph and programmatically found a quadratic line of best fit, shown in Figure \ref{fig:model}. The line of best fit is our model, which we can use to compute an expected value for either depth or face size, as long as we have the other. Once this model was included in the node, rectangle sizes from detections were used to determine expected depth and compared with the depth data from the Kinect. When they were not within a set tolerance, the detections were discarded as false positives.
 
 \begin{algorithm}
-  \caption{Face detection}
+  \caption{Face Detection Node}
   \label{alg:facedetect}
   \begin{algorithmic}[1]
-    \State \textbf{Algorithm detect\_face}\textnormal{(image)}
-    \State face\_rects$\leftarrow$\textbf{haarDetect}(image, haar\_cascade)
+    \State \textbf{Algorithm detectFace}\textnormal{(image)}
+    \State face\_rects $\gets$ \textbf{haarDetect}(image, haar\_cascade)
     \For{face in face\_rects}
     \If{$\neg$\textbf{validFace}(face, depth)}
     \State \textbf{remove}(face\_rects, face)
@@ -215,21 +215,21 @@ The face detection system using OpenCV worked as expected, but gave many false p
     \State \textbf{publish} face\_rects
   \end{algorithmic}
 \end{algorithm}
-Algorithm \ref{alg:facedetect} shows our face detection algorithm. In line 1, a Haar feature detector is run on the image received from the Kinect video feed, from which a series of rectangles representing possible faces are received. Non-faces are removed from the array in line 4. If valid faces remain after the array has been checked, they are published to the network. Face validity is determined by Algorithm \ref{alg:faceprune}. In line 2, depth values from a smaller rectangle of 20\% width and height of the original rectangle, in the centre of the original rectangle are retrieved. We use the median depth of this smaller area as the actual depth of the potential face. If the median of the area exceeds a threshold of 3.5m as per the effective range of the face detection algorithm, the face is rejected. Otherwise, in lines 7--10, the expected depth and actual depth are compared. The tolerance value $\alpha$, set to 15\%, is applied to the value expected by the model. If the actual depth is within this tolerance range, the face is considered valid.
+Algorithm \ref{alg:facedetect} shows the algorithm in the face detection node. In line 1, a Haar feature detector is run on the image received from the Kinect video feed, from which a series of rectangles representing possible faces are received. Non-faces are removed from the array in line 4. If valid faces remain after the array has been checked, they are published to the network. Face validity is determined by Algorithm \ref{alg:faceprune}. In line 2, depth values from a smaller rectangle of 20\% width and height of the original rectangle, in the centre of the original rectangle are retrieved. We use the median depth of this smaller area as the actual depth of the potential face. If the median of the area exceeds a threshold of 3.5m as per the effective range of the face detection algorithm, the face is rejected. Otherwise, in lines 7--10, the expected depth and actual depth are compared. The tolerance value $\alpha$, set to 15\%, is applied to the value expected by the model. If the actual depth is within this tolerance range, the face is considered valid.
 \begin{algorithm}
-  \caption{Face validity check}
+  \caption{Face Validity Check}
   \label{alg:faceprune}
   \begin{algorithmic}[1]
     \State \textbf{Algorithm validFace}\textnormal{(face\_rect, depth)}
-    \State depth\_pixels$\leftarrow$\textbf{getCentreRegion}(face\_rect)
-    \State median$\leftarrow$\textbf{getMedian}(depth\_pixels)
-    \If{median$>$threshold}
+    \State depth\_pixels $\gets$ \textbf{getCentreRegion}(face\_rect)
+    \State median $\gets$ \textbf{getMedian}(depth\_pixels)
+    \If{median $>$ threshold}
     \State \textbf{return} False
     \Else
-    \State expected$\leftarrow$\textbf{expectedDepth}(face\_rect)
-    \State tolerance$\leftarrow \alpha \cdot$expected
-    \State diff$\leftarrow \left|\textnormal{median}-\textnormal{expected}\right|$
-    \If{diff$>$tolerance}
+    \State expected $\gets$ \textbf{expectedDepth}(face\_rect)
+    \State tolerance $\gets \alpha \cdot$expected
+    \State diff $\gets \left|\textnormal{median}-\textnormal{expected}\right|$
+    \If{diff $>$ tolerance}
     \State \textbf{return} False
     \EndIf
     \EndIf
