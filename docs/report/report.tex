@@ -52,10 +52,7 @@ As the Bayes filter is not restricted to finite state spaces, it is not possible
 \subsubsection{Gaussian Filters}
 The basic principle of the family of Gaussian filters is the use of multivariate normal distributions, which can be formulated from a mean $\mu$ and covariance $\Sigma$, to represent belief. As a result, the assumption that the system is a linear Gaussian system is made; the initial belief must be a Gaussian, and both the state transition function and measurement probability must be linear functions. Although Gaussian filters can be extended to non-linear systems, they perform best when the system meets the assumptions made. One of the main advantages of such filters is the computational complexity, which is polynomial with respect to the dimensionality of the state space. The main disadvantage is that Gaussians are unimodal and therefore cannot represent situations in which there are multiple hypotheses; a situation that is often encountered in robotics. Examples include the Kalman filter and the information filter, which are derived from two different ways of representing Gaussians. Both of these filters can be extended to non-linear systems by using a Taylor expansion to produce linear approximations of non-linear functions. Mixtures of Gaussians can also be used to extend the Kalman filter to encompass situations in which multiple hypotheses are required, but each extension increases the complexity of the algorithm. This extensibility is one of the reasons for the popularity of the Kalman filter in state estimation problems. With some extension, the information filter is particularly suited to multi-robot systems where information from multiple sources must be integrated, but issues with complexity have resulted in the Kalman filter becoming the more popular of the two for the majority of problems \cite{thrun}.
 
-\subsubsection{Nonparametric Filters}
-In contrast to Gaussian filters, nonparametric filters discretise the probability distribution and do not require assumptions of linearity and Gaussian belief distributions. Instead, the state is approximated by a finite number of values which are taken from the belief state at any given time. The number of these values can be varied, and nonparametric filters converge to the correct state as the number tends towards infinity. Because this family of filters does not impose restrictions on the posterior density, they are useful for problems such as global localisation, which require the state to be represented in a complex form. Global localisation is the problem of determining the position of the robot without knowing its initial position, resulting in global uncertainty and the need for a multimodal belief distribution. Although as a result nonparametric filters are more computationally expensive than Gaussian filters, it is possible to vary the number of values used to represent the belief to suit the problem using \emph{adaptive} techniques. Examples of these types of filters are the histogram and particle filters. The histogram filter decomposes a continuous space into some finite number of regions, each of which is assigned a probability based on the belief. Extensions include using dynamic decomposition techniques to use more coarse representations in regions with lower probability, and the use of \emph{selective updating}, which updates only the parts of the space which are deemed important. Particle filters approximate the belief by drawing a number of hypotheses called \emph{particles} randomly from the belief distribution. The most important part of the particle filter is the resampling step, which selects particles from the initial set proportional to an importance factor. This has the effect of concentrating particles in areas of high likelihood, reducing computational power spent in areas which are not relevant. Improving the sampling method and adapting the number of particles based on time and uncertainty lead to more effective and error-resistant particle filters. A property which is particularly useful to us is that particle filters are very easy to implement \cite{thrun}.
-
-\begin{algorithm}
+\begin{algorithm}[h]
   \caption{Basic Monte Carlo Localisation \cite{thrun}}
   \label{alg:basicMCL}
   \begin{algorithmic}[1]
@@ -73,6 +70,9 @@ In contrast to Gaussian filters, nonparametric filters discretise the probabilit
     \State \textbf{return} $\mathcal{X}_t$
   \end{algorithmic}
 \end{algorithm}
+
+\subsubsection{Nonparametric Filters}
+In contrast to Gaussian filters, nonparametric filters discretise the probability distribution and do not require assumptions of linearity and Gaussian belief distributions. Instead, the state is approximated by a finite number of values which are taken from the belief state at any given time. The number of these values can be varied, and nonparametric filters converge to the correct state as the number tends towards infinity. Because this family of filters does not impose restrictions on the posterior density, they are useful for problems such as global localisation, which require the state to be represented in a complex form. Global localisation is the problem of determining the position of the robot without knowing its initial position, resulting in global uncertainty and the need for a multimodal belief distribution. Although as a result nonparametric filters are more computationally expensive than Gaussian filters, it is possible to vary the number of values used to represent the belief to suit the problem using \emph{adaptive} techniques. Examples of these types of filters are the histogram and particle filters. The histogram filter decomposes a continuous space into some finite number of regions, each of which is assigned a probability based on the belief. Extensions include using dynamic decomposition techniques to use more coarse representations in regions with lower probability, and the use of \emph{selective updating}, which updates only the parts of the space which are deemed important. Particle filters approximate the belief by drawing a number of hypotheses called \emph{particles} randomly from the belief distribution. The most important part of the particle filter is the resampling step, which selects particles from the initial set proportional to an importance factor. This has the effect of concentrating particles in areas of high likelihood, reducing computational power spent in areas which are not relevant. Improving the sampling method and adapting the number of particles based on time and uncertainty lead to more effective and error-resistant particle filters. A property which is particularly useful to us is that particle filters are very easy to implement \cite{thrun}.
 
 \subsubsection{The Markov Assumption}
 One of the reasons that these filters are so efficient stems from the assumption that the Markov property holds. While this may not actually be the case, the Bayes filter that forms the base of these filters is robust to the violation of some of the requirements of the property. The Markov property states that the future states of the system do not depend on past states. In other words, considering all previous states of the system provides no additional information for predicting future states; all prediction can be done using only the current state. Previous states do not have to be included in calculations, and as a result do not need to be stored, which leads to faster computation and lower memory usage.
@@ -152,14 +152,14 @@ We independently developed two localisation nodes which implemented Monte Carlo 
   \end{algorithmic}
 \end{algorithm}
 The PRM node is used to find paths to navigate from one point on the map to another. Whenever a goal point is received by the node, it finds the shortest path from the robot's current position to the goal position by using Dijkstra's algorithm to search the road map generated when the node is initialised. We will now walk through Algorithm \ref{alg:prm}, used for generating the roadmap. In line 2, points are sampled from the map using cell sampling. Cell sampling is a uniform sampling technique in which the map is split into a number of equally sized square \emph{cells}, and a certain number of points are randomly sampled from within each cell. This sampling technique, although simple, provides very good coverage of the space, and is particularly good at sampling points in narrow corridors, as each cell is required to contain a specified number of points. We now iterate over the sampled points, hereafter called vertices, attempting to make connections between them. There are three connection strategies available. The \emph{nearestN} strategy connects only to a certain number of the nearest nodes by Euclidean distance. The \emph{threshold} strategy connects nodes to a certain number of randomly selected nodes which are within a threshold distance of the node. The \emph{neighbourhood} connection strategy, which we have chosen to use after experimentation, is explained here. We connect the target vertex $v$ to candidate vertices $n$ in the graph in order of proximity to $v$. As some vertices may be unconnectable, we specify a maximum number of attempts $A$ that should be made to connect a vertex to the graph. We also specify $C$, the maximum number of connections that a vertex can have. If the number of connection attempts $a$ exceeds $A$, or the number of connections the target vertex has exceeds $C$, the algorithm will move on to the next vertex. When connecting vertices, the algorithm starts by selecting the vertex in the graph which is the shortest Euclidean distance from $v$. In line 7, a check is made to see if the candidate vertex is within the neighbourhood of the target vertex. Vertices within a Euclidean distance $R_n$ of $v$ are considered to be within its neighbourhood. If the candidate vertex is within the neighbourhood, $v$ and $n$ are connected only if they are not already connected by a path that is contained entirely inside the neighbourhood, and there is a straight line between the two vertices which does not pass through any obstacles. If the candidate vertex is not in the neighbourhood of the target, then a connection is made so long as there is a free path between the the two. These checks are performed in lines 8 and 11. The benefit of this is that vertices are not connected multiple times to other vertices in close proximity, but connect to vertices further away which means that shortcuts can be made between neighbourhoods. A vertex is guaranteed to be connected to the closest accessible vertex in its neighbourhood.
-\begin{figure}
+
+When checking the validity of points and lines on the map, it is necessary to take into account the size of the robot. This can be done by checking a radius around each point for obstacles, but for the purposes of efficiency, we have taken a slightly different approach. Instead of checking the area around points, we increase the size of obstacles by the required safe distance from obstacles. In our case, this is slightly above half of the longest dimension of the robot. After applying this size increase, we receive an ``inflated'' map, an example of which can be seen in Figure \ref{fig:inflatedmap}, which we use when generating the graph and for path planning.
+\begin{figure}[h]
   \centering
   \includegraphics[width=\columnwidth]{inflated}
   \caption{Example of an inflated map used for PRM. Black pixels are obstacles. Grey pixels inside the map show the inflation applied to the obstacles.}
   \label{fig:inflatedmap}
 \end{figure}
-When checking the validity of points and lines on the map, it is necessary to take into account the size of the robot. This can be done by checking a radius around each point for obstacles, but for the purposes of efficiency, we have taken a slightly different approach. Instead of checking the area around points, we increase the size of obstacles by the required safe distance from obstacles. In our case, this is slightly above half of the longest dimension of the robot. After applying this size increase, we receive an ``inflated'' map, an example of which can be seen in Figure \ref{fig:inflatedmap}, which we use when generating the graph and for path planning.
-
 When querying the PRM, a the robot's current position and the goal location are added to the graph and connected in the same way as other vertices. Dijkstra's algorithm is then run with the newly added vertices as parameters, and the shortest path between the vertices is returned. While using the raw path is viable, it can be further improved by smoothing. As seen in Algorithm \ref{alg:pathsmooth}, redundant intermediate vertices are removed from the path in an iterative fashion. $I$ is the number of smoothing passes executed, and $P$ is a vector of waypoints along the path. $P_n$ represents the $n$th waypoint in the path. The intermediate waypoint $b$ is removed only if there is a valid path between waypoints $a$ and $c$. The algorithm terminates either when the requested number of iterations has completed or if the path cannot be smoothed further. The benefit of smoothing is twofold; the path length becomes closer to the optimum, and the number of vertices in the path is reduced. The fewer vertices there are in the path, the less the robot must rotate during travel, and this results in a faster travel time from start to goal.
 
 When a path has been found, a message is sent to a topic announcing that a path to the goal was found. In cases where a path cannot be found with the current graph that the PRM holds, the graph will be regenerated and searched again a number of times. If a path still cannot be found after the specified number of regenerations has occurred, the PRM will publish a message informing listening nodes of this fact so that they can handle the consequences.
@@ -192,7 +192,7 @@ The navigation node moves the robot along paths provided by the PRM, and uses th
 The navigation also performs obstacle detection, by using laser data. An area of 90$^\circ$ directly in front of the robot is split into 10 sectors, from each of which a median distance reading is drawn. The median is used to reduce the effect of noise and erroneous readings. If the median of any sector is within a safe distance of 0.5 metres, movement commands will no longer be sent to the motors. The position of the detected obstacle is calculated using trigonometry and placed onto a temporary map, which is passed into the PRM. The obstacle is detected as a point on the map, which is then inflated in the same way as the map used in the PRM. The PRM then prunes vertices which fall within the obstacle, as well as connections between vertices that pass through the obstacle. When this process is complete, the navigator re-sends the goal to the PRM which generates a new route, avoiding the obstacle. Obstacles are removed from the map when the robot is more than 4 metres from their location, or when it arrives at its goal. When an obstacle is removed, the graph is reconnected to ensure that the connectivity of the graph is not permanently affected.
 \subsubsection{Vision Node}
 For face detection, we decided to make use of camera data from the Kinect. Face detection in ROS necessitates the use of a vision library. We decided to use OpenCV as it is a highly popular tool in the research field, and is written in part by the ROS developers, suggesting easier integration. Communication between ROS and OpenCV requires the cv\_bridge stack, which is only compatible with C++ and Python. We decided that C++ was a better candidate than Python as face detection is very computationally expensive, and C++ is faster in these types of applications.
-\begin{figure}
+\begin{figure}[h]
   \includegraphics[width=\columnwidth]{centre_model}
   \caption{Depth model showing correlation between face size and distance to face.}
   \label{fig:model}
@@ -241,7 +241,7 @@ With our first implementation of this model, referred to as depth model 1, we no
 
 \subsubsection{Control Node}
 \label{sec:control}
-\begin{figure}
+\begin{figure}[h]
   \centering
   \begin{tikzpicture}
     \node [cloud] (init) {Initialisation};
@@ -281,24 +281,35 @@ In this section we display the results of experiments carried out to determine t
 The aim of this experiment is to compare the tracking error of three different MCL implementations; the built in ROS AMCL and two of our own implementations.
 \subsubsection{Method}
 As each MCL implementation has many different variables, we will use the set of variables that resulted in the best performance in past experiments. To provide accurate results, we require a ground truth, which will be obtained from the Stage simulator. We will run the experiment three times for each implementation and record the tracking error every second while the robot moves, until it reaches the end of its path. The tracking error is defined as the Euclidean distance between the ground truth and the estimated pose provided by the localisation at each point at which a measurement is taken. The robot will start from the same initial position and follow the same path, seen in Figure \ref{fig:locpath}, in each experiment.
-\subsubsection{Results}
-Figure \ref{fig:local} shows the tracking errors for each implementation, with error bars representing the standard deviation over three runs. Apart from two anomalous points at 13 and 25 seconds at which all implementations experience an increase in tracking error, the deviation of AMCL is significantly lower than the other two implementations. The average deviation over the three runs for AMCL is 0.019m, compared to averages of 0.071m and 0.085m for Penny and Leslie respectively. It is clear that to obtain accurate position estimates we should make use of ROS AMCL.
-\begin{figure}
+\begin{figure}[h]
   \includegraphics[width=\columnwidth]{tracking_stdev}
   \caption{Comparison of Tracking error of ROS AMCL and two independently developed MCL algorithms}
   \label{fig:local}
 \end{figure}
+\subsubsection{Results}
+Figure \ref{fig:local} shows the tracking errors for each implementation, with error bars representing the standard deviation over three runs. Apart from two anomalous points at 13 and 25 seconds at which all implementations experience an increase in tracking error, the deviation of AMCL is significantly lower than the other two implementations. The average deviation over the three runs for AMCL is 0.019m, compared to averages of 0.071m and 0.085m for Penny and Leslie respectively. It is clear that to obtain accurate position estimates we should make use of ROS AMCL.
+
 \subsection{PRM sampling methods and connection strategies}
 
 \subsubsection{Aim}
 The aim of this experiment is to find the sampling method and connection strategy which, as a pair, produce the shortest path lengths on average.
+\begin{figure}
+  \includegraphics[width=\columnwidth]{optimumpaths}
+  \caption{Optimum paths used for comparison of connection strategies and sampling methods.}
+  \label{fig:optimum}
+\end{figure}
 \subsubsection{Method}
 To find the best sampling method and connection strategy pair, we created four qualitatively different pairs of start and end points. We passed each point pair to the PRM, applied the path smoothing algorithm to the generated path and measured its length. We varied the maximum number of connections per node---using values of 5, 10, 20 and 30---and only chose the value which produced the best path length. In addition, we experimented with different values for variables specific to each sampling method. For grid sampling we varied the size of the x and y step, using values of 0.5m, 1m, 2m and 4m. For cell sampling we varied the number of points sampled in each cell, either 2 or 5, and used 1m, 2m, 4m and 6m cell sizes. For random sampling, we varied the total number of points sampled, using values of 25, 50, 100, 200, 400 and 800. We ran three trials for every combination of sampling method, connection strategy, maximum connections per node, and pair of start and end points as well as every combination of variables specific to each sampling method.
 
 We chose four start and end point pairs which would provide qualitatively different paths, allowing us to compare the various techniques in different environments, ensuring we choose a combination which is able to generalise well. Point pairs were chosen to give examples of long, medium and short paths through the map. Finally, we added a pair in which the goal point is within a narrow corridor. This final pair should give us data about how well the sampling method deals with difficult areas of the map.
+
 \subsubsection{Results}
 The experiment produced four path length values for every combination mentioned above, one for each pair of start and end points. Sets of four values cannot be compared at once, so in order to compare combinations, these four path lengths must be combined into a score which indicates how good the paths are. To create such a score, we determined the theoretical optimum path length by manually tracing lines on the map and measuring their length. These are the lines shown in Figure \ref{fig:optimum}. The score for a combination of variables and methods is calculated as the ratio between the computed path length and the theoretical optimum. For example, if the optimum length were 10m and the computed length were 12m, the ratio as a decimal number is 1.2. To achieve a combined score for all four paths, we average the four scores. Figure \ref{fig:sampleconntable} shows the best scores achieved by sampling method and connection strategy combinations.
-\begin{figure}
+
+The best score (lower values are better) is achieved by random sampling with the neighbourhood connection strategy. However, during the experiment the trials for this combination did not always compute a path. In particular, a path could not be computed where the end point was within the narrow corridor. This is due to the fact that with random sampling nodes are randomly distributed across the map with no regard for the fact that narrow areas have a smaller probability of having nodes generated within them. Since this combination could not compute a path in one of our test cases, we cannot use it.
+
+The next best score was achieved by grid sampling and the neighbourhood connection strategy. This combination, similarly, consistently could not compute a path to the end point within the narrow corridor. This is easily explained by the nature of grid sampling; the nodes are placed across the map as evenly spaced points, meaning that narrow areas have a smaller probability of having nodes placed within them. Again, we cannot use this combination because it does not compute a path in our test scenario.
+\begin{figure}[h]
   \centering
   \begin{tabular}{|c|c|c|}
     \cline{1-3}
@@ -317,23 +328,14 @@ The experiment produced four path length values for every combination mentioned 
   \label{fig:sampleconntable}
 \end{figure}
 
-The best score (lower values are better) is achieved by random sampling with the neighbourhood connection strategy. However, during the experiment the trials for this combination did not always compute a path. In particular, a path could not be computed where the end point was within the narrow corridor. This is due to the fact that with random sampling nodes are randomly distributed across the map with no regard for the fact that narrow areas have a smaller probability of having nodes generated within them. Since this combination could not compute a path in one of our test cases, we cannot use it.
-
-The next best score was achieved by grid sampling and the neighbourhood connection strategy. This combination, similarly, consistently could not compute a path to the end point within the narrow corridor. This is easily explained by the nature of grid sampling; the nodes are placed across the map as evenly spaced points, meaning that narrow areas have a smaller probability of having nodes placed within them. Again, we cannot use this combination because it does not compute a path in our test scenario.
-\begin{figure}
-  \includegraphics[width=\columnwidth]{optimumpaths}
-  \caption{Optimum paths used for comparison of connection strategies and sampling methods.}
-  \label{fig:optimum}
-\end{figure}
-
 The third best score was achieved by cell sampling and the neighbourhood connection strategy. This combination was consistently able to compute paths in all cases in the experiment. The reason is fairly clear; cell sampling is designed to ensure complete coverage of the free space in the map and provides a higher probability of node coverage in narrow areas containing walls or non-free space. We could not see any qualitative objections to using this combination, so this is chosen as the best combination. Specifically, this combination used 30 maximum connections per cell, a cell width of 1m and a target number of nodes per cell of 5.
 
-\subsection{Haar cascade comparison}
 \begin{figure}
   \includegraphics[width=\columnwidth]{haar_ROC}
   \caption{ROC graph of frontalface Haar cascade results.}
   \label{fig:haar}
 \end{figure}
+\subsection{Haar cascade comparison}
 \subsubsection{Aim}
 The aim of this experiment is to find the Haar cascade most suited to perform face detection with the Kinect. We wish to find the cascade which has the highest specificity and sensitivity; all actual faces should be classified as faces, and anything which is not a face should be ignored.
 \subsubsection{Method}
@@ -347,6 +349,11 @@ The previous experiment established the best Haar cascade to use in our vision n
 Since we are trying to improve detections for this cascade with our face size model, we performed this experiment in the areas where all the cascades generally performed badly (had many false positives). In this area, we used all of the cascades to find features of the scene which were falsely detected as faces. We noted these for reference as true negatives, which we can eliminate with our new depth model. To determine the sensitivity and specificity of the vision node with the new assumptions, both before and after the inclusion of both Kinect depth models (depth model 1 and depth model 2 as described in the Design section), we designed a single experiment which would produce results for all three at once.
 
 We modified our vision node to show rectangles of different colours based on whether they would be accepted by model 1 or model 2. We had a participant move within the depth of field of the camera to 100 different positions and we took readings for true and false positives and negatives. Alongside the features of the scene we noted earlier which we hoped to eliminate as true negatives, this allows us to gain three points on the ROC graph to compare.
+\begin{figure}[h]
+  \includegraphics[width=\columnwidth]{kinect_ROC}
+  \caption{ROC graph of frontal\_face\_alt cascade performance with assumption that subjects face the camera and with depth models applied.}
+  \label{fig:cascade_with_model}
+\end{figure}
 \subsubsection{Results}
 The resulting ROC graph is shown in Figure \ref{fig:cascade_with_model}. The point labelled `alt (no assumption)' is the point taken from the last experiment. We collected 11 scene features which were falsely identified by the cascades as faces. This means that the 1-specificity axis of the ROC graph is of a fairly low resolution. However, with 100 true faces, the sensitivity axis is of a high resolution.
 
@@ -356,20 +363,17 @@ Using depth model 1 we see that we have decreased both the sensitivity and the 1
 
 When using depth model 2, we see that the performance improves greatly. This depth model discards none of the true positives given by the cascade, keeping its sensitivity identical to using no model at all. However, false positives are down to 0, making the 1-specificity value also 0. It is worth noting that, since there were only 11 'true negatives' being sought, this value being 0 may be slightly misleading and may well be higher with a larger number of true negatives. Using depth model 2 cannot improve on the sensitivity of using no model at all, but by eliminating all true negatives it is clearly the best point on the ROC graph and is certainly worth using.
 
-\begin{figure}
-  \includegraphics[width=\columnwidth]{kinect_ROC}
-  \caption{ROC graph of frontal\_face\_alt cascade performance with assumption that subjects face the camera and with depth models applied.}
-  \label{fig:cascade_with_model}
+\begin{figure}[h]
+  \includegraphics[width=\columnwidth]{percent_coverage_time}
+  \caption{Comparison of the best grid and cell based exploration strategies. The heatmap corresponding to the cell strategy run is found in Figure \ref{fig:heatmap}.}
+  \label{fig:coverage}
 \end{figure}
 \subsection{Exploration coverage}
 \subsubsection{Aim}
 In this experiment, we aim to find the best method of sampling points on the map so that the robot can explore the most space in the shortest amount of time.
 \subsubsection{Method}
 We let the robot explore the map in simulation, as described in Section \ref{sec:control}, for 8 minutes, using each of the sampling methods with four different strategies (8m-6m-4m, 6m-4m-2m, 4m-2m-1m and 2m-1m). We used ray tracing to project the field of view of the robot onto an occupancy grid. Each grid cell the ray passed through was counted as explored. Rays originated 0.3m in front of the robot and travelled outwards until the ray was obstructed by a wall or reached the maximum effective distance of the face detection node of 3.5m. The number of free cells remaining in the map was calculated each second. As we do not explore the meeting rooms, cells inside these areas were not counted in the total. Each experiment will be run for 8 minutes. The movement speed of the robot affects the speed of exploration. The maximum movement speed and rotation speed were set to 0.7m/s and 0.4rad/sec respectively in each experiment.
-
-\subsubsection{Results}
-As can be seen in Figure \ref{fig:covtbl}, the cell-based exploration consistently covered more of the map than the grid strategy. Figure \ref{fig:coverage} shows the best run of the best strategy for each method. After 300 seconds, the grid method stopped covering new areas of the map, while the cell based method continued to increase its coverage. The effectiveness of the exploration can also be shown as a heat map. Figure \ref{fig:heatmap} shows the heat map at the end of the best cell method run, which shows that almost the whole map was explored, with relatively even coverage.
-\begin{figure}
+\begin{figure}[h]
   \centering
   \begin{tabular}{|c|c|c|}
     \cline{1-3}
@@ -383,18 +387,14 @@ As can be seen in Figure \ref{fig:covtbl}, the cell-based exploration consistent
   \caption{Percentage coverage after eight minutes of exploration with different strategies and sampling methods.}
   \label{fig:covtbl}
 \end{figure}
-\begin{figure}
-  \includegraphics[width=\columnwidth]{percent_coverage_time}
-  \caption{Comparison of the best grid and cell based exploration strategies. The heatmap corresponding to the cell strategy run is found in Figure \ref{fig:heatmap}.}
-  \label{fig:coverage}
-\end{figure}
+\subsubsection{Results}
+As can be seen in Figure \ref{fig:covtbl}, the cell based exploration consistently covered more of the map than the grid strategy. Figure \ref{fig:coverage} shows the best run of the best strategy for each method. After 300 seconds, the grid method stopped covering new areas of the map, while the cell based method continued to increase its coverage. The effectiveness of the exploration can also be shown as a heat map. Figure \ref{fig:heatmap} shows the heat map at the end of the best cell method run, which shows that almost the whole map was explored, with relatively even coverage.
 
-\begin{figure}
+\begin{figure}[b]
   \includegraphics[width=\columnwidth]{4-1_1}
   \caption{Heat map showing coverage over an 8-minute run using the best cell-based strategy. The colour gradient goes from red (high) to blue (low). The pink dot shows the starting location. The black line is the path taken by the robot.}
   \label{fig:heatmap}
 \end{figure}
-
 \subsection{Locating meeting rooms}
 
 \subsubsection{Aim}
@@ -416,7 +416,7 @@ We came up with three test cases to check the system's ability to deal with diff
 \subsubsection{Results}
 \label{sec:attendres}
 Figure \ref{fig:fullsystem} shows the results of the trials. Even with the worst case scenario time, averaging 11 minutes and 55 seconds, adding the 2 minutes and 22 seconds worst case time to locate a meeting room does not exceed the 15-minute time limit. However, people in view were sometimes not correctly detected. This is usually caused by fewer than the three frames required to confirm a face being received. During the experiment we had many issues related to AMCL localising to an incorrect position, which caused the robot to collide with walls and require intervention. If this happened, the experiment was abandoned. We were unable to identify the reason for AMCL losing its position frequently because it was not our implementation. When there were few or no issues with AMCL, the system worked well. Empty meeting rooms were found correctly each time, and attendees who were not detected the first time they were passed were found when the exploration returned to that location. Most importantly, we remained within the 15-minute time limit required by the task.
-\begin{figure}
+\begin{figure}[h]
   \centering
     \begin{tabular}{r|r|r|r|}
     \cline{2-4}
